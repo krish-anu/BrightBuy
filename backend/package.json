@@ -1,0 +1,23 @@
+{
+  "name": "brightbuy",
+  "version": "1.0.0",
+  "description": "Online sales",
+  "keywords": [
+    "node",
+    "express",
+    "mysql"
+  ],
+  "license": "ISC",
+  "author": "Anusan",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.3",
+    "sequelize": "^6.37.7"
+  }
+}
