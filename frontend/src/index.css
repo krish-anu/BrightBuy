@@ -42,7 +42,7 @@
   --font-sans: Lato, ui-sans-serif, sans-serif, system-ui;
   --font-mono: Courier Prime, ui-monospace, monospace;
   --font-serif: Merriweather, ui-serif, serif;
-  --radius: 0.5rem;
+  --radius: 0.8rem;
   --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
   --tracking-tight: calc(var(--tracking-normal) - 0.025em);
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
@@ -69,7 +69,7 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.8rem;
   --background: oklch(1.0000 0 0);
   --foreground: oklch(0.2077 0.0398 265.7549);
   --card: oklch(0.9842 0.0034 247.8575);

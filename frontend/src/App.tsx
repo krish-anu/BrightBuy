@@ -1,8 +1,13 @@
 import Login from "./pages/Authpage/login"  
-
+import {Navbar} from "@/components/Header/Navbar";
 function App(){
   return (
-    <Login />
+    <div className="bg-accent min-h-screen">
+      <Navbar />
+      <Login />
+      <Login />
+      <Login />
+    </div>
   );
 }
 
