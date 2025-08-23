@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 
 export function Navbar() {
     return (
-        <div className="bg-accent/40 backdrop-blur-sm border-b border-b-accent-foreground/20 sticky top-0 z-50">
+        <div className="bg-accent/40 backdrop-blur-sm border-b border-b-accent-foreground/20 sticky top-0 z-50 shadow-lg/20">
             <div className="max-w-7xl mx-auto px-4 grid grid-cols-4 h-16 items-center">
                 <div className="col-span-2 md:col-span-1" >
                     <Link to="/">
@@ -28,19 +28,19 @@ export function Navbar() {
                     </Button>
                 </div>
                 <div className="ml-auto flex flex-row items-center space-x-4 col-span-2 md:col-span-1 sm:justify-end">
-                    <Link to="/cart" className="items-center gap-2 text-muted-foreground hover:text-accent-foreground">
+                    <Link to="/cart" className="flex items-center gap-2 text-muted-foreground hover:text-accent-foreground">
                         <ShoppingCart className="h-5 w-5" />
-                        <span className="hidden md:inline-flex text-lg font-medium">Cart</span>
+                        <span className="hidden md:block text-lg font-medium">Cart</span>
                     </Link>
                     <Separator orientation="vertical" />
-                    <Link to="/login" className="items-center gap-2 text-muted-foreground hover:text-foreground">
+                    <Link to="/login" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
                         <User className="h-5 w-5" />
-                        <span className="hidden md:inline-flex text-lg font-medium">Login</span>
+                        <span className="hidden md:block text-lg font-medium">Login</span>
                     </Link>
                 </div>
             </div>
-            
-            {/* serch bar for smal screens */}
+
+            {/* search bar for small screens */}
             <div className="flex md:hidden max-w-7xl mx-auto px-4 pb-2">
                 <Input
                     type="text"
