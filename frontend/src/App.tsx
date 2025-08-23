@@ -1,18 +1,15 @@
-import Login from "./pages/Authpage/login"  
-import {Navbar} from "@/components/Header/Navbar";
-import Footer from "@/components/Footer/Footer";
+import { BrowserRouter} from "react-router-dom";  
+import AppRoutes from "@/routes/AppRoutes";
+
+
 function App(){
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <Login />
-      <Login />
-      <Login />
-
-      <Footer />
-    </div>
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }
 
 
 export default App;
+
