@@ -1,8 +1,10 @@
-const { getVariants, getVariant, addVariant, updateVariant, updateStock, deleteVariant, searchAndFilterVariants} = require('../controllers/variant.controller');
+const { getVariants, getVariant, addVariant, updateVariant, updateStock, deleteVariant, searchAndFilterVariants, getPopularVariants, getLowStockVariants} = require('../controllers/variant.controller');
 
 const router = require('express').Router();
 
-router.get('/search',searchAndFilterVariants)
+router.get('/search', searchAndFilterVariants)
+router.get('/popular', getPopularVariants)
+router.get('/lowStk',getLowStockVariants)
 router.get('/', getVariants)
 router.get('/:id', getVariant);
 

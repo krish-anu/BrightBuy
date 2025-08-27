@@ -90,6 +90,75 @@ const addVariant = async (req, res, next) => {
     }
 };
 
+/*search by name and filter by attributes,price range*/
+const searchAndFilterVariants = async (req, res, next) => {
+    try {
+        const filters = {};
+        for (const q in req.query) {
+            if (q !== 'keyword' && q !== 'minPrice' && q !== 'maxPrice')
+                filters[q] = req.query[q].split(',');
+        }
+        const attrInclude = [];
+        for (const [attr, val] of Object.entries(filters)) {
+            attrInclude.push({
+                model: VariantAttribute,
+                attributes: { exclude: ['createdAt', 'updatedAt'] },
+                where: { name: attr },
+                through: { where: { value: { [Op.in]: val } }, attributes: [] },
+                required: true,
+            });
+        }
+        const whereClause = {};
+        if (req.query.keyword)
+            whereClause.variantName = { [Op.like]: `%${ req.query.keyword }%` };
+        if (req.query.minPrice || req.query.maxPrice) {
+            whereClause.price = {};
+            if (req.query.minPrice)
+                whereClause.price[Op.gte] = +req.query.minPrice;
+            if (req.query.maxPrice)
+                whereClause.price[Op.lte] = +req.query.maxPrice;
+        }
+
+        const variants = await ProductVariant.findAll({
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            where: whereClause,
+            include: attrInclude,
+            order: [['price', 'ASC']],
+            distinct: true,
+        });
+        if (!variants.length) throw new Error('Matching variants not found', 404);
+        res.status(200).json({ success: true, data: variants });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getLowStockVariants = async (req, res, next) => {
+    try {
+        const qnt = req.query.qnt ? +req.query.qnt : 5;
+        const variants = await ProductVariant.findAll({
+            where: { stockQnt: { [Op.lte]: qnt } },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            order: [['stockQnt', 'ASC']],
+        });
+        if (!variants.length)
+            throw new ApiError(`Variants with stock quantity ≤ ${ qnt } not found`, 404);
+
+        res.status(200).json({ success: true, data: variants });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getPopularVariants = async (req, res, next) => {
+    try {
+        // orderItems needed
+       res.status(200).json({success:true}) 
+    } catch (error) {
+        next(error)
+    }
+}
+
 const updateVariant = async (req, res, next) => {
     try {
         const variant = await ProductVariant.findByPk(req.params.id);
@@ -126,54 +195,13 @@ const deleteVariant = async (req, res, next) => {
         next(error);
     }
 };
-/*search by name and filter by attributes,price range*/
-const searchAndFilterVariants = async (req, res, next) => {
-    try {
-        const filters = { };
-        for (const q in req.query) {
-            if(q!=='keyword'&& q!=='minPrice' && q!=='maxPrice')
-                filters[q] = req.query[q].split(',');
-        }
-        const attrInclude = [];
-        for (const [attr, val] of Object.entries(filters)) {
-            attrInclude.push({
-                model: VariantAttribute,
-                attributes:{exclude:['createdAt','updatedAt']},
-                where: { name: attr },
-                through: { where: { value: { [Op.in]: val } }, attributes: [] },
-                required: true,
-            });    
-        }
-        const whereClause = {}
-        if (req.query.keyword) 
-            whereClause.variantName = { [Op.like]: `%${ req.query.keyword }%` }
-        if (req.query.minPrice || req.query.maxPrice) {
-            whereClause.price = {}
-            if (req.query.minPrice)
-                whereClause.price[Op.gte] = +req.query.minPrice
-            if (req.query.maxPrice)
-                whereClause.price[Op.lte]=+req.query.maxPrice
-        }
-        
-        const variants = await ProductVariant.findAll({
-            attributes: { exclude: ['createdAt', 'updatedAt'] },
-            where: whereClause,
-            include: attrInclude,
-            order: [['price', 'ASC']],
-            distinct: true,
-        });
-        if (!variants.length) throw new Error('Matching variants not found', 404);
-        res.status(200).json({ success: true, data:variants });
-    } catch (error) {
-        next(error);
-    }
-};
-
 
 module.exports = {
     getVariants,
     getVariant,
     addVariant,
+    getLowStockVariants,
+    getPopularVariants,
     updateVariant,
     updateStock,
     deleteVariant,

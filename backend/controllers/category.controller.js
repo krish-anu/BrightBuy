@@ -74,6 +74,19 @@ const getCategoryVariants = async (req, res, next) => {
     }
 };
 
+const getCategoryHierarchy = async (req, res, next) => {
+    try {
+        const categories = await Category.findAll({
+            where: { parentId: null }, attributes: ['id', 'name'],
+            include: [{ model: Category, as: 'subcategories', attributes: ['id', 'name'],oreder:[['name','ASC']] }],
+            order: [['name', 'ASC']]
+        });
+        res.status(200).json({ success: true, data: categories });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const updateCategory = async (req, res, next) => {
     try {
         const category = await Category.findByPk(req.params.id);
@@ -112,6 +125,7 @@ module.exports = {
     getCategory,
     addCategory,
     getCategoryVariants,
+    getCategoryHierarchy,
     updateCategory,
     deleteCategory,
 };
