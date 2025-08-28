@@ -1,5 +1,5 @@
 const ApiError = require('../utils/ApiError');
-const { Op } = require('sequelize');
+const { Op, fn ,col} = require('sequelize');
 const db = require('../models');
 const generateSKU  = require('../utils/generateSKU');
 
@@ -7,6 +7,7 @@ const Product = db.product;
 const ProductVariant = db.productVariant;
 const VariantAttribute = db.variantAttribute;
 const ProductVariantOption = db.productVariantOption;
+const OrderItem = db.orderItem;
 
 const getVariants = async (req, res, next) => {
     try {
@@ -162,14 +163,6 @@ const getLowStockVariants = async (req, res, next) => {
     }
 };
 
-const getPopularVariants = async (req, res, next) => {
-    try {
-        // orderItems needed
-        res.status(200).json({ success: true });
-    } catch (error) {
-        next(error);
-    }
-};
 
 const updateVariant = async (req, res, next) => {
     try {
@@ -242,14 +235,34 @@ const deleteVariant = async (req, res, next) => {
     }
 };
 
+
+const getPopularVariants = async (req, res, next) => {
+    try {
+        const limit = req.query.limit ? parseInt(req.query.limit) : 7;
+        const variants = await ProductVariant.findAll({
+            attributes: ['id','variantName','SKU','price',
+                [fn('SUM', col('OrderItems.quantity')), 'soldQuantity']],
+            include: [{model: OrderItem,attributes: [],required:true}],
+            group: ['ProductVariant.id'],
+            order: [[fn('SUM', col('OrderItems.quantity')), 'DESC']],
+            limit,
+            subQuery:false
+        });
+        res.status(200).json({ success: true, data: variants });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
 module.exports = {
     getVariants,
     getVariant,
     addVariant,
     getLowStockVariants,
-    getPopularVariants,
     updateVariant,
     updateStock,
     deleteVariant,
-    searchAndFilterVariants
+    searchAndFilterVariants,
+    getPopularVariants,
 };

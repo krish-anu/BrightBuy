@@ -8,6 +8,7 @@ const ProductVariant = db.productVariant;
 const Category = db.category;
 const VariantAttribute = db.variantAttribute;
 const ProductVariantOption = db.productVariantOption;
+const OrderItem = db.orderItem;
 
 const getProducts = async (req, res, next) => {
     try {
@@ -46,7 +47,7 @@ const getProduct = async (req, res, next) => {
 
 const addProduct = async (req, res, next) => {
     try {
-        const { name, description, categoryIds, brand, attributes,stockQnt,price } = req.body;
+        const { name, description, categoryIds, brand, attributes, stockQnt, price } = req.body;
         if (!name || !description || !attributes || !price) throw new ApiError('Name, description,price and attributes are required', 400);
 
         const existing = await Product.findOne({ where: { name } });
@@ -55,20 +56,20 @@ const addProduct = async (req, res, next) => {
         const newProduct = await db.sequelize.transaction(async (t) => {
             const productData = { name, description };
             if (brand) productData.brand = brand;
-            const product = await Product.create(productData,{transaction:t});
+            const product = await Product.create(productData, { transaction: t });
 
             if (Array.isArray(categoryIds) && categoryIds.length) {
                 const categories = await Category.findAll({ where: { id: categoryIds } });
-                await product.setCategories(categories,{transaction:t});
-            } 
-            
+                await product.setCategories(categories, { transaction: t });
+            }
+
             const attrName = attributes.map((attr) => attr.value).join(' ');
             const variantName = `${ product.name } ${ attrName }`;
             const SKU = generateSKU(product.name, variantName);
-            
+
 
             const variant = await ProductVariant.create(
-                { productId:product.id, variantName: variantName, SKU, stockQnt: stockQnt || 1, price },
+                { productId: product.id, variantName: variantName, SKU, stockQnt: stockQnt || 1, price },
                 { transaction: t }
             );
 
@@ -174,6 +175,31 @@ const deleteProduct = async (req, res, next) => {
     }
 };
 
+const getPopularProduct = async (req, res, next) => {
+    try {
+        const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+        const products = await Product.findAll({
+            attributes: [
+                'id', 'name', 'brand', 'description',
+                [fn('SUM', col('ProductVariants.OrderItems.quantity')), 'soldQuantity']
+            ],
+            include: [{
+                model: ProductVariant, attributes: [],
+                include: [{ model: OrderItem, attributes: [], required: true }],
+                required: true
+            }],
+            group: ['Product.id'],
+            order: [[fn('SUM', col('ProductVariants.OrderItems.quantity')), 'DESC']],
+            limit,
+            subQuery: false
+        });
+
+        res.status(200).json({ success: true, data: products });
+    } catch (error) {
+        next(error);
+    }
+};
+
 
 module.exports = {
     getProducts,
@@ -183,5 +209,6 @@ module.exports = {
     updateProduct,
     deleteProduct,
     getVariantsOfProduct,
-    getProductCount
+    getProductCount,
+    getPopularProduct
 };
