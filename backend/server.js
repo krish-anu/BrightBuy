@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+require('dotenv').config()
 
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
@@ -23,10 +24,12 @@ app.use(express.urlencoded({ extended: true }));
 const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
 const variantRouter = require('./routes/variant');
+const authRouter = require('./routes/auth');
 
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);
+app.use('/api/auth', authRouter);
 
 
 
@@ -47,3 +50,4 @@ const PORT = port || 8080;
 app.listen(PORT, () => {
   console.log(`Server is now running on PORT ${ PORT }`);
 });
+ 
