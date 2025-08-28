@@ -5,6 +5,9 @@ const estimateDeliveryDate = require('../utils/estimateDeliveryDate');
 const Order = db.order;
 const OrderItem = db.orderItem;
 const City = db.city;
+const ProductVariant = db.productVariant;
+const ProductVariantOption = db.productVariantOption;
+const VariantAttribute = db.variantAttribute;
 
 const getOrders = async (req, res, next) => {
     try {
@@ -72,7 +75,19 @@ const addOrder = async (req, res, next) => {
 
             const finalOrder = await Order.findByPk(newOrder.id, {
                 attributes:{exclude:['createdAt','updatedAt']},
-                include: [{ model: OrderItem ,attributes:{exclude:['createdAt','updatedAt','orderId']}}],
+                include: [{
+                    model: OrderItem,
+                    attributes: { exclude: ['createdAt', 'updatedAt', 'orderId','variantId'] },
+                    include: [{
+                        model: ProductVariant,
+                        attributes: ['id', 'variantName', 'SKU', 'price', 'stockQnt'],
+                        include: [ {
+                            model: VariantAttribute,
+                            attributes: ['id', 'name'],
+                            through: { model: ProductVariantOption, attributes: ['value'] }
+                        }]
+                    }]
+                }],
                 transaction:t
             })
             return finalOrder;
