@@ -1,4 +1,7 @@
 const { getProducts, getProduct, addProduct, updateProduct, deleteProduct, getProductVariantCount, getVariantsOfProduct, getProductCount } = require('../controllers/product.controller');
+const verifyToken = require('../middlewares/auth.middleware');
+const authorizeRoles = require('../middlewares/role.middleware');
+const ROLES = require('../roles');
 
 const router = require('express').Router();
 
@@ -9,10 +12,10 @@ router.get('/', getProducts);
 router.get('/:id', getProduct);
 
 
-router.post('/', addProduct)
+router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addProduct)
 
-router.put('/:id', updateProduct);
+router.put('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), updateProduct);
 
-router.delete('/:id',deleteProduct)
+router.delete('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), deleteProduct)
 
 module.exports = router;

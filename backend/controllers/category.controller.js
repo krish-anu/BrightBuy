@@ -8,27 +8,20 @@ const ProductVariant = db.productVariant;
 
 const getCategories = async (req, res, next) => {
     try {
-        const { limit, parentId } = req.query;
-        const whereClause = {};
-        whereClause.parentId = parentId ? parentId : null;
-
-        const options = {
-            where: whereClause,
+        const { limit } = req.query;
+        const allCategories = await Category.findAll({
             include: [
-                { model: Category, as: 'subcategories', attributes: ['id', 'name'] },
-                { model: Category, as: 'parent', attributes: ['id', 'name'] }
+                {model: Category,as: 'subcategories',attributes: ['id', 'name']},
+                {model: Category,as: 'parent',attributes: ['id', 'name']}
             ],
-            order: [['name', 'ASC']]
-        };
-        if (limit) options.limit = parseInt(limit);
-        const categories = await Category.findAndCountAll(options);
-        res.status(200).json({
-            success: true,
-            data: {
-                categories: categories.rows,
-                totalCount: categories.count
-            }
+            order: [
+                ['name', 'ASC'],
+                [{ model: Category, as: 'subcategories' }, 'name', 'ASC']
+            ]
         });
+        const categories = limit ? allCategories.slice(0, parseInt(limit)) : allCategories;
+
+        res.status(200).json({success: true,data: categories});
     } catch (error) {
         next(error);
     }
@@ -39,8 +32,8 @@ const getCategory = async (req, res, next) => {
         const category = await Category.findByPk(req.params.id, {
             attributes: ['id', 'name'],
             include: [
-                { model: Category, as: 'parent', attributes: ['name', 'id'] },
-                { model: Category, as: 'subcategories', attributes: ['name'] },
+                { model: Category, as: 'parent', attributes: ['id','name'] },
+                { model: Category, as: 'subcategories', attributes: ['id','name'] },
             ]
         });
         if (!category) throw new ApiError('Category not found', 404);
@@ -164,9 +157,7 @@ const deleteCategory = async (req, res, next) => {
                 { model: db.product, through: { attributes: [] } }]
         });
         if (!category) throw new ApiError('Category not found', 404);
-        if (category.subcategories && category.subcategories.length > 0) {
-            throw new ApiError('Cannot delete category with subcategories', 400);
-        }
+
         if (category.Products && category.Products.length > 0) {
             throw new ApiError('Cannot delete category with assigned products', 400);
         }
@@ -176,7 +167,6 @@ const deleteCategory = async (req, res, next) => {
         next(error);
     }
 };
-
 
 
 module.exports = {
@@ -189,3 +179,4 @@ module.exports = {
     updateCategory,
     deleteCategory,
 };
+

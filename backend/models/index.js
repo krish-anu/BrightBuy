@@ -26,6 +26,7 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
+db.user=require('./user.model')(sequelize,DataTypes)
 db.product = require('./product.model')(sequelize, DataTypes);
 db.category = require('./category.model')(sequelize, DataTypes);
 db.productCategory = require('./productCategory.model')(sequelize, DataTypes);
@@ -37,14 +38,17 @@ db.orderItem = require('./orderItem.model')(sequelize, DataTypes);
 db.payment = require('./payment.model')(sequelize, DataTypes);
 db.city=require('./city.model')(sequelize,DataTypes)
 
-db.sequelize.sync({ force: true}).then(() => {
+db.sequelize.sync({ force :false}).then(() => {
   console.log('Yes re-sync done');
 
 });
 
 // Associations
-db.category.hasMany(db.category, { as: 'subcategories', foreignKey: 'parentId' });
-db.category.belongsTo(db.category, { as: 'parent', foreignKey: 'parentId' });
+db.user.hasMany(db.order)
+db.order.belongsTo(db.user)
+
+db.category.hasMany(db.category, { as: 'subcategories', foreignKey: 'parentId',onDelete:'SET NULL' });
+db.category.belongsTo(db.category, { as: 'parent', foreignKey: 'parentId',onDelete:'SET NULL' });
 
 db.product.belongsToMany(db.category, { through: db.productCategory });
 db.category.belongsToMany(db.product, { through: db.productCategory });
@@ -67,6 +71,7 @@ db.productVariant.hasMany(db.orderItem, { foreignKey: 'variantId' });
 db.orderItem.belongsTo(db.productVariant, { foreignKey: 'variantId', onDelete: 'SET NULL' });
 
 db.order.hasOne(db.payment, { foreignKey: 'orderId', onDelete: 'CASCADE' });
-db.payment.belongsTo(db.order, { foreignKey:'orderId'})
+db.payment.belongsTo(db.order, { foreignKey: 'orderId' })
+
 
 module.exports = db;

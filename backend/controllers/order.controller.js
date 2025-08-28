@@ -80,18 +80,45 @@ const addOrder = async (req, res, next) => {
 };
 
 const getUserOrders = async (req, res, next) => {
-    // get all orders of a user 
-    // can use token to fetch userId
+    try {
+        const options = {
+            where: { UserId: req.user.id },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
+            order: [['createdAt', 'DESC']],
+            distinct:true,
+        }
+        if (limit) options.limit = parseInt(limit);
+        const orders = await Order.findAll(options);
+        res.status(200).json({success:true,data:orders})
+    } catch (error) {
+        next(error)
+    }
 }
 
 const getUserOrder = async (req, res, next) => {
+    try {
+        const order = await Order.findOne({
+            where: { id: req.params.id, UserId: req.user.id },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
+        });
+        if (!order) throw new ApiError('Order not found', 404);
+
+        res.status(200).json({ success: true, data: order });
+    } catch (error) {
+        next(error);
+    }
 }
 
 const cancelOrder = async (req, res, next) => {
     try {
         const cancelledOrder=await db.sequelize.transaction(async t => {
             const order = await Order.findByPk(req.params.id, { transaction: t })
-            if (!order) throw new ApiError('Order not found',404);
+            if (!order) throw new ApiError('Order not found', 404);
+            if (order.UserId !== req.user.id) {
+                throw new ApiError('Forbidden: You cannot cancel this order', 403);
+            }
             if (['Confirmed','Shipped', 'Delivered'].includes(order.status))
                 throw new ApiError('Order shipped or delivered cannot be cancelled', 400);
             // update stock if decemented - after confirmed cancellation allowed
@@ -102,7 +129,7 @@ const cancelOrder = async (req, res, next) => {
     } catch (error) {
         next(error)
     }
-}
+};
 
 const getOrderStatus = async (req, res, next) => {
     try {
@@ -134,47 +161,14 @@ const updateOrderStatus = async (req, res, next) => {
     }
 };
 
-// const updateOrderItemQnt = async (req, res, next) => {
-//     try {
 
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
-// const deleteOrderItem = async (req, res, next) => {
-    try {
-
-    } catch (error) {
-        next(error);
-    }
-// };
-// add,remove order item
-
-// const updateOrder = async (req, res, next) => {
-//     try {
-
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
-// const deleteOrder = async (req, res, next) => {
-//     try {
-
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
-// get orders of a user
-// order summary
-// return handling
 
 module.exports = {
     getOrders,
     getOrder,
     addOrder,
+    getUserOrder,
+    getUserOrders,
     cancelOrder,
     getOrderStatus,
     updateOrderStatus,

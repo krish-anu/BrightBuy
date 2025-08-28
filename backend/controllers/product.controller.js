@@ -144,8 +144,6 @@ const deleteProduct = async (req, res, next) => {
     }
 };
 
-// add products into a category
-
 
 module.exports = {
     getProducts,
