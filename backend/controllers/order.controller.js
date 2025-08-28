@@ -1,4 +1,5 @@
 const ApiError = require('../utils/ApiError');
+const {  fn, col } = require('sequelize');
 
 const db = require('../models');
 const estimateDeliveryDate = require('../utils/estimateDeliveryDate');
@@ -8,6 +9,8 @@ const City = db.city;
 const ProductVariant = db.productVariant;
 const ProductVariantOption = db.productVariantOption;
 const VariantAttribute = db.variantAttribute;
+const Product=db.product
+const Category = db.category;
 
 const getOrders = async (req, res, next) => {
     try {
@@ -181,6 +184,56 @@ const updateOrderStatus = async (req, res, next) => {
     }
 };
 
+const getCategoryWiseOrders = async (req, res, next) => {
+    try {
+        const result = await OrderItem.findAll({
+            attributes: [],
+            include: [
+                {
+                    model: ProductVariant, attributes: [],
+                    include: [{
+                        model: Product, attributes: [],
+                        include: [{
+                            model: Category, attributes: ['id', 'name', 'parentId'], through: { attributes: [] },
+                        include:[{model:Category,as:'parent',attributes:['id','name']}]}]
+                    }]
+                }
+            ],
+            group: ['ProductVariant.Product.Categories.id'],
+            raw: true,
+            attributes: [
+                [fn('COUNT', col('OrderItem.id')), 'orderCount'],
+                [col('ProductVariant.Product.Categories.id'), 'categoryId'],
+                [col('ProductVariant.Product.Categories.name'), 'categoryName'],
+                [col('ProductVariant.Product.Categories.parentId'), 'parentId'],
+                [col('ProductVariant.Product.Categories.parent.name'), 'parentName']
+            ],
+        })
+        const categoryOrders = {}
+        let totalOrders=0
+        for (const row of result) {
+            const parent = row.parentId;
+            const child = row.categoryId;
+            const count = parseInt(row.orderCount);
+            const parentName = row.parentName;
+            const categoryName=row.categoryName
+
+            if (parent!==null) {
+                if (!categoryOrders[parent])
+                    categoryOrders[parent] = { catgory: parentName, totalOrders: 0, subcategories: {} } 
+                categoryOrders[parent].totalOrders += count;
+                categoryOrders[parent].subcategories[child] = { categoryName: categoryName, order: count };
+            }
+            totalOrders += count;
+        }
+
+
+        res.status(200).json({ success: true, data: { categoryOrders, totalOrders } })
+    } catch (error) {
+        next(error)
+    }
+}
+
 
 
 module.exports = {
@@ -192,4 +245,5 @@ module.exports = {
     cancelOrder,
     getOrderStatus,
     updateOrderStatus,
+    getCategoryWiseOrders
 };
