@@ -39,14 +39,13 @@ const getOrder = async (req, res, next) => {
 
 const addOrder = async (req, res, next) => {
     try {
-        const { items, deliveryMode,totalPrice } = req.body;
+        const { items, deliveryMode,totalPrice ,deliveryAddress} = req.body;
         if (!items || !deliveryMode || !totalPrice) throw new ApiError('Ordered items, total price and delivery mode is required', 400);
         const order = await db.sequelize.transaction(async t => {
-            const deliveryDays = 1; 
+            let deliveryDays = 1; 
             if (deliveryMode === 'Standard Delivery') {
-                const deliveryAddress = req.body.deliveryAddress;
                 // if not give fetch from user data
-                const city = await City.findOrCreate({ where: { name: deliveryAddress.city } }, { transaction: t })
+                const [city ]= await City.findOrCreate({ where: { name: deliveryAddress.city } ,  transaction: t })
                 deliveryDays = 7; 
                 if (city.isMainCity) deliveryDays = 5;
             }
@@ -54,7 +53,11 @@ const addOrder = async (req, res, next) => {
             const deliveryDate = estimateDeliveryDate(deliveryDays);
 
             const newOrder = await Order.create({
-                totalPrice,deliveryMode,estimateDeliveryDate:deliveryDate
+                totalPrice,
+                deliveryMode,
+                estimatedDeliveryDate: deliveryDate,
+                deliveryAddress,
+                userId:req.user.id
             }, { transaction: t })
 
             for (const item of items) {
@@ -62,7 +65,8 @@ const addOrder = async (req, res, next) => {
                     variantId: item.variantId,
                     orderId:newOrder.id,
                     quantity: item.quantity,
-                    price:item.price,
+                    unitPrice: item.price,
+                    totalPrice:item.price*item.quantity
                 }, { transaction: t })
             }
 
@@ -88,7 +92,7 @@ const getUserOrders = async (req, res, next) => {
             order: [['createdAt', 'DESC']],
             distinct:true,
         }
-        if (limit) options.limit = parseInt(limit);
+        if (req.query.limit) options.limit = parseInt(req.query.limit);
         const orders = await Order.findAll(options);
         res.status(200).json({success:true,data:orders})
     } catch (error) {
@@ -116,7 +120,8 @@ const cancelOrder = async (req, res, next) => {
         const cancelledOrder=await db.sequelize.transaction(async t => {
             const order = await Order.findByPk(req.params.id, { transaction: t })
             if (!order) throw new ApiError('Order not found', 404);
-            if (order.UserId !== req.user.id) {
+            if (order.userId !== req.user.id) {
+                console.log(order.UserId,req.user.id)
                 throw new ApiError('Forbidden: You cannot cancel this order', 403);
             }
             if (['Confirmed','Shipped', 'Delivered'].includes(order.status))

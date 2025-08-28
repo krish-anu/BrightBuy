@@ -44,8 +44,8 @@ db.sequelize.sync({ force :false}).then(() => {
 });
 
 // Associations
-db.user.hasMany(db.order)
-db.order.belongsTo(db.user)
+db.user.hasMany(db.order, { foreignKey: 'userId' })
+db.order.belongsTo(db.user, { foreignKey: 'userId' })
 
 db.category.hasMany(db.category, { as: 'subcategories', foreignKey: 'parentId',onDelete:'SET NULL' });
 db.category.belongsTo(db.category, { as: 'parent', foreignKey: 'parentId',onDelete:'SET NULL' });
@@ -61,8 +61,8 @@ db.productVariantOption.belongsTo(db.productVariant, { foreignKey: 'variantId' }
 db.productVariantOption.belongsTo(db.variantAttribute, { foreignKey: 'attributeId' });
 
 
-db.product.hasMany(db.productVariant, { onDelete: 'CASCADE', hooks: true });
-db.productVariant.belongsTo(db.product);
+db.product.hasMany(db.productVariant, { foreignKey: 'productId',onDelete: 'CASCADE', hooks: true });
+db.productVariant.belongsTo(db.product, { foreignKey: 'productId' });
 
 db.order.hasMany(db.orderItem, { foreignKey: 'orderId', onDelete: 'CASCADE', hooks: true });
 db.orderItem.belongsTo(db.order, { foreignKey: 'orderId', onDelete: 'CASCADE' });

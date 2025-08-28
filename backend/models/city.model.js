@@ -16,8 +16,8 @@ module.exports = (sequelize, DataTypes) => {
         },
         isMainCity: {
             type: DataTypes.BOOLEAN,
-            allowNull: false,
-        },
+            defaultValue:false
+        }
     }, {
         indexes: [{ fields: ['name'] },{fields:['isMainCity']}]
     });

@@ -7,7 +7,7 @@ const router = require('express').Router();
 
 router.get('/count', getProductCount);
 router.get('/variant/count', getProductVariantCount);
-router.get('/variant/:id', getVariantsOfProduct);
+router.get('/:productId/variants', getVariantsOfProduct);
 router.get('/', getProducts);
 router.get('/:id', getProduct);
 

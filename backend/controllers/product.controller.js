@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const { fn, col } = require('sequelize');
 
 const db = require('../models');
+const generateSKU = require('../utils/generateSKU');
 const Product = db.product;
 const ProductVariant = db.productVariant;
 const Category = db.category;
@@ -45,20 +46,48 @@ const getProduct = async (req, res, next) => {
 
 const addProduct = async (req, res, next) => {
     try {
-        const { name, description, categoryIds } = req.body;
-        if (!name || !description) throw new ApiError('Name and description are required', 400);
+        const { name, description, categoryIds, brand, attributes,stockQnt,price } = req.body;
+        if (!name || !description || !attributes || !price) throw new ApiError('Name, description,price and attributes are required', 400);
+
         const existing = await Product.findOne({ where: { name } });
         if (existing) throw new ApiError('Product exists', 409);
-        const product = await Product.create({ name, description });
 
-        if (Array.isArray(categoryIds) && categoryIds.length) {
-            const categories = await Category.findAll({ where: { id: categoryIds } });
-            await product.setCategories(categories);
-        }
-        res.status(201).json({ success: true, data: product });
-    } catch (error) {
-        next(error);
+        const newProduct = await db.sequelize.transaction(async (t) => {
+            const productData = { name, description };
+            if (brand) productData.brand = brand;
+            const product = await Product.create(productData,{transaction:t});
+
+            if (Array.isArray(categoryIds) && categoryIds.length) {
+                const categories = await Category.findAll({ where: { id: categoryIds } });
+                await product.setCategories(categories,{transaction:t});
+            } 
+            
+            const attrName = attributes.map((attr) => attr.value).join(' ');
+            const variantName = `${ product.name } ${ attrName }`;
+            const SKU = generateSKU(product.name, variantName);
+            
+
+            const variant = await ProductVariant.create(
+                { productId:product.id, variantName: variantName, SKU, stockQnt: stockQnt || 1, price },
+                { transaction: t }
+            );
+
+            for (const attr of attributes) {
+                const [attribute] = await VariantAttribute.findOrCreate({
+                    where: { name: attr.name },
+                    defaults: { name: attr.name },
+                    transaction: t,
+                });
+                await ProductVariantOption.create(
+                    { variantId: variant.id, attributeId: attribute.id, value: attr.value },
+                    { transaction: t }
+                );
+            }
+            return product;
+        });
+        res.status(201).json({ success: true, data: newProduct });
     }
+    catch (error) { next(error); }
 };
 
 /**Get variant count of each product */
@@ -78,15 +107,16 @@ const getProductVariantCount = async (req, res, next) => {
 
 const getVariantsOfProduct = async (req, res, next) => {
     try {
-        const product = await db.product.findByPk(id);
+        const { productId } = req.params;
+        const product = await db.product.findByPk(productId);
         if (!product) throw new ApiError('Product not found', 404);
         const variants = await db.productVariant.findAll({
-            where: { ProductId: id },
+            where: { productId },
             include: [{
-                    model: VariantAttribute,
-                    attributes: ['id', 'name'],
-                    through: {
-                        model: ProductVariantOption,
+                model: VariantAttribute,
+                attributes: ['id', 'name'],
+                through: {
+                    model: ProductVariantOption,
                     attributes: ['value']
                 }
             }],

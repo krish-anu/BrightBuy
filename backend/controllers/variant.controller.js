@@ -1,7 +1,7 @@
 const ApiError = require('../utils/ApiError');
 const { Op } = require('sequelize');
 const db = require('../models');
-const { generateSKU } = require('../utils/generateSKU');
+const generateSKU  = require('../utils/generateSKU');
 
 const Product = db.product;
 const ProductVariant = db.productVariant;
@@ -61,7 +61,7 @@ const addVariant = async (req, res, next) => {
 
             const attrName = attributes.map((attr) => attr.value).join(' ');
             const name = variantName || `${ product.name } ${ attrName }`;
-            const SKU = generateSKU(product.name, attributes);
+            const SKU = generateSKU(product.name, name);
 
             const variant = await ProductVariant.create(
                 { productId, variantName: name, SKU, stockQnt: stockQnt || 1, price },
