@@ -20,18 +20,33 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
         },
         deliveryAddress: {
-            type: DataTypes.TEXT,
+            type: DataTypes.JSON,
             allowNull: true,
+        },
+        deliveryCharge: {
+            type: DataTypes.DECIMAL(10, 2),
+            defaultValue: 0.00,
+            validate: { min: 0 }
         },
         estimatedDeliveryDate: {
             type: DataTypes.DATE,
             allowNull: true,
+        },
+        deliveredDate: {
+            type: DataTypes.DATE,
+            allowNull: true
         },
         status: {
             type: DataTypes.ENUM('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'),
             allowNull: false,
             defaultValue: 'Pending',
         },
-    }, { paranoid: true });
+    }, {
+        indexes: [
+            { fields: ['orderDate'] },
+            { fields: ['status'] }]
+    });
     return Order;
 };
+
+// returned order?

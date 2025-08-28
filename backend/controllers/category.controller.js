@@ -8,13 +8,27 @@ const ProductVariant = db.productVariant;
 
 const getCategories = async (req, res, next) => {
     try {
-        const categories = await Category.findAll({
-            attributes: ['id', 'name'],
-            include: [{ model: Category, as: 'parent', attributes: ['name', 'id'] },
-            { model: Category, as: 'subcategories', attributes: ['name', 'id'] }],
-            order: [['name', 'ASC']],
+        const { limit, parentId } = req.query;
+        const whereClause = {};
+        whereClause.parentId = parentId ? parentId : null;
+
+        const options = {
+            where: whereClause,
+            include: [
+                { model: Category, as: 'subcategories', attributes: ['id', 'name'] },
+                { model: Category, as: 'parent', attributes: ['id', 'name'] }
+            ],
+            order: [['name', 'ASC']]
+        };
+        if (limit) options.limit = parseInt(limit);
+        const categories = await Category.findAndCountAll(options);
+        res.status(200).json({
+            success: true,
+            data: {
+                categories: categories.rows,
+                totalCount: categories.count
+            }
         });
-        res.status(200).json({ success: true, data: categories });
     } catch (error) {
         next(error);
     }
@@ -24,8 +38,10 @@ const getCategory = async (req, res, next) => {
     try {
         const category = await Category.findByPk(req.params.id, {
             attributes: ['id', 'name'],
-            include: [{ model: Category, as: 'parent', attributes: ['name', 'id'] },
-            { model: Category, as: 'subcategories', attributes: ['name'] }]
+            include: [
+                { model: Category, as: 'parent', attributes: ['name', 'id'] },
+                { model: Category, as: 'subcategories', attributes: ['name'] },
+            ]
         });
         if (!category) throw new ApiError('Category not found', 404);
         res.status(200).json({ success: true, data: category });
@@ -56,18 +72,33 @@ const addCategory = async (req, res, next) => {
 /**Get all variants of a category */
 const getCategoryVariants = async (req, res, next) => {
     try {
-        const category = await Category.findByPk(req.params.id);
-        if (!category) throw new ApiError('Category not found', 404);
-        const productsWithVariants = await Product.findAll({
+        const variants = await ProductVariant.findAll({
+            attributes: ['id', 'SKU', 'variantName', 'price', 'stockQnt'],
             include: [{
-                model: Category,
-                where: { [Op.or]: [{ id: req.params.id }, { parentId: req.params.id }] },
+                model: Product,
                 attributes: [],
-                through: { attributes: [] }
-            }, { model: ProductVariant, attributes: ['id', 'SKU', 'variantName', 'price', 'stockQnt'] }],
-            distinct: true,
+                required: true,
+                include: [{
+                    model: Category,
+                    attributes: [],
+                    required: true,
+                    where: { [Op.or]: [{ id: req.params.id }, { parentId: req.params.id }] }, through: { attributes: [] }
+                }]
+            },
+            {
+                model: db.variantAttribute,
+                attributes: ['id', 'name'],
+                through: { model: db.productVariantOption, attributes: ['value'] }
+            }],
+            order: [['variantName', 'ASC']]
         });
-        const variants = productsWithVariants.flatMap(product => product.ProductVariants);
+        if (variants.length === 0) {
+            const categoryExists = await Category.findByPk(req.params.id, { attributes: ['id'] });
+            if (!categoryExists) {
+                throw new ApiError('Category not found', 404);
+            }
+        }
+
         res.status(200).json({ success: true, data: variants });
     } catch (error) {
         next(error);
@@ -78,10 +109,28 @@ const getCategoryHierarchy = async (req, res, next) => {
     try {
         const categories = await Category.findAll({
             where: { parentId: null }, attributes: ['id', 'name'],
-            include: [{ model: Category, as: 'subcategories', attributes: ['id', 'name'],oreder:[['name','ASC']] }],
+            include: [{ model: Category, as: 'subcategories', attributes: ['id', 'name'], oreder: [['name', 'ASC']] }],
             order: [['name', 'ASC']]
         });
         res.status(200).json({ success: true, data: categories });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const addProductsToCategory = async (req, res, next) => {
+    try {
+        const { categoryId, productIds } = req.body;
+        if (!categoryId || !Array.isArray(productIds) || productIds.length === 0) {
+            throw new ApiError('categoryId and productIds are required', 400);
+        }
+        const category = await Category.findByPk(categoryId);
+        if (!category) throw new ApiError('Category not found', 404);
+        const products = await Product.findAll({ where: { id: { [Op.in]: productIds } } });
+        if (products.length !== productIds.length)
+            throw new ApiError('Some products not found', 404);
+        await category.addProducts(products);
+        res.status(200).json({ success: true, data: products });
     } catch (error) {
         next(error);
     }
@@ -109,8 +158,18 @@ const updateCategory = async (req, res, next) => {
 
 const deleteCategory = async (req, res, next) => {
     try {
-        const category = await Category.findByPk(req.params.id);
+        const category = await Category.findByPk(req.params.id, {
+            include: [
+                { model: db.category, as: 'subcategories' },
+                { model: db.product, through: { attributes: [] } }]
+        });
         if (!category) throw new ApiError('Category not found', 404);
+        if (category.subcategories && category.subcategories.length > 0) {
+            throw new ApiError('Cannot delete category with subcategories', 400);
+        }
+        if (category.Products && category.Products.length > 0) {
+            throw new ApiError('Cannot delete category with assigned products', 400);
+        }
         await category.destroy();
         res.status(200).json({ success: true, message: 'Category deleted successfully' });
     } catch (error) {
@@ -125,6 +184,7 @@ module.exports = {
     getCategory,
     addCategory,
     getCategoryVariants,
+    addProductsToCategory,
     getCategoryHierarchy,
     updateCategory,
     deleteCategory,

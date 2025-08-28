@@ -1,19 +1,25 @@
 module.exports = (sequelize, DataTypes) => {
-    const ProductVariantOption = sequelize.define("ProductVariantOption", {
+    const City = sequelize.define("City", {
         id: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        value: {
+        name: {
             type: DataTypes.STRING(200),
             allowNull: false,
+            unique: true,
             validate: {
                 notEmpty: true,
-                len:[2,200]
+                len: [2, 200]
             }
         },
-
+        isMainCity: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+        },
+    }, {
+        indexes: [{ fields: ['name'] },{fields:['isMainCity']}]
     });
-    return ProductVariantOption;
+    return City;
 };

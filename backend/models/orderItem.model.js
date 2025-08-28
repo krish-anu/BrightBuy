@@ -9,12 +9,19 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 1,
+            validate:{min:1}
         },
-        price: {
+        unitPrice: {
             type: DataTypes.DECIMAL(10, 2),
             allowNull: false,
             validate: { min: 0 },
         },
+        totalPrice: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: false,
+            validate: { min: 0 },
+        }
+        
     });
     return OrderItem;
 };

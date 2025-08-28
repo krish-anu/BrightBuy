@@ -23,12 +23,14 @@ app.use(express.urlencoded({ extended: true }));
 const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
 const variantRouter = require('./routes/variant');
+const orderRouter = require('./routes/order');
+const cityRouter = require('./routes/city');
 
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);
-
-
+app.use('/api/order', orderRouter);
+app.use('/api/city',cityRouter)
 
 
 app.use(errorMiddleware);

@@ -6,9 +6,10 @@ module.exports = (sequelize, DataTypes) => {
             primaryKey: true,
         },
         name: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING(100),
             allowNull: false,
             unique: true,
+            validate:{notEmpty:true,len:[2,100]}
         },
         parentId: {
             type: DataTypes.UUID,
@@ -20,6 +21,8 @@ module.exports = (sequelize, DataTypes) => {
             onUpdate: 'CASCADE',
             onDelete: 'SET NULL'
         }
+    }, {
+        indexes:[{fields:['parentId']}]
     });
     return Category;
 };

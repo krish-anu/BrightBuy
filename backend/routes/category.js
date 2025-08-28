@@ -1,5 +1,4 @@
-const { getCategories, getCategory, addCategory, updateCategory, deleteCategory, getCategoryVariantCount, getCategoryVariants, getCategoryHierarchy } = require('../controllers/category.controller');
-const { route } = require('./variant');
+const { getCategories, getCategory, addCategory, updateCategory, deleteCategory, getCategoryVariantCount, getCategoryVariants, getCategoryHierarchy, addProductsToCategory } = require('../controllers/category.controller');
 
 const router = require('express').Router();
 
@@ -8,6 +7,7 @@ router.get('/variant/:id', getCategoryVariants);
 router.get('/', getCategories);
 router.get('/:id', getCategory);
 
+router.post('/addProducts', addProductsToCategory);
 router.post('/', addCategory);
 
 router.put('/:id', updateCategory);

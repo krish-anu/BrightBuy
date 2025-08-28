@@ -6,14 +6,24 @@ module.exports = (sequelize, DataTypes) => {
             primaryKey: true,
         },
         name: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING(200),
             allowNull: false,
             unique: true,
+            validate: {
+                notEmpty: true,
+                len:[2,200]
+            }
         },
         description: {
             type: DataTypes.TEXT,
             allowNull:true,
         },
+        brand: {
+            type: DataTypes.STRING(100),
+            allowNull:true,
+        }
+    }, {
+        indexes:[{fields:['brand']}]
     });
     return Product;
 };
