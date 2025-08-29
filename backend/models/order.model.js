@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
         },
         totalPrice: {
+            // without delivery charge
             type: DataTypes.DECIMAL(10, 2),
             allowNull: false,
             validate: { min: 0 }
@@ -40,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.ENUM('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'),
             allowNull: false,
             defaultValue: 'Pending',
-        },
+        }
     }, {
         indexes: [
             { fields: ['orderDate'] },

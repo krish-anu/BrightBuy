@@ -9,14 +9,9 @@ const ProductVariant = db.productVariant;
 const getCategories = async (req, res, next) => {
     try {
         const { limit } = req.query;
-        const allCategories = await Category.findAll({
-            include: [
-                {model: Category,as: 'subcategories',attributes: ['id', 'name']},
-                {model: Category,as: 'parent',attributes: ['id', 'name']}
-            ],
+        const allCategories = await Category.findAll({            
             order: [
-                ['name', 'ASC'],
-                [{ model: Category, as: 'subcategories' }, 'name', 'ASC']
+                ['name', 'ASC'],                
             ]
         });
         const categories = limit ? allCategories.slice(0, parseInt(limit)) : allCategories;
@@ -167,6 +162,8 @@ const deleteCategory = async (req, res, next) => {
         next(error);
     }
 };
+
+
 
 
 module.exports = {

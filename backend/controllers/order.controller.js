@@ -1,33 +1,39 @@
 const ApiError = require('../utils/ApiError');
-const {  fn, col } = require('sequelize');
+const { fn, col } = require('sequelize');
+const { calculateOrderDetails } = require('../utils/calculateOrderDetails');
+const { saveOrderToDatabase } = require('../services/order.service');
 
 const db = require('../models');
-const estimateDeliveryDate = require('../utils/estimateDeliveryDate');
+const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
 const Order = db.order;
 const OrderItem = db.orderItem;
 const City = db.city;
 const ProductVariant = db.productVariant;
-const ProductVariantOption = db.productVariantOption;
-const VariantAttribute = db.variantAttribute;
-const Product=db.product
+const Product = db.product;
 const Category = db.category;
+const User = db.user;
+
+const stripe = require('stripe')(STRIPE_SECRET_KEY);
+
+
 
 const getOrders = async (req, res, next) => {
     try {
         const { limit } = req.query;
         const options = {
             attributes: { exclude: ['createdAt', 'updatedAt'] },
-            include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt',] } }],
+            include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
             order: [['createdAt', 'DESC']],
             distinct: true,
         };
-        if (limit) orders.limit = parseInt(limit);
+        if (limit) options.limit = parseInt(limit);
         const orders = await Order.findAll(options);
         res.status(200).json({ success: true, data: orders });
     } catch (error) {
         next(error);
     }
 };
+
 
 const getOrder = async (req, res, next) => {
     try {
@@ -36,7 +42,7 @@ const getOrder = async (req, res, next) => {
             include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt',] } }],
         });
         if (!order) throw new ApiError('Order not found', 404);
-        res.status(200).json({success:true,data:order})
+        res.status(200).json({ success: true, data: order });
 
     } catch (error) {
         next(error);
@@ -45,57 +51,72 @@ const getOrder = async (req, res, next) => {
 
 const addOrder = async (req, res, next) => {
     try {
-        const { items, deliveryMode,totalPrice ,deliveryAddress} = req.body;
-        if (!items || !deliveryMode || !totalPrice) throw new ApiError('Ordered items, total price and delivery mode is required', 400);
-        const order = await db.sequelize.transaction(async t => {
-            let deliveryDays = 1; 
-            if (deliveryMode === 'Standard Delivery') {
-                // if not give fetch from user data
-                const [city ]= await City.findOrCreate({ where: { name: deliveryAddress.city } ,  transaction: t })
-                deliveryDays = 7; 
-                if (city.isMainCity) deliveryDays = 5;
+        const { items, paymentMethod, deliveryMode, deliveryAddress } = req.body;
+        if (!items || !deliveryMode || !paymentMethod) {
+            throw new ApiError('Items, delivery mode, and payment method are required', 400);
+        }
+
+        const result = await db.sequelize.transaction(async t => {
+            const user = await User.findByPk(req.user.id, {
+                attributes: ['address', 'cityId'],
+                include: [{ model: City, attributes: ['name', 'isMainCity'] }],
+                transaction: t
+            });
+
+            const { totalPrice, deliveryCharge, totalAmount, deliveryDate, finalAddress, orderedItems } =
+                await calculateOrderDetails(items, deliveryMode, deliveryAddress, user, t);
+
+            if (paymentMethod === 'COD') {
+                const order = await saveOrderToDatabase(
+                    orderedItems,
+                    req.user.id,
+                    deliveryMode,
+                    finalAddress,
+                    deliveryDate,
+                    totalPrice,
+                    deliveryCharge,
+                    t,
+                    'COD'
+                );
+                return { type: 'order', order };
             }
-            // handle outof stock add 3 more days
-            const deliveryDate = estimateDeliveryDate(deliveryDays);
-
-            const newOrder = await Order.create({
-                totalPrice,
-                deliveryMode,
-                estimatedDeliveryDate: deliveryDate,
-                deliveryAddress,
-                userId:req.user.id
-            }, { transaction: t })
-
-            for (const item of items) {
-                await OrderItem.create({
-                    variantId: item.variantId,
-                    orderId:newOrder.id,
-                    quantity: item.quantity,
-                    unitPrice: item.price,
-                    totalPrice:item.price*item.quantity
-                }, { transaction: t })
+            if (paymentMethod === 'Card') {
+                const pendingOrder = await saveOrderToDatabase(
+                    orderedItems,
+                    req.user.id,
+                    deliveryMode,
+                    finalAddress,
+                    deliveryDate,
+                    totalPrice,
+                    deliveryCharge,
+                    t,
+                    'Card' 
+                );
+                const session = await stripe.checkout.sessions.create({
+                    payment_method_types: ['card'],
+                    line_items: orderedItems.map(item => ({
+                        price_data: {
+                            currency: 'lkr',
+                            product_data: { name: item.productName },
+                            unit_amount: Math.round(item.price * 100)
+                        },
+                        quantity: item.quantity
+                    })),
+                    mode: 'payment',
+                    success_url: `http://localhost:8081/success?session_id={CHECKOUT_SESSION_ID}`,
+                    cancel_url: `http://localhost:8081/cancel`,
+                    metadata: {
+                        userId: req.user.id,
+                        orderId:pendingOrder.id,
+                    }
+                });
+                return { type:'checkout',checkoutSessionId: session.id };
             }
-
-            const finalOrder = await Order.findByPk(newOrder.id, {
-                attributes:{exclude:['createdAt','updatedAt']},
-                include: [{
-                    model: OrderItem,
-                    attributes: { exclude: ['createdAt', 'updatedAt', 'orderId','variantId'] },
-                    include: [{
-                        model: ProductVariant,
-                        attributes: ['id', 'variantName', 'SKU', 'price', 'stockQnt'],
-                        include: [ {
-                            model: VariantAttribute,
-                            attributes: ['id', 'name'],
-                            through: { model: ProductVariantOption, attributes: ['value'] }
-                        }]
-                    }]
-                }],
-                transaction:t
-            })
-            return finalOrder;
-        })
-        res.status(200).json({success:true,data:order})
+            throw new ApiError('Invalid payment method',400)
+        });
+        if (result.type === 'order')
+            return res.status(201).json({success:true,data:result.order})
+        return res.status(200).json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -108,15 +129,15 @@ const getUserOrders = async (req, res, next) => {
             attributes: { exclude: ['createdAt', 'updatedAt'] },
             include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
             order: [['createdAt', 'DESC']],
-            distinct:true,
-        }
+            distinct: true,
+        };
         if (req.query.limit) options.limit = parseInt(req.query.limit);
         const orders = await Order.findAll(options);
-        res.status(200).json({success:true,data:orders})
+        res.status(200).json({ success: true, data: orders });
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
 
 const getUserOrder = async (req, res, next) => {
     try {
@@ -131,48 +152,48 @@ const getUserOrder = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-}
+};
 
 const cancelOrder = async (req, res, next) => {
     try {
-        const cancelledOrder=await db.sequelize.transaction(async t => {
-            const order = await Order.findByPk(req.params.id, { transaction: t })
+        const cancelledOrder = await db.sequelize.transaction(async t => {
+            const order = await Order.findByPk(req.params.id, { transaction: t });
             if (!order) throw new ApiError('Order not found', 404);
             if (order.userId !== req.user.id) {
-                console.log(order.UserId,req.user.id)
+                console.log(order.UserId, req.user.id);
                 throw new ApiError('Forbidden: You cannot cancel this order', 403);
             }
-            if (['Confirmed','Shipped', 'Delivered'].includes(order.status))
+            if (['Confirmed', 'Shipped', 'Delivered'].includes(order.status))
                 throw new ApiError('Order shipped or delivered cannot be cancelled', 400);
             // update stock if decemented - after confirmed cancellation allowed
             await order.update({ status: 'Cancelled' }, { transaction: t });
-            return order;            
-        })
-        res.status(200).json({success:true,data:cancelledOrder})
+            return order;
+        });
+        res.status(200).json({ success: true, data: cancelledOrder });
     } catch (error) {
-        next(error)
+        next(error);
     }
 };
 
 const getOrderStatus = async (req, res, next) => {
     try {
         const order = await Order.findByPk(req.params.id, {
-            attributes:{include:['id','status','deliveryMode','deliveryAddress','estimatedDeliveryDate']}
+            attributes: { include: ['id', 'status', 'deliveryMode', 'deliveryAddress', 'estimatedDeliveryDate','userId'] }
         });
         if (!order) throw new ApiError('Order not found', 404);
         let result = { id: order.id, status: order.status };
         if (['Cancelled', 'Delivered'].includes(order.status)) {
-            return res.status(200).json({success:true,data:result})
+            return res.status(200).json({ success: true, data: result });
         }
         if (order.deliveryMode === 'Standard Delivery') {
             result.deliveryAddress = order.deliveryAddress;
             result.estimatedDeliveryDate = order.estimatedDeliveryDate;
         }
-        res.status(200).json({sucess:true,data:result})
+        res.status(200).json({ sucess: true, data: result });
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
 
 // update deliveryAddress or anything before shipping?
 
@@ -195,7 +216,8 @@ const getCategoryWiseOrders = async (req, res, next) => {
                         model: Product, attributes: [],
                         include: [{
                             model: Category, attributes: ['id', 'name', 'parentId'], through: { attributes: [] },
-                        include:[{model:Category,as:'parent',attributes:['id','name']}]}]
+                            include: [{ model: Category, as: 'parent', attributes: ['id', 'name'] }]
+                        }]
                     }]
                 }
             ],
@@ -208,19 +230,19 @@ const getCategoryWiseOrders = async (req, res, next) => {
                 [col('ProductVariant.Product.Categories.parentId'), 'parentId'],
                 [col('ProductVariant.Product.Categories.parent.name'), 'parentName']
             ],
-        })
-        const categoryOrders = {}
-        let totalOrders=0
+        });
+        const categoryOrders = {};
+        let totalOrders = 0;
         for (const row of result) {
             const parent = row.parentId;
             const child = row.categoryId;
             const count = parseInt(row.orderCount);
             const parentName = row.parentName;
-            const categoryName=row.categoryName
+            const categoryName = row.categoryName;
 
-            if (parent!==null) {
+            if (parent !== null) {
                 if (!categoryOrders[parent])
-                    categoryOrders[parent] = { catgory: parentName, totalOrders: 0, subcategories: {} } 
+                    categoryOrders[parent] = { catgory: parentName, totalOrders: 0, subcategories: {} };
                 categoryOrders[parent].totalOrders += count;
                 categoryOrders[parent].subcategories[child] = { categoryName: categoryName, order: count };
             }
@@ -228,11 +250,11 @@ const getCategoryWiseOrders = async (req, res, next) => {
         }
 
 
-        res.status(200).json({ success: true, data: { categoryOrders, totalOrders } })
+        res.status(200).json({ success: true, data: { categoryOrders, totalOrders } });
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
 
 
 

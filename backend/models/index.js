@@ -26,7 +26,7 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-db.user=require('./user.model')(sequelize,DataTypes)
+db.user = require('./user.model')(sequelize, DataTypes);
 db.product = require('./product.model')(sequelize, DataTypes);
 db.category = require('./category.model')(sequelize, DataTypes);
 db.productCategory = require('./productCategory.model')(sequelize, DataTypes);
@@ -36,19 +36,19 @@ db.productVariantOption = require('./productVariantOption.model')(sequelize, Dat
 db.order = require('./order.model')(sequelize, DataTypes);
 db.orderItem = require('./orderItem.model')(sequelize, DataTypes);
 db.payment = require('./payment.model')(sequelize, DataTypes);
-db.city=require('./city.model')(sequelize,DataTypes)
+db.city = require('./city.model')(sequelize, DataTypes);
 
-db.sequelize.sync({ force :false}).then(() => {
+db.sequelize.sync({ force: false }).then(() => {
   console.log('Yes re-sync done');
 
 });
 
 // Associations
-db.user.hasMany(db.order, { foreignKey: 'userId' })
-db.order.belongsTo(db.user, { foreignKey: 'userId' })
+db.user.hasMany(db.order, { foreignKey: 'userId' });
+db.order.belongsTo(db.user, { foreignKey: 'userId' });
 
-db.category.hasMany(db.category, { as: 'subcategories', foreignKey: 'parentId',onDelete:'SET NULL' });
-db.category.belongsTo(db.category, { as: 'parent', foreignKey: 'parentId',onDelete:'SET NULL' });
+db.category.hasMany(db.category, { as: 'subcategories', foreignKey: 'parentId', onDelete: 'SET NULL' });
+db.category.belongsTo(db.category, { as: 'parent', foreignKey: 'parentId', onDelete: 'SET NULL' });
 
 db.product.belongsToMany(db.category, { through: db.productCategory });
 db.category.belongsToMany(db.product, { through: db.productCategory });
@@ -61,7 +61,7 @@ db.productVariantOption.belongsTo(db.productVariant, { foreignKey: 'variantId' }
 db.productVariantOption.belongsTo(db.variantAttribute, { foreignKey: 'attributeId' });
 
 
-db.product.hasMany(db.productVariant, { foreignKey: 'productId',onDelete: 'CASCADE', hooks: true });
+db.product.hasMany(db.productVariant, { foreignKey: 'productId', onDelete: 'CASCADE', hooks: true });
 db.productVariant.belongsTo(db.product, { foreignKey: 'productId' });
 
 db.order.hasMany(db.orderItem, { foreignKey: 'orderId', onDelete: 'CASCADE', hooks: true });
@@ -71,7 +71,12 @@ db.productVariant.hasMany(db.orderItem, { foreignKey: 'variantId' });
 db.orderItem.belongsTo(db.productVariant, { foreignKey: 'variantId', onDelete: 'SET NULL' });
 
 db.order.hasOne(db.payment, { foreignKey: 'orderId', onDelete: 'CASCADE' });
-db.payment.belongsTo(db.order, { foreignKey: 'orderId' })
+db.payment.belongsTo(db.order, { foreignKey: 'orderId' });
 
+db.user.hasMany(db.payment);
+db.payment.belongsTo(db.user);
+
+db.city.hasMany(db.user);
+db.user.belongsTo(db.city);
 
 module.exports = db;

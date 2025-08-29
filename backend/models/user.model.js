@@ -51,10 +51,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    city: {
-      type: DataTypes.STRING,
-    //   allowNull: true,
-    },
+    // city: {
+    //   type: DataTypes.STRING,
+    // //   allowNull: true,
+    // },
   });
   return User;
 };

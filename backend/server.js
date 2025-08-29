@@ -1,25 +1,8 @@
 const express = require("express");
 const cors = require("cors");
-
+const bodyParser = require('body-parser');
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
-
-const app = express();
-
-var corOptins = {
-  origin: "http://localhost:8081",
-};
-
-
-
-//middleware
-app.use(cors(corOptins));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-
-
-//routers
 
 const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
@@ -27,7 +10,28 @@ const variantRouter = require('./routes/variant');
 const orderRouter = require('./routes/order');
 const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
+const webhookRouter = require('./routes/webhook');
 
+const app = express();
+
+var corOptins = {
+  origin: "http://localhost:5500",
+};
+
+
+
+//middleware
+app.use(cors(corOptins));
+app.use('/api/webhook', webhookRouter);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+
+
+
+app.use('/api/webhook', webhookRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
@@ -36,8 +40,14 @@ app.use('/api/order', orderRouter);
 app.use('/api/city', cityRouter);
 
 
-app.use(errorMiddleware);
 
+app.use(errorMiddleware);
+app.get("/success", (req, res) => {
+  res.send("Payment successful! Your order has been placed.");
+});
+app.get("/cancel", (req, res) => {
+  res.send("Payment canceled. You can try again.");
+});
 //testing api
 app.get("/", (req, res) => {
   res.json({

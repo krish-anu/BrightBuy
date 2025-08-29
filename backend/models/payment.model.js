@@ -20,11 +20,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
         },
         status: {
-            type: DataTypes.ENUM('Pending', 'Confirmed', 'Failed'),
+            type: DataTypes.ENUM('Pending', 'Paid', 'Failed'),
             allowNull: false,
             defaultValue: 'Pending',
         },
-        transactionId: {
+        paymentIntentId: {
             type: DataTypes.STRING(100),
             allowNull: true,
             unique: true,
