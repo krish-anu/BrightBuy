@@ -33,6 +33,7 @@ db.productVariant = require('./productVariant.model')(sequelize, DataTypes);
 db.productVariantOption = require('./productVariantOption.model')(sequelize, DataTypes);
 db.order = require('./order.model')(sequelize, DataTypes);
 db.orderItem = require('./orderItem.model')(sequelize, DataTypes);
+db.user=require("./user.model")(sequelize, DataTypes)
 
 
 db.sequelize.sync({force:false}).then(()=>{
