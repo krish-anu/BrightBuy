@@ -6,7 +6,7 @@ export default function Layout() {
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-1">
+            <main className="flex-1 my-8">
                 <Outlet />
             </main>
             <Footer />
