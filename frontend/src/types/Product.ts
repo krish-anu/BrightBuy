@@ -1,7 +1,11 @@
 export default interface Product {
   id: string;
-  name: string;
+  title: string;
   description: string;
   price: number;
-  imageUrl: string;
+  image: string;
+  sku: string;
+  inStock: boolean;
+  category: string;
+  properties: { key: string; values: string[] }[];
 }
