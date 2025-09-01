@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 
 export function Navbar() {
     return (
-        <div className="bg-accent/40 backdrop-blur-xs border-b border-b-accent-foreground/20 sticky top-0 z-50 shadow-lg/20">
+        <div className="bg-accent/40 backdrop-blur-sm border-b border-b-accent-foreground/20 sticky top-0 z-50 shadow-lg/20">
             <div className="max-w-7xl mx-auto px-4 grid grid-cols-4 h-16 items-center">
                 <div className="col-span-2 md:col-span-1" >
                     <Link to="/">

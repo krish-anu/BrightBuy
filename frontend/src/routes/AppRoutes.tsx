@@ -5,7 +5,6 @@ import ProductsPage from "@/pages/User/ProductsPage";
 import Layout from "@/components/Layout/Layout";
 import CartPage from "@/pages/User/CartPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
-import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 
 export default function AppRoutes(){
   return (
@@ -16,7 +15,6 @@ export default function AppRoutes(){
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/signup" element={<UserSignup />} />
-          <Route path="/product/:id" element={<ProductDetailPage   />} />
         </Route>
       </Routes>
   );
