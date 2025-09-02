@@ -64,7 +64,7 @@ const getCategoryVariants = async (req, res, next) => {
             attributes: ['id', 'SKU', 'variantName', 'price', 'stockQnt'],
             include: [{
                 model: Product,
-                attributes: [],
+                attributes: ['id','name'],
                 required: true,
                 include: [{
                     model: Category,

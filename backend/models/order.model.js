@@ -41,6 +41,9 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.ENUM('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'),
             allowNull: false,
             defaultValue: 'Pending',
+        },
+        cancelReason: {
+            type:DataTypes.ENUM('PaymentFailed','Expired','UserCancelled')
         }
     }, {
         indexes: [

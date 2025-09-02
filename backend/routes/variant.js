@@ -1,5 +1,5 @@
 
-const { getVariants, getVariant, addVariant, updateVariant, updateStock, deleteVariant, searchAndFilterVariants,  getLowStockVariants, getPopularVariants} = require('../controllers/variant.controller');
+const { getVariants, getVariant, addVariant, updateVariant, updateVariantStock, deleteVariant, searchAndFilterVariants,  getLowStockVariants, getPopularVariants} = require('../controllers/variant.controller');
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
 const ROLES = require('../roles');
@@ -14,7 +14,7 @@ router.get('/:id', getVariant);
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addVariant);
 
 router.put('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), updateVariant)
-router.put('/stock/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.WAREHOUSE), updateStock)
+router.put('/stock/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.WAREHOUSE), updateVariantStock)
 
 router.delete('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), deleteVariant)
 

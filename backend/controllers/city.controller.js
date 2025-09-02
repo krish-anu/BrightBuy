@@ -65,7 +65,7 @@ const getMainCities = async (req, res, next) => {
 
 const getOtherCities = async (req, res, next) => {
     try {
-        const otherCities = await City.findAll({ where: { isMainCity: true }, attributes: { exclude: ['createdAt', 'updatedAt'] } });
+        const otherCities = await City.findAll({ where: { isMainCity: false }, attributes: { exclude: ['createdAt', 'updatedAt'] } });
         if (!otherCities || !otherCities.length) throw new ApiError('Other cities not found', 404);
         res.status(200).json({ success: true, data: otherCities });
     } catch (error) {

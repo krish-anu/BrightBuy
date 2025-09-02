@@ -1,7 +1,7 @@
-// controllers/webhook.controller.js
 const { STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY } = require("../config/dbConfig");
 const ApiError = require("../utils/ApiError");
 const db = require("../models");
+const { addOrderItems, getOrderDetails } = require("../services/order.service");
 
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
@@ -23,51 +23,37 @@ const stripeWebhook = async (req, res, next) => {
         }
 
         console.log('Received webhook event:', event.type);
-
-        if (event.type === 'checkout.session.completed') {
+        await db.sequelize.transaction(async t => {
             const session = event.data.object;
+            const orderId = session.metadata.orderId;
+            const order = await Order.findByPk(orderId, { transaction: t });
             const userId = session.metadata.userId;
-            const pendingOrderId = session.metadata.orderId;
-
-            await db.sequelize.transaction(async (t) => {
-                const order = await Order.findByPk(pendingOrderId, { transaction: t });
-                if (!order) throw new ApiError('Order not found', 404);
-                if (order.userId.toString() !== userId.toString()) throw new ApiError('Order user mismatch', 400);
-
-                await order.update({
-                    status: 'Confirmed',
-                    paymentMethod: 'Card',
-                    paymentIntentId: session.payment_intent,
-                }, { transaction: t });
-
-                await Payment.update(
-                    { status: 'Paid', paymentIntentId: session.payment_intent },
-                    { where: { orderId: pendingOrderId }, transaction: t }
-                );
-            });
-
-            console.log('Order confirmed after stripe payment');
-        }
-
-        if (event.type === 'checkout.session.expired') {
-            const session = event.data.object;
-            const pendingOrderId = session.metadata.orderId;
-
-            await db.sequelize.transaction(async (t) => {
-                await Order.update({
-                    status: 'Cancelled'
-                }, { where: { id: pendingOrderId }, transaction: t });
-
-                await Payment.update(
-                    { status: 'Cancelled' },
-                    { where: { orderId: pendingOrderId }, transaction: t }
-                );
-            });
-
-            console.log('Order cancelled due to session expiry');
-        }
-
-        res.status(200).json({ received: true });
+            if (order.userId.toString() !== userId.toString()) throw new ApiError('Order user mismatch', 400);
+            const payment = await Payment.findOne({ where: { orderId } }, { transaction: t });
+            switch (event.type) {
+                case 'checkout.session.completed': {
+                    await order.update({ status: 'Confirmed' }, { transaction: t })
+                    await payment.update({ status: 'Paid', paymentIntentId: session.payment_intent }, { transaction: t })
+                    const finalOrder=await getOrderDetails(order.id)
+                    res.status(200).json({ success: true, data: finalOrder })
+                    break;
+                }
+                case 'payment_intent.payment_failed': {
+                    await order.update({ status: 'Cancelled' ,cancelReason:'PaymentFailed'}, { transaction: t });
+                    await payment.update({ status: 'Cancelled' }, { transaction: t });
+                    await restock(orderId,t)
+                    res.status(200).json({ success: false, data: payment })
+                    break;
+                }
+                case 'checkout.session.expired': {
+                    await order.update({ status: 'Cancelled',cancelReason:'Expired' }, { transaction: t });
+                    await payment.update({ status: 'Cancelled' }, { transaction: t });
+                    await restock(orderId,t)
+                    res.status(200).json({ success: false, data: payment })
+                    break;
+                }
+            }
+        })
     } catch (error) {
         next(error);
     }

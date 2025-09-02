@@ -1,7 +1,8 @@
 const ApiError = require('../utils/ApiError');
-const { Op, fn ,col} = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const db = require('../models');
-const generateSKU  = require('../utils/generateSKU');
+const generateSKU = require('../utils/generateSKU');
+const {updateStock}=require('../services/order.service')
 
 const Product = db.product;
 const ProductVariant = db.productVariant;
@@ -144,7 +145,7 @@ const getLowStockVariants = async (req, res, next) => {
         const variants = await ProductVariant.findAll({
             where: { stockQnt: { [Op.lte]: qnt } },
             attributes: { exclude: ['createdAt', 'updatedAt'] },
-            include:[{
+            include: [{
                 model: db.variantAttribute,
                 attributes: ['id', 'name'],
                 through: {
@@ -162,7 +163,6 @@ const getLowStockVariants = async (req, res, next) => {
         next(error);
     }
 };
-
 
 const updateVariant = async (req, res, next) => {
     try {
@@ -193,19 +193,15 @@ const updateVariant = async (req, res, next) => {
 //     }
 // };
 
-const updateStock = async (req, res, next) => {
+const updateVariantStock = async (req, res, next) => {
     // use transaction and lock
     try {
-        const { qnt } = req.body;
-        const variant = await ProductVariant.findByPk(req.params.id, {
-            attributes: { include: ['id', 'variantName', 'SKU', 'stockQnt', 'updatedAt'] }
+        await db.sequelize.transaction(async (t) => {
+            const { qnt } = req.body;
+            const variant=await this.updateStock(req.params.id,qnt,t)
+            
+            res.status(200).json({ success: true, data: variant });
         });
-        if (!variant) throw new ApiError('Variant not found', 404);
-        const newStock = variant.stockQnt + qnt;
-        if (newStock < 0) throw new ApiError('Stock cannot go below 0', 400);
-        await variant.increment('stockQnt', { by: qnt });
-        await variant.reload();
-        res.status(200).json({ success: true, data: variant });
     } catch (error) {
         next(error);
     }
@@ -239,14 +235,18 @@ const deleteVariant = async (req, res, next) => {
 const getPopularVariants = async (req, res, next) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit) : 7;
+        // weekly popular
+        let startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+
         const variants = await ProductVariant.findAll({
-            attributes: ['id','variantName','SKU','price',
+            attributes: ['id', 'variantName', 'SKU', 'price',
                 [fn('SUM', col('OrderItems.quantity')), 'soldQuantity']],
-            include: [{model: OrderItem,attributes: [],required:true}],
+            include: [{ model: OrderItem, attributes: [], required: true, where: { createdAt: { [Op.gte]: startDate } } }],
             group: ['ProductVariant.id'],
             order: [[fn('SUM', col('OrderItems.quantity')), 'DESC']],
             limit,
-            subQuery:false
+            subQuery: false
         });
         res.status(200).json({ success: true, data: variants });
     } catch (error) {
@@ -261,8 +261,9 @@ module.exports = {
     addVariant,
     getLowStockVariants,
     updateVariant,
-    updateStock,
+    updateVariantStock,
     deleteVariant,
     searchAndFilterVariants,
     getPopularVariants,
+    getStock
 };

@@ -16,10 +16,17 @@ const getUserDeliveryInfo = async (req, res, next) => {
     }
 };
 
-const updateUserInfor = async (req, res, next) => {
+
+// to implement
+const updateUserInfo = async (req, res, next) => {
     try {
         
     } catch (error) {
         next(error)
     }
+};
+
+module.exports = {
+    getUserDeliveryInfo,
+    updateUserInfo
 }

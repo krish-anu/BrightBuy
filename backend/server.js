@@ -42,12 +42,7 @@ app.use('/api/city', cityRouter);
 
 
 app.use(errorMiddleware);
-app.get("/success", (req, res) => {
-  res.send("Payment successful! Your order has been placed.");
-});
-app.get("/cancel", (req, res) => {
-  res.send("Payment canceled. You can try again.");
-});
+
 //testing api
 app.get("/", (req, res) => {
   res.json({

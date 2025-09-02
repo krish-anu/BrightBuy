@@ -16,7 +16,6 @@ const User = db.user;
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
 
-
 const getOrders = async (req, res, next) => {
     try {
         const { limit } = req.query;
@@ -33,7 +32,6 @@ const getOrders = async (req, res, next) => {
         next(error);
     }
 };
-
 
 const getOrder = async (req, res, next) => {
     try {
@@ -63,35 +61,24 @@ const addOrder = async (req, res, next) => {
                 transaction: t
             });
 
-            const { totalPrice, deliveryCharge, totalAmount, deliveryDate, finalAddress, orderedItems } =
+            const { totalPrice, deliveryCharge,  deliveryDate, finalAddress, orderedItems } =
                 await calculateOrderDetails(items, deliveryMode, deliveryAddress, user, t);
 
+            const order = await saveOrderToDatabase(
+                orderedItems,
+                req.user.id,
+                deliveryMode,
+                finalAddress,
+                deliveryDate,
+                totalPrice,
+                deliveryCharge,
+                t,
+                paymentMethod
+            )
             if (paymentMethod === 'COD') {
-                const order = await saveOrderToDatabase(
-                    orderedItems,
-                    req.user.id,
-                    deliveryMode,
-                    finalAddress,
-                    deliveryDate,
-                    totalPrice,
-                    deliveryCharge,
-                    t,
-                    'COD'
-                );
                 return { type: 'order', order };
             }
             if (paymentMethod === 'Card') {
-                const pendingOrder = await saveOrderToDatabase(
-                    orderedItems,
-                    req.user.id,
-                    deliveryMode,
-                    finalAddress,
-                    deliveryDate,
-                    totalPrice,
-                    deliveryCharge,
-                    t,
-                    'Card' 
-                );
                 const session = await stripe.checkout.sessions.create({
                     payment_method_types: ['card'],
                     line_items: orderedItems.map(item => ({
@@ -103,14 +90,14 @@ const addOrder = async (req, res, next) => {
                         quantity: item.quantity
                     })),
                     mode: 'payment',
-                    success_url: `http://localhost:8081/success?session_id={CHECKOUT_SESSION_ID}`,
-                    cancel_url: `http://localhost:8081/cancel`,
+                    success_url: `http://localhost:8081/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                    cancel_url: `http://localhost:8081/payment/cancel`,
                     metadata: {
                         userId: req.user.id,
-                        orderId:pendingOrder.id,
+                        orderId:order.id,
                     }
                 });
-                return { type:'checkout',checkoutSessionId: session.id };
+                return { type:'checkout',checkoutUrl:session.url};
             }
             throw new ApiError('Invalid payment method',400)
         });
@@ -189,14 +176,13 @@ const getOrderStatus = async (req, res, next) => {
             result.deliveryAddress = order.deliveryAddress;
             result.estimatedDeliveryDate = order.estimatedDeliveryDate;
         }
-        res.status(200).json({ sucess: true, data: result });
+        res.status(200).json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
 };
 
-// update deliveryAddress or anything before shipping?
-
+// have to be implemented
 const updateOrderStatus = async (req, res, next) => {
     try {
 
