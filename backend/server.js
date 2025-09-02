@@ -7,14 +7,19 @@ const errorMiddleware = require("./middlewares/error.middleware");
 
 const app = express();
 
-var corOptins = {
-  origin: "https://localhost:8081",
-};
 
 
 
-//middleware
-app.use(cors(corOptins));
+app.use(cors({
+  origin: "http://localhost:5173",   // allow frontend
+  credentials: true
+}));
+
+
+
+
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

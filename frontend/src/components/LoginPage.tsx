@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import * as LucideIcons from 'lucide-react';
+import { loginUser } from "../services/auth.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -14,7 +15,7 @@ const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) =>
 };
 
 const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState<string>('');
+  const [email, setEmail] = useState<string>('');   // changed from username
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -25,19 +26,21 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!username || !password) {
-      setError('Please enter both username and password');
+    if (!email || !password) {
+      setError('Please enter both email and password');
       return;
     }
+    console.log("email", email);
 
     try {
-      navigate('/admin')
-      const result = await login(username, password);
+      const result = await loginUser(email, password);
+      console.log("REs",result);
       
-      if (result.success) {
+
+      if (result?.success === true) {
         navigate('/admin'); // Redirect after success
       } else {
-        setError(result.error || 'Login failed');
+        setError(result?.error || 'Login failed');
       }
     } catch (err) {
       setError('Something went wrong. Please try again.');
@@ -64,23 +67,23 @@ const LoginPage: React.FC = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
               </label>
               <div className="mt-1 relative">
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
                   required
                   className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <IconComponent iconName="User" size={16} />
+                  <IconComponent iconName="Mail" size={16} />
                 </div>
               </div>
             </div>

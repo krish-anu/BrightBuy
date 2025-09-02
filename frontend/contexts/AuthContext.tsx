@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
+import { loginUser } from "@/services/auth.services";
 
 // Types
 interface User {
@@ -91,28 +92,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<{ success: boolean; user?: User; error?: string }> => {
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 500)); // simulate API delay
+   const foundUser = await loginUser(username, password);
 
-    const foundUser = mockUsers.find(
-      (u) => u.username === username && u.password === password
-    );
+if (foundUser?.success) {
+  const userWithoutPassword = foundUser.user;
 
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
+  setUser(userWithoutPassword);
 
-      setUser(userWithoutPassword);
+  // Save user to cookie (7 days)
+  Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
+    expires: 7,
+  });
 
-      // Save user to cookie (7 days)
-      Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-        expires: 7,
-      });
-
-      setIsLoading(false);
-      return { success: true, user: userWithoutPassword };
-    } else {
-      setIsLoading(false);
-      return { success: false, error: "Invalid username or password" };
-    }
+  setIsLoading(false);
+  return { success: true, user: userWithoutPassword };
+} else {
+  setIsLoading(false);
+  return { success: false, error: foundUser?.error || "Invalid username or password" };
+}
   };
 
   // Logout function

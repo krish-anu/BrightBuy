@@ -13,6 +13,7 @@ const registerUser = async (req, res) => {
 
     // Create user in Sequelize
     const newUser = await User.create({
+    
       name,
       email,
       password: hashedPassword,
@@ -59,9 +60,9 @@ const loginUser = async (req, res) => {
       process.env.JWT_SECRET, 
       { expiresIn: "1h" }
     );
-     console.log("Hiiiiiiiiiiiiii", token); 
+    //  console.log("Hiiiiiiiiiiiiii", token); 
 
-    res.status(200).json({ token, role: user.role, email: user.email });
+    res.status(200).json(user);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
