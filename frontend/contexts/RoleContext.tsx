@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react'; 
-import { useAuth } from './AuthContext';
-import * as LucideIcons from 'lucide-react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
+import { useAuth } from "./AuthContext";
+import * as LucideIcons from "lucide-react";
 
 // Type for each route item in sidebar
 export interface RouteItem {
@@ -27,7 +27,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 export const useRole = (): RoleContextType => {
   const context = useContext(RoleContext);
   if (!context) {
-    throw new Error('useRole must be used within a RoleProvider');
+    throw new Error("useRole must be used within a RoleProvider");
   }
   return context;
 };
@@ -40,7 +40,7 @@ interface RoleProviderProps {
 // RoleProvider component
 export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   const { user } = useAuth();
-  const [currentRole, setCurrentRole] = useState<string>('admin'); // Default role
+  const [currentRole, setCurrentRole] = useState<string>("user"); // Default role
 
   // Update role when user changes
   useEffect(() => {
@@ -51,28 +51,44 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
 
   // Define role configurations and sidebar routes
   const roleConfig: Record<string, { name: string; routes: RouteItem[] }> = {
+    superAdmin: {
+      name: "Super Admin",
+      routes: [
+        { path: "/superadmin", label: "Overview", icon: "LayoutDashboard" },
+        { path: "/superadmin/settings", label: "System Settings", icon: "Settings" },
+        { path: "/superadmin/logs", label: "System Logs", icon: "FileText" },
+      ],
+    },
     admin: {
-      name: 'Main Admin',
+      name: "Main Admin",
       routes: [
-        { path: '/admin', label: 'Dashboard', icon: 'LayoutDashboard' },
-        { path: '/admin/users', label: 'User Management', icon: 'Users' },
-        { path: '/admin/inventory', label: 'Inventory', icon: 'Package' },
-        { path: '/admin/orders', label: 'Orders', icon: 'ShoppingCart' },
-        { path: '/admin/reports', label: 'Reports', icon: 'BarChart3' },
+        { path: "/admin", label: "Dashboard", icon: "LayoutDashboard" },
+        { path: "/admin/users", label: "User Management", icon: "Users" },
+        { path: "/admin/inventory", label: "Inventory", icon: "Package" },
+        { path: "/admin/orders", label: "Orders", icon: "ShoppingCart" },
+        { path: "/admin/reports", label: "Reports", icon: "BarChart3" },
       ],
     },
-    warehouse: {
-      name: 'Warehouse Staff',
+    warehouseStaff: {
+      name: "Warehouse Staff",
       routes: [
-        { path: '/admin/inventory', label: 'Inventory', icon: 'Package' },
-        { path: '/admin/orders', label: 'Orders', icon: 'ShoppingCart' },
+        { path: "/admin/inventory", label: "Inventory", icon: "Package" },
+        { path: "/admin/orders", label: "Orders", icon: "ShoppingCart" },
       ],
     },
-    delivery: {
-      name: 'Delivery Staff',
+    deliveryStaff: {
+      name: "Delivery Staff",
       routes: [
-        { path: '/admin/deliveries', label: 'Assigned Deliveries', icon: 'Truck' },
-        { path: '/admin/delivery-status', label: 'Update Status', icon: 'RefreshCw' },
+        { path: "/admin/deliveries", label: "Assigned Deliveries", icon: "Truck" },
+        { path: "/admin/delivery-status", label: "Update Status", icon: "RefreshCw" },
+      ],
+    },
+    user: {
+      name: "Customer",
+      routes: [
+        { path: "/shop", label: "Shop", icon: "ShoppingBag" },
+        { path: "/orders", label: "My Orders", icon: "Package" },
+        { path: "/profile", label: "Profile", icon: "User" },
       ],
     },
   };
@@ -84,15 +100,15 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
 
   // Get current role display name
   const getCurrentRoleName = (): string => {
-    return roleConfig[currentRole]?.name || 'Unknown Role';
+    return roleConfig[currentRole]?.name || "Unknown Role";
   };
 
   // Check if user has access to a route
   const hasAccess = (routePath: string): boolean => {
-    return getCurrentUserRoutes().some(route => route.path === routePath);
+    return getCurrentUserRoutes().some((route) => route.path === routePath);
   };
 
-  // Switch role
+  // Switch role (manual role switching, e.g. for testing)
   const switchRole = (newRole: string) => {
     if (roleConfig[newRole]) {
       setCurrentRole(newRole);

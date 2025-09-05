@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
-import { loginUser } from "@/services/auth.services";
+import { loginUser } from "../src/services/auth.services";
 
 // Types
 interface User {
   id: number;
   username: string;
-  role: "admin" | "warehouse" | "delivery";
+  role: "user" | "admin" | "superAdmin" | "warehouseStaff" | "deliveryStaff";
   name: string;
   email: string;
 }
@@ -15,7 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (
-    username: string,
+    email: string,
     password: string
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
@@ -33,34 +33,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-// Mock users for demonstration
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: 1,
-    username: "admin",
-    password: "admin123",
-    role: "admin",
-    name: "John Admin",
-    email: "admin@brightbuy.com",
-  },
-  {
-    id: 2,
-    username: "warehouse",
-    password: "warehouse123",
-    role: "warehouse",
-    name: "Sarah Warehouse",
-    email: "warehouse@brightbuy.com",
-  },
-  {
-    id: 3,
-    username: "delivery",
-    password: "delivery123",
-    role: "delivery",
-    name: "Mike Delivery",
-    email: "delivery@brightbuy.com",
-  },
-];
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -86,30 +58,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (
-    username: string,
-    password: string
-  ): Promise<{ success: boolean; user?: User; error?: string }> => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
+    try {
+      const foundUser = await loginUser(email, password);
+      console.log("foundUser", foundUser);
 
-   const foundUser = await loginUser(username, password);
-
-if (foundUser?.success) {
-  const userWithoutPassword = foundUser.user;
-
-  setUser(userWithoutPassword);
-
-  // Save user to cookie (7 days)
-  Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-    expires: 7,
-  });
-
-  setIsLoading(false);
-  return { success: true, user: userWithoutPassword };
-} else {
-  setIsLoading(false);
-  return { success: false, error: foundUser?.error || "Invalid username or password" };
-}
+      if (foundUser?.success) {
+        const userWithoutPassword = foundUser.user;
+        setUser(userWithoutPassword);
+        Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
+          expires: 7,
+        });
+        return { success: true, user: userWithoutPassword };
+      } else {
+        return {
+          success: false,
+          error: foundUser?.error || "Invalid username or password",
+        };
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      return { success: false, error: "Something went wrong" };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Logout function

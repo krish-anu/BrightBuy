@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import * as LucideIcons from 'lucide-react';
-import { loginUser } from "../services/auth.services";
+// import { loginUser } from "../services/auth.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -33,7 +33,7 @@ const LoginPage: React.FC = () => {
     console.log("email", email);
 
     try {
-      const result = await loginUser(email, password);
+      const result = await login(email, password);
       console.log("REs",result);
       
 
