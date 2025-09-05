@@ -1,49 +1,88 @@
-import React, { useState } from 'react';
-import { users } from '../../../data/mockData';
-import * as LucideIcons from 'lucide-react';
-import type { LucideProps } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import * as LucideIcons from "lucide-react";
+import type { LucideProps } from "lucide-react";
+import { getAllUsers } from "../../services/user.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
   size?: number;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+}) => {
   const Icon = LucideIcons[iconName] as React.ComponentType<LucideProps>;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
 
-const UserManagement: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('');
+// Normalize roles for filtering and display
+const normalizeRole = (role: string) => {
+  switch (role) {
+    case "admin": return "admin";
+    case "warehouseStaff": return "warehouse";
+    case "deliveryStaff": return "delivery";
+    case "customer": return "customer";
+    default: return role;
+  }
+};
 
-  const filteredUsers = users.filter(user => {
+// Display friendly role names
+const displayRole = (role: string) => {
+  switch (role) {
+    case "admin": return "Admin";
+    case "warehouseStaff": return "Warehouse Staff";
+    case "deliveryStaff": return "Delivery Staff";
+    case "customer": return "Customer";
+    default: return role;
+  }
+};
+
+const UserManagement: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await getAllUsers();
+      if (res?.data) setUsers(res.data);
+      console.log("Fetched users:", res?.data);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === '' || user.role === filterRole;
+    const matchesRole =
+      filterRole === "" || normalizeRole(user.role) === filterRole;
     return matchesSearch && matchesRole;
   });
 
   const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-800';
-      case 'warehouse':
-        return 'bg-blue-100 text-blue-800';
-      case 'delivery':
-        return 'bg-green-100 text-green-800';
-      case 'customer':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+    switch (normalizeRole(role)) {
+      case "admin": return "bg-purple-100 text-purple-800";
+      case "warehouse": return "bg-blue-100 text-blue-800";
+      case "delivery": return "bg-green-100 text-green-800";
+      case "customer": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusColor = (status: string) =>
-    status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+    status === "active"
+      ? "bg-green-100 text-green-800"
+      : "bg-red-100 text-red-800";
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString();
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -52,7 +91,7 @@ const UserManagement: React.FC = () => {
         <p className="text-gray-600 mt-2">Manage system users and their roles</p>
       </div>
 
-      {/* Search and Filter */}
+      {/* Search & Filter */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
@@ -75,8 +114,8 @@ const UserManagement: React.FC = () => {
           >
             <option value="">All Roles</option>
             <option value="admin">Admin</option>
-            <option value="warehouse">Warehouse</option>
-            <option value="delivery">Delivery</option>
+            <option value="warehouse">Warehouse Staff</option>
+            <option value="delivery">Delivery Staff</option>
             <option value="customer">Customer</option>
           </select>
 
@@ -93,40 +132,33 @@ const UserManagement: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th>ID</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Phone</th>
+                <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">{user.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <IconComponent iconName="User" size={20} />
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                    <div className="text-sm text-gray-500">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.status)}`}>
-                      {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(
+                        user.role
+                      )}`}
+                    >
+                      {displayRole(user.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(user.lastLogin)}
+                    {user.phone || "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatDate(user.createdAt)}
@@ -153,50 +185,32 @@ const UserManagement: React.FC = () => {
 
       {/* User Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-md">
-              <IconComponent iconName="Shield" size={24} />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'admin').length}</div>
-              <div className="text-sm text-gray-500">Admins</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-md">
-              <IconComponent iconName="Package" size={24} />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'warehouse').length}</div>
-              <div className="text-sm text-gray-500">Warehouse Staff</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-md">
-              <IconComponent iconName="Truck" size={24} />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'delivery').length}</div>
-              <div className="text-sm text-gray-500">Delivery Staff</div>
+        {["admin", "warehouse", "delivery", "customer"].map((role) => (
+          <div key={role} className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 rounded-md">
+                <IconComponent
+                  iconName={
+                    role === "admin"
+                      ? "Shield"
+                      : role === "warehouse"
+                      ? "Package"
+                      : role === "delivery"
+                      ? "Truck"
+                      : "Users"
+                  }
+                  size={24}
+                />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {users.filter((u) => normalizeRole(u.role) === role).length}
+                </div>
+                <div className="text-sm text-gray-500">{displayRole(role)}</div>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-gray-100 rounded-md">
-              <IconComponent iconName="Users" size={24} />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'customer').length}</div>
-              <div className="text-sm text-gray-500">Customers</div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
