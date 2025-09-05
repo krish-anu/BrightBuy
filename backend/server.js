@@ -30,11 +30,13 @@ const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
 const variantRouter = require('./routes/variant');
 const authRouter = require('./routes/auth');
+const orderRouter=require("./routes/order")
 
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);
 app.use('/api/auth', authRouter);
+app.use('api/order',orderRouter)
 
 
 
