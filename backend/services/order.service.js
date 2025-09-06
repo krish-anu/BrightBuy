@@ -108,7 +108,6 @@ const restock = async (orderId,transaction) => {
 
 module.exports = {
     saveOrderToDatabase, addOrderItems,
-    decrementStockforOrder,
     getOrderDetails,
     createOrder,
     restock,
