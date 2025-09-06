@@ -22,8 +22,6 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(100),
             allowNull:true,
         }
-    }, {
-        indexes:[{fields:['brand']}]
     });
     return Product;
 };

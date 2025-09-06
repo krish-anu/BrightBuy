@@ -2,62 +2,83 @@ const db = require('../models');
 const Order = db.order;
 const ApiError = require('../utils/ApiError');
 const Payment = db.payment;
+const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
+const { getOrderDetails, restock } = require('../services/order.service');
+const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
-
-app.get("/success", async (req, res) => {
+const successPayment = async (req, res, next) => {
     try {
-        const result = await db.sequelize.transaction(async t => {
-            const session = await stripeWebhook.checkout.sessions.retrieve(req.query.session_id);
-            if (session.status != 'paid') {
-                throw new ApiError('Payment not completed', 400);
-            }
-            const { orderId, userId } = session.metadata;
-            const order = await Order.findByPk(orderId, { transaction: t });
+        const sessionId = req.query.session_id;
+        if (!sessionId) {
+            throw new ApiError('Session ID is required', 400);
+        }
 
-            await order.update({ status: 'Confirmed' }, { transaction: t });
-            const payment = await Payment.findOne({ where: { orderId: orderId } }, { transaction: t });
-            await payment.update({ status: 'Paid' }, { transaction: t });
-            return await Order.findByPk(order.id, {
-                attributes: { exclude: ['createdAt', 'updatedAt'] },
-                include: [{
-                    model: OrderItem,
-                    attributes: { exclude: ['createdAt', 'updatedAt', 'orderId', 'variantId'] },
-                    include: [{
-                        model: ProductVariant,
-                        attributes: ['id', 'variantName', 'SKU', 'price', 'stockQnt'],
-                        include: [{
-                            model: VariantAttribute,
-                            attributes: ['id', 'name'],
-                            through: { model: ProductVariantOption, attributes: ['value'] }
-                        }]
-                    }]
-                }],
-                transaction: t
+        const result = await db.sequelize.transaction(async t => {
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+            if (session.payment_status === 'paid') {
+                const orderId = session.metadata.orderId;
+                const order = await getOrderDetails(orderId, t);
+                return { paymentStatus: session.payment_status, order };
+            }
+
+            return { paymentStatus: session.payment_status };
+        });
+
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const cancelledPayment = async (req, res, next) => {
+    try {
+        const sessionId = req.query.session_id;
+        if (!sessionId) {
+            throw new ApiError('Session ID is required', 400);
+        }
+
+        await db.sequelize.transaction(async t => {
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+            const { orderId, userId } = session.metadata;
+
+            if (!orderId) {
+                return res.status(200).json({ success: true, message: 'No order to cancel' });
+            }
+
+            const order = await Order.findByPk(orderId, { transaction: t });
+            if (!order) {
+                return res.status(404).json({ success: false, message: 'Order not found' });
+            }
+
+            // Only cancel if order is still pending
+            if (order.status === 'Pending') {
+                await order.update({
+                    status: 'Cancelled',
+                    cancelReason: 'UserCancelled'
+                }, { transaction: t });
+
+                const payment = await Payment.findOne({ where: { orderId }, transaction: t });
+                if (payment) {
+                    await payment.update({ status: 'Cancelled' }, { transaction: t });
+                }
+
+                // Restock items that were not backordered
+                await restock(orderId, t);
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Payment cancelled successfully',
+                orderStatus: order.status
             });
         });
-        return res.status(201).json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-
-    }
-});
-
-app.get("/cancel", async (req, res) => {
-    try {
-        await db.sequelize.transaction(async t => {
-            const session = await stripe.checkout.sessions.retrieve(req.query.session_id);
-            const { orderId, userId } = session.metadata;
-            const order = await Order.findByPk(orderId);
-            await Order.destroy({ where: { id: order.id } });
-            const payment = await Payment.findOne({ where: { orderId: order.id } }, { transaction: t });
-            await payment.update({ status: 'Failed' }, { transaction: t });
-            await payment.destroy();
-            res.status(200).json({ success: true, message: 'payment Cancelled' });
-    
-        });
     } catch (error) {
         next(error);
     }
+};
 
-});
-
+module.exports = {
+    successPayment,
+    cancelledPayment,
+};

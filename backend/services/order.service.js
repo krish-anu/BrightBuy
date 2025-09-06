@@ -16,7 +16,7 @@ const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, de
     return getOrderDetails(order.id, transaction);
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, transaction) => {
+const createOrder = async (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod,transaction) => {
     const status = paymentMethod === 'COD' ? 'Confirmed' : 'Pending';
     const order = await Order.create({
         totalPrice, // without delivery
@@ -59,7 +59,7 @@ const getOrderDetails = async (orderId, transaction) => {
             attributes: { exclude: ['createdAt', 'updatedAt', 'orderId', 'variantId'] },
             include: [{
                 model: ProductVariant,
-                attributes: ['id', 'variantName', 'SKU', 'price', 'stockQnt'],
+                attributes: ['id', 'variantName', 'SKU', 'price'],
                 include: [{
                     model: VariantAttribute,
                     attributes: ['id', 'name'],
@@ -84,26 +84,36 @@ const updateStock = async (variantId, quantityChange, transaction) => {
 };
 
 //increment stock after order cancelled
-const restock = async (orderId,transaction) => {
+const restock = async (orderId, transaction) => {
     try {
         const order = await Order.findByPk(orderId, { transaction });
-        if (!order || order.status !== 'Cancelled') throw new ApiError('Order not found or cancelled');
+        if (!order) throw new ApiError('Order not found', 404);
+
+        // Allow restocking for cancelled orders
+        if (order.status !== 'Cancelled') {
+            console.log(`Order ${ orderId } is not cancelled, skipping restock`);
+            return;
+        }
+
         const orderedItems = await OrderItem.findAll({
             where: { orderId },
             attributes: ['id', 'quantity', 'isBackOrdered', 'variantId'],
             transaction,
         });
+
         for (const item of orderedItems) {
+            // Only restock items that were actually deducted from stock
             if (!item.isBackOrdered) {
                 await updateStock(item.variantId, item.quantity, transaction);
             }
         }
-        
-    } catch (error) {
-        next(error)
-    }
-}
 
+        console.log(`Successfully restocked items for order ${ orderId }`);
+    } catch (error) {
+        console.error('Error in restock:', error);
+        throw error; // Re-throw to be handled by the calling function
+    }
+};
 
 
 module.exports = {

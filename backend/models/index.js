@@ -38,7 +38,7 @@ db.orderItem = require('./orderItem.model')(sequelize, DataTypes);
 db.payment = require('./payment.model')(sequelize, DataTypes);
 db.city = require('./city.model')(sequelize, DataTypes);
 
-db.sequelize.sync({ force: false }).then(() => {
+db.sequelize.sync({ alter:false }).then(() => {
   console.log('Yes re-sync done');
 
 });

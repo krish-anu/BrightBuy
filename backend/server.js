@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require('body-parser');
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
 
@@ -11,11 +10,12 @@ const orderRouter = require('./routes/order');
 const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
 const webhookRouter = require('./routes/webhook');
+const paymentRouter=require('./routes/payment')
 
 const app = express();
 
 var corOptins = {
-  origin: "http://localhost:5500",
+  // origin: "http://localhost:5500",
 };
 
 
@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 
-app.use('/api/webhook', webhookRouter);
+app.use('/api/payment',paymentRouter)
 app.use('/api/auth', authRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);

@@ -54,6 +54,7 @@ const addOrder = async (req, res, next) => {
             throw new ApiError('Items, delivery mode, and payment method are required', 400);
         }
 
+        // Start transaction
         const result = await db.sequelize.transaction(async t => {
             const user = await User.findByPk(req.user.id, {
                 attributes: ['address', 'cityId'],
@@ -61,10 +62,11 @@ const addOrder = async (req, res, next) => {
                 transaction: t
             });
 
-            const { totalPrice, deliveryCharge,  deliveryDate, finalAddress, orderedItems } =
+            const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
                 await calculateOrderDetails(items, deliveryMode, deliveryAddress, user, t);
 
-            const order = await saveOrderToDatabase(
+            // Save order and payment in DB
+            const orderDetails = await saveOrderToDatabase(
                 orderedItems,
                 req.user.id,
                 deliveryMode,
@@ -73,36 +75,41 @@ const addOrder = async (req, res, next) => {
                 totalPrice,
                 deliveryCharge,
                 t,
-                paymentMethod
-            )
+                paymentMethod,
+                null // paymentIntentId is null initially for card payments
+            );
+
+            // For COD, return immediately
             if (paymentMethod === 'COD') {
-                return { type: 'order', order };
+                return { type: 'order', order: orderDetails };
             }
-            if (paymentMethod === 'Card') {
-                const session = await stripe.checkout.sessions.create({
-                    payment_method_types: ['card'],
-                    line_items: orderedItems.map(item => ({
-                        price_data: {
-                            currency: 'lkr',
-                            product_data: { name: item.productName },
-                            unit_amount: Math.round(item.price * 100)
-                        },
-                        quantity: item.quantity
-                    })),
-                    mode: 'payment',
-                    success_url: `http://localhost:8081/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-                    cancel_url: `http://localhost:8081/payment/cancel`,
-                    metadata: {
-                        userId: req.user.id,
-                        orderId:order.id,
-                    }
-                });
-                return { type:'checkout',checkoutUrl:session.url};
-            }
-            throw new ApiError('Invalid payment method',400)
+
+            // For Card, create Stripe session AFTER committing order in DB
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: orderedItems.map(item => ({
+                    price_data: {
+                        currency: 'lkr',
+                        product_data: { name: item.productName },
+                        unit_amount: Math.round(item.price * 100)
+                    },
+                    quantity: item.quantity
+                })),
+                mode: 'payment',
+                success_url: `http://localhost:8081/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `http://localhost:8081/api/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
+                metadata: {
+                    userId: req.user.id.toString(),
+                    orderId: orderDetails.id.toString()
+                }
+            });
+
+            return { type: 'checkout', checkoutSessionId: session.id, orderId: orderDetails.id };
         });
-        if (result.type === 'order')
-            return res.status(201).json({success:true,data:result.order})
+
+        if (result.type === 'order') {
+            return res.status(201).json({ success: true, data: result.order });
+        }
         return res.status(200).json({ success: true, data: result });
     } catch (error) {
         next(error);

@@ -21,8 +21,6 @@ module.exports = (sequelize, DataTypes) => {
             onUpdate: 'CASCADE',
             onDelete: 'SET NULL'
         }
-    }, {
-        indexes:[{fields:['parentId']}]
     });
     return Category;
 };

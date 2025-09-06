@@ -45,10 +45,6 @@ module.exports = (sequelize, DataTypes) => {
         cancelReason: {
             type:DataTypes.ENUM('PaymentFailed','Expired','UserCancelled')
         }
-    }, {
-        indexes: [
-            { fields: ['orderDate'] },
-            { fields: ['status'] }]
     });
     return Order;
 };
