@@ -4,7 +4,7 @@ const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
 const ROLES = require('../roles');
 const router = require('express').Router();
-
+router.get("/totalRevenue",getTotalRevenue)
 
 router.get('/category',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),getCategoryWiseOrders)
 router.get('/user', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getUserOrders);

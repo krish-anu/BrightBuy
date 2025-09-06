@@ -241,7 +241,16 @@ const getCategoryWiseOrders = async (req, res, next) => {
         next(error);
     }
 };
+const getTotalRevenue=async (req,res,next)=>{
+        try{
+            const totalRevenue=await Order.sum("totalPrice")
 
+            res.status(200).json({success:true,data:totalRevenue})
+
+        }catch(error){
+            next(error)
+        }
+}
 
 
 module.exports = {
@@ -253,5 +262,6 @@ module.exports = {
     cancelOrder,
     getOrderStatus,
     updateOrderStatus,
-    getCategoryWiseOrders
+    getCategoryWiseOrders,
+    getTotalRevenue
 };

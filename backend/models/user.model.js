@@ -1,13 +1,14 @@
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define("User", {
     id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
+      type: DataTypes.INTEGER,
       primaryKey: true,
+      autoIncrement: true,
+      allowNull: false,
     },
     name: {
       type: DataTypes.STRING,
-    //   allowNull: false,
+      allowNull: false,
     },
     email: {
       type: DataTypes.STRING,
@@ -34,12 +35,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     address: {
       type: DataTypes.STRING,
-    //   allowNull: true,
-
+      allowNull: true,
     },
     phone: {
       type: DataTypes.STRING,
-    //   allowNull: true,
+      allowNull: true,
     },
     createdAt: {
       type: DataTypes.DATE,
@@ -51,10 +51,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    // city: {
-    //   type: DataTypes.STRING,
-    // //   allowNull: true,
-    // },
+    city: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   });
   return User;
 };

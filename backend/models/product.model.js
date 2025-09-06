@@ -1,11 +1,12 @@
 module.exports = (sequelize, DataTypes) => {
-    const Product = sequelize.define("Product", {
-        id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
-            primaryKey: true,
-        },
-        name: {
+  const Product = sequelize.define("Product", {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false,
+    },
+     name: {
             type: DataTypes.STRING(200),
             allowNull: false,
             unique: true,
@@ -14,16 +15,16 @@ module.exports = (sequelize, DataTypes) => {
                 len:[2,200]
             }
         },
-        description: {
-            type: DataTypes.TEXT,
-            allowNull:true,
-        },
-        brand: {
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    brand: {
             type: DataTypes.STRING(100),
             allowNull:true,
         }
-    }, {
+  },{
         indexes:[{fields:['brand']}]
     });
-    return Product;
+  return Product;
 };
