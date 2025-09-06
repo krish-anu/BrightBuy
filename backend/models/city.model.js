@@ -8,7 +8,6 @@ module.exports = (sequelize, DataTypes) => {
         name: {
             type: DataTypes.STRING(200),
             allowNull: false,
-            unique: true,
             validate: {
                 notEmpty: true,
                 len: [2, 200]
@@ -16,10 +15,8 @@ module.exports = (sequelize, DataTypes) => {
         },
         isMainCity: {
             type: DataTypes.BOOLEAN,
-            defaultValue:false
+            defaultValue: false
         }
-    }, {
-        indexes: [{ fields: ['name'] },{fields:['isMainCity']}]
     });
     return City;
 };

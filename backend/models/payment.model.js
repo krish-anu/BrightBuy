@@ -29,10 +29,6 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             unique: true,
         }
-    }, {
-        indexes: [
-            { fields: ['status'] },
-            { fields: ['paymentMethod'] }]
     });
     return Payment;
 };

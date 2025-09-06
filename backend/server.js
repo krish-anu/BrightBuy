@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require('body-parser');require('dotenv').config()
+const bodyParser = require('body-parser');
+require('dotenv').config()
 
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
@@ -38,7 +39,7 @@ const webhookRouter = require('./routes/webhook');
 const userRouter=require("./routes/user")
 
 
-app.use('/api/webhook', webhookRouter);
+app.use('/api/payment',paymentRouter)
 app.use('/api/auth', authRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);

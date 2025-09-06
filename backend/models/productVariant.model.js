@@ -34,11 +34,6 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             validate: { min: 0 },
         },
-    }, {
-        indexes: [
-            { fields: ['SKU'], unique: true },
-            { fields: ['stockQnt'] },
-            { fields: ['price'] }]
     });
     return ProductVariant;
 };
