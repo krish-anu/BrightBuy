@@ -15,7 +15,7 @@ const paymentRouter=require('./routes/payment')
 const app = express();
 
 var corOptins = {
-  // origin: "http://localhost:5500",
+  origin: "http://localhost:5500",
 };
 
 

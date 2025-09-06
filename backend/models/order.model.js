@@ -49,4 +49,3 @@ module.exports = (sequelize, DataTypes) => {
     return Order;
 };
 
-// returned order?
