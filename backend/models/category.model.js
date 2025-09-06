@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
             validate:{notEmpty:true,len:[2,100]}
     },
     parentId: {
-      type: DataTypes.UUID,
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: "Categories",

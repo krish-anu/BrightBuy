@@ -5,13 +5,7 @@ const bodyParser = require('body-parser');require('dotenv').config()
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
 
-const categoryRouter = require('./routes/category');
-const productRouter = require('./routes/product');
-const variantRouter = require('./routes/variant');
-const orderRouter = require('./routes/order');
-const cityRouter = require('./routes/city');
-const authRouter = require('./routes/auth');
-const webhookRouter = require('./routes/webhook');
+
 
 const app = express();
 
@@ -23,7 +17,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use('/api/webhook', webhookRouter);
+
 
 
 
@@ -32,14 +26,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-
+ 
 //routers
 const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
 const variantRouter = require('./routes/variant');
+const orderRouter = require('./routes/order'); 
+const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
-const orderRouter=require("./routes/order")
+const webhookRouter = require('./routes/webhook');
 const userRouter=require("./routes/user")
+
 
 app.use('/api/webhook', webhookRouter);
 app.use('/api/auth', authRouter);

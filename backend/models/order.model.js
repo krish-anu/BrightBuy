@@ -27,13 +27,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       deliveryCharge: {
-            type: DataTypes.DECIMAL(10, 2),
-            defaultValue: 0.00,
-            validate: { min: 0 }
-        },
+        type: DataTypes.DECIMAL(10, 2),
+        defaultValue: 0.00,
+        validate: { min: 0 },
+      },
       estimatedDeliveryDate: {
         type: DataTypes.DATE,
         allowNull: true,
+        defaultValue: null,
       },
       status: {
         type: DataTypes.ENUM(
@@ -46,16 +47,21 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: "Pending",
       },
+      paymentMethod: {
+        type: DataTypes.ENUM("Card", "CashOnDelivery"),
+        allowNull: false,
+      },
       cancelReason: {
-            type:DataTypes.ENUM('PaymentFailed','Expired','UserCancelled')
-        }
-    }, {
-        indexes: [
-            { fields: ['orderDate'] },
-            { fields: ['status'] }]
+        type: DataTypes.ENUM("PaymentFailed", "Expired", "UserCancelled"),
+        allowNull: true,
+      },
     },
+    {
+      indexes: [
+        { fields: ["orderDate"] },
+        { fields: ["status"] },
+      ],
+    }
   );
   return Order;
 };
-
-// returned order?

@@ -12,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
             validate: {
                 notEmpty: true,
                 len: [2, 200]
-            }
+            } 
         },
         isMainCity: {
             type: DataTypes.BOOLEAN,

@@ -52,6 +52,8 @@ const getVariant = async (req, res, next) => {
 
 const addVariant = async (req, res, next) => {
     try {
+        console.log('req.body:', req.body);
+
         const { variantName, productId, price, stockQnt, attributes } = req.body;
         if (!productId || !price || !attributes) {
             throw new ApiError('Product id, price, attributes are required', 400);
