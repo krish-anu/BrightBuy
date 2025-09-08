@@ -14,7 +14,7 @@ interface IconComponentProps {
 interface ProductVariant {
   id: number;
   variantName: string;
-  price: string;
+  price: number;
   stockQnt: number;
 }
 
@@ -60,6 +60,7 @@ const Inventory: React.FC = () => {
         }))
       );
       setProducts(flattened);
+      
     }
   };
 
@@ -185,7 +186,49 @@ const loadCategories = async () => {
           </table>
         </div>
       </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-md">
+              <IconComponent iconName="Package" size={24} />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{products.length}</div>
+              <div className="text-sm text-gray-500">Total Products</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-md">
+              <IconComponent iconName="AlertTriangle" size={24} />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">
+                {products.filter(p => p.stockQnt <= 10).length}
+              </div>
+              <div className="text-sm text-gray-500">Low Stock Items</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-md">
+              <IconComponent iconName="DollarSign" size={24} />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">
+                ${products.reduce((sum, p) => sum + (p.price * p.stockQnt), 0).toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-500">Total Value</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+    
   );
 };
 
