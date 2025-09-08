@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { getAllProducts } from '@/services/product.services';
+import { getAllCategories } from '@/services/category.services';
 
 // Icon props
 interface IconComponentProps {
@@ -38,6 +39,7 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [products, setProducts] = useState<ProductVariantFlattened[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);  
 
   // Icon component
   const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
@@ -61,9 +63,7 @@ const Inventory: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+
 
   // Filter products by search and category
   const filteredProducts = products.filter(p =>
@@ -72,8 +72,15 @@ const Inventory: React.FC = () => {
     (filterCategory === '' || p.categories.includes(filterCategory))
   );
 
-  // Extract unique categories
-  const categories = Array.from(new Set(products.flatMap(p => p.categories.split(', '))));
+const loadCategories = async () => {
+  try {
+    const categories = await getAllCategories();
+
+    setCategories(categories.data.map((cat: { id: number; name: string }) => cat.name));
+  } catch (error) {
+    console.error('Error loading categories:', error);
+  }
+};
 
   // Stock status helper
   const getStockStatus = (stock: number) => {
@@ -81,6 +88,12 @@ const Inventory: React.FC = () => {
     if (stock <= 10) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
   };
+    useEffect(() => {
+    loadProducts();
+    loadCategories();
+        console.log('categories',categories);
+
+  }, []);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
