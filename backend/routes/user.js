@@ -20,7 +20,7 @@ const { getAllUsers } = require("../controllers/user.controller");
 
 // // ===================== ADMIN ROUTES =====================
 // // Admin can update product details
-// router.put(
+// router.put( 
 //   "/products/:id",
 //   verifyToken,
 //   authorizeRoles(ROLES.ADMIN),
