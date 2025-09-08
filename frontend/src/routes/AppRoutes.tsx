@@ -37,21 +37,23 @@ function App() {
             {/* ========== User Routes ========== */}
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<UserSignup />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/cart" element={<CartPage />} />
+              <Route path="login" element={<Login />} />
+              <Route path="signup" element={<UserSignup />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route path="cart" element={<CartPage />} />
+              <Route path="products/:id" element={<ProductDetailPage />} />
+
             </Route>
 
             {/* ========== Admin Routes (Protected) ========== */}
-            <Route path="/admin" element={<AdminLayout />}>
+            <Route path="admin" element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/deliveries" element={<AssignedDeliveries />} />
-              <Route path="/delivery-status" element={<DeliveryStatus />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="deliveries" element={<AssignedDeliveries />} />
+              <Route path="delivery-status" element={<DeliveryStatus />} />
             </Route>
           </Routes>
         </div>

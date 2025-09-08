@@ -21,7 +21,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <span className="text-md md:text-lg font-bold text-secondary">LKR {product.price}</span>
       </CardContent>
       <CardFooter className="flex justify- px-0">
-        <Link to={`/product/${product.id}`} className="w-full">
+        <Link to={`/products/${product.id}`} className="w-full">
           <Button variant="order" size="lg" className="w-full text-md font-bold "><ShoppingBag className="inline-block mr-2" />Buy Now</Button>
         </Link>
       </CardFooter>
