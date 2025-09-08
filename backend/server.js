@@ -37,17 +37,20 @@ const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
 const webhookRouter = require('./routes/webhook');
 const userRouter=require("./routes/user")
+const paymentRouter=require('./routes/payment') 
 
 
-app.use('/api/payment',paymentRouter)
+app.use('/api/webhook',webhookRouter)
 app.use('/api/auth', authRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);
 app.use('/api/order', orderRouter);
-app.use('/api/city', cityRouter);app.use('/api/auth', authRouter);
+app.use('/api/city', cityRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/order', orderRouter);
 app.use('/api/users', userRouter);
+app.use('./api/payment',paymentRouter)
 
 
 
