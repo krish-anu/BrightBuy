@@ -9,8 +9,8 @@ import { AuthProvider } from "../../contexts/AuthContext";
 import { RoleProvider } from "../../contexts/RoleContext";
 
 // Admin Components
-import PrivateRoute from "../components/PrivateRoute";
-import AdminLayout from "../components/AdminLayout";
+import PrivateRoute from "../components/Admin/PrivateRoute";
+import AdminLayout from "../components/Admin/AdminLayout";
 import Dashboard from "../pages/Admin/Dashboard";
 import Inventory from "../pages/Admin/Inventory";
 import Orders from "../pages/Admin/Orders";
@@ -24,7 +24,7 @@ import Layout from "@/components/Layout/Layout";
 import HomePage from "@/pages/User/HomePage";
 import ProductsPage from "@/pages/User/ProductsPage";
 import CartPage from "@/pages/User/CartPage";
-import Login from "@/components/LoginPage";
+import Login from "@/components/Admin/LoginPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 
@@ -46,7 +46,11 @@ function App() {
             </Route>
 
             {/* ========== Admin Routes (Protected) ========== */}
-            <Route path="admin" element={<AdminLayout />}>
+            <Route path="admin" element={
+              <PrivateRoute roles={['admin']}>
+                <AdminLayout />
+              </PrivateRoute>
+            }>
               <Route index element={<Dashboard />} />
               <Route path="users" element={<UserManagement />} />
               <Route path="inventory" element={<Inventory />} />
