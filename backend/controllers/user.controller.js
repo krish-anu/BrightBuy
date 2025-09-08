@@ -7,7 +7,7 @@ const User = db.user;
 const getUserDeliveryInfo = async (req, res, next) => {
     try {
         const userInfo = await User.findByPk(req.user.id, {
-            attributes:['id','name','email','address','phone','city']
+            attributes:['id','name','email','address','phone','cityId','createdAt']
         })
         if (!userInfo) throw new ApiError('User not found', 404);
         res.status(200).json({success:true,data:userInfo})
@@ -35,7 +35,7 @@ const getAllUsers = async (req, res, next) => {
         "role",
         "address",
         "phone",
-        "city",
+        "cityId",
         "createdAt",
       ],
     });
