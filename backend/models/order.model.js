@@ -22,20 +22,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM("Store Pickup", "Standard Delivery"),
         allowNull: false,
       },
-      deliveryAddress: {
-        type: DataTypes.JSON,
-        allowNull: true,
-      },
       deliveryCharge: {
         type: DataTypes.DECIMAL(10, 2),
         defaultValue: 0.00,
         validate: { min: 0 },
       },
-      estimatedDeliveryDate: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        defaultValue: null,
-      },
+      // estimatedDeliveryDate: {
+      //   type: DataTypes.DATE,
+      //   allowNull: true,
+      //   defaultValue: null,
+      // },
       status: {
         type: DataTypes.ENUM(
           "Pending",
@@ -47,14 +43,17 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: "Pending",
       },
-      paymentMethod: {
-        type: DataTypes.ENUM("Card", "CashOnDelivery"),
+      userId: {
+        type: DataTypes.INTEGER,
         allowNull: false,
+        references: {
+          model: "Users",
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
-      cancelReason: {
-        type: DataTypes.ENUM("PaymentFailed", "Expired", "UserCancelled"),
-        allowNull: true,
-      },
+
     },
     {
       indexes: [

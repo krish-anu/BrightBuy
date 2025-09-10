@@ -1,7 +1,7 @@
 module.exports = (sequelize, DataTypes) => {
   const City = sequelize.define("City", {
     id: {  // primary key
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },

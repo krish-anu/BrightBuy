@@ -24,7 +24,27 @@ unitPrice: {
     isBackOrdered: {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
-        }
+    },
+    orderId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "Orders",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
+    },
+    variantId: {
+      type: DataTypes.INTEGER,
+      allowNull: true, 
+      references: {
+        model: "ProductVariants",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
+    },
   });
   return OrderItem;
 };
