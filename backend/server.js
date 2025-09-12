@@ -38,6 +38,7 @@ const authRouter = require('./routes/auth');
 const webhookRouter = require('./routes/webhook');
 const userRouter=require("./routes/user")
 const paymentRouter=require('./routes/payment') 
+const imageRouter=require('./routes/image.upload')
 
 
 app.use('/api/webhook',webhookRouter)
@@ -50,8 +51,8 @@ app.use('/api/city', cityRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/order', orderRouter);
 app.use('/api/users', userRouter);
-app.use('./api/payment',paymentRouter)
-
+app.use('/api/payment',paymentRouter);
+app.use('/api/image', imageRouter);
 
 
 

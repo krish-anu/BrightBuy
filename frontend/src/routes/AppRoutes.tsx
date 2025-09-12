@@ -27,6 +27,7 @@ import CartPage from "@/pages/User/CartPage";
 import Login from "@/components/Admin/LoginPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
+import UserLogin from "@/pages/Authpage/UserLogin"; 
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
               <Route index element={<HomePage />} />
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<UserSignup />} />
+              <Route path="userlogin" element={<UserLogin />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="cart" element={<CartPage />} />
               <Route path="products/:id" element={<ProductDetailPage />} />
