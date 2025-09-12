@@ -78,3 +78,21 @@ export default function ProductInfo({ product }: ProductPageProps) {
         </div>
     );
 }
+
+
+
+
+export function getUniqueAttributes(variants: { id: string; price: number; stock: number; attributes: { name: string; value: string }[] }[]) {
+    const uniqueAttributes = new Map<string, Set<string>>();
+
+    variants.forEach(variant => {
+        variant.attributes.forEach(attr => {
+            if (!uniqueAttributes.has(attr.name)) {
+                uniqueAttributes.set(attr.name, new Set());
+            }
+            uniqueAttributes.get(attr.name)?.add(attr.value);
+        });
+    });
+
+    return uniqueAttributes;
+}
