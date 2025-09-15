@@ -165,8 +165,13 @@ db.delivery.belongsTo(db.user,{foreignKey:"staffId"})
 db.order.hasOne(db.delivery, { foreignKey: "orderId" });
 db.delivery.belongsTo(db.order, { foreignKey: "orderId" })
 
+
+db.address.hasMany(db.order, { foreignKey: 'addressId' })
+db.order.belongsTo(db.address,{foreignKey:'addressId'})
+
+
 // ====================== Sync ======================
-db.sequelize.sync({ force: false}).then(() => {
+db.sequelize.sync({ force:false}).then(() => {
   console.log("Yes re-sync done");
 });
 

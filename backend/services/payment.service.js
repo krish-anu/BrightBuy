@@ -1,16 +1,17 @@
 const db = require('../models');
 const Payment = db.payment;
 
-const createPayment = async (orderId, totalPrice, deliveryCharge, paymentMethod, paymentIntentId, transaction) => {
-    await Payment.create({
-        orderId: orderId,
-        amount: parseFloat(totalPrice) + parseFloat(deliveryCharge),
-        paymentMethod: paymentMethod,
-        status: paymentIntentId ? 'Paid' : 'Pending',
+const createPayment = async (orderId, totalAmount, paymentMethod, userId, transaction, paymentIntentId = null) => {
+    return await Payment.create({
+        orderId,
+        amount: totalAmount,
+        paymentMethod,
+        status: 'Pending',
+        userId,
         paymentIntentId
     }, { transaction });
 };
 
-
-
-module.exports={createPayment}
+module.exports = {
+    createPayment,
+};

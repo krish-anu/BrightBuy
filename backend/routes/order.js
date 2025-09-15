@@ -1,17 +1,16 @@
-const { addOrder, getOrders, getOrder, cancelOrder, getOrderStatus, getUserOrders, getUserOrder, getCategoryWiseOrders,getTotalRevenue } = require('../controllers/order.controller');
+const { addOrder, getOrders, getOrder, cancelOrder, getOrderStatus, getUserOrders, getUserOrder, getCategoryWiseOrders,getTotalRevenue, updateOrderStatus } = require('../controllers/order.controller');
 
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
 const ROLES = require('../roles');
 const router = require('express').Router();
-router.get("/totalRevenue",getTotalRevenue)
+router.get("/totalRevenue", verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getTotalRevenue)
 
 router.get('/category',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),getCategoryWiseOrders)
 router.get('/user', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getUserOrders);
-router.get('/user/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getUserOrder);
 router.get('/track/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getOrderStatus);
 router.get('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), getOrders);
-router.get('/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getOrder);
+router.get('/:id', verifyToken, authorizeRoles( ROLES.USER,ROLES.ADMIN, ROLES.SUPERADMIN), getOrder);
 
 router.post('/', verifyToken, authorizeRoles(ROLES.USER), addOrder);
 

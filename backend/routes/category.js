@@ -1,4 +1,4 @@
-const { getCategories, getCategory, addCategory, updateCategory, deleteCategory, getCategoryVariantCount, getCategoryVariants, getCategoryHierarchy, addProductsToCategory } = require('../controllers/category.controller');
+const { getCategories, getCategory, addCategory, updateCategory, deleteCategory, getCategoryVariantCount, getCategoryVariants, getCategoryHierarchy, addProductsToCategory, addNewAttributes } = require('../controllers/category.controller');
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require("../middlewares/role.middleware");
 const ROLES = require('../roles');
@@ -11,6 +11,7 @@ router.get('/variant/:id', getCategoryVariants);
 router.get('/', getCategories);
 router.get('/:id', getCategory);
 
+router.post('/addAttributes/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,addNewAttributes)
 router.post('/addProductsCategory', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addProductsToCategory);
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addCategory);
 

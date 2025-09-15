@@ -20,19 +20,7 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: "user",
     },
     role_accepted: { type: DataTypes.BOOLEAN, defaultValue: false },
-    address: { type: DataTypes.STRING, allowNull: true },
     phone: { type: DataTypes.STRING, allowNull: true },
-    // cityId: {
-    //   // <-- foreign key
-    //   type: DataTypes.INTEGER,
-    //   allowNull: true,
-    //   references: {
-    //     model: "Cities",
-    //     key: "id",
-    //   },
-    //   onUpdate: "CASCADE",
-    //   onDelete: "SET NULL",
-    // },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

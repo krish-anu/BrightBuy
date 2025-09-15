@@ -21,7 +21,7 @@ unitPrice: {
       allowNull: false,
       validate: { min: 0 },
     },
-    isBackOrdered: {
+    preOrdered: {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
     },
