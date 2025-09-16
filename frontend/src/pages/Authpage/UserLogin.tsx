@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
+import { useNavigate ,useLocation} from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -14,12 +16,16 @@ const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20, clas
 };
 
 const UserLogin: React.FC = () => {
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/";
+  const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
@@ -28,8 +34,19 @@ const UserLogin: React.FC = () => {
       return;
     }
 
-    // Just show an alert for demonstration
-    alert(`Email: ${email}\nPassword: ${password}`);
+    try {
+      const result = await login(email, password);
+      console.log("REs",result);
+      
+
+      if (result?.success === true) {
+        navigate(from,{replace: true}); // Redirect after success
+      } else {
+        setError(result?.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+    }
   };
 
   return (
@@ -78,6 +95,9 @@ const UserLogin: React.FC = () => {
       type={showPassword ? "text" : "password"}
       className="w-full px-3 py-2 pl-10 pr-10 border border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
       value={password}
+      autoComplete="current-password"
+      required
+      placeholder="Enter your password"
       onChange={(e) => setPassword(e.target.value)}
     />
     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -92,14 +112,29 @@ const UserLogin: React.FC = () => {
     </button>
   </div>
 </div>
-
+{error && (
+  <div className="rounded-md bg-red-50 p-4">
+    <div className="flex">
+      <div className="flex-shrink-0">
+        <IconComponent iconName="AlertCircle" size={20} />
+      </div>
+      <div className="ml-3">
+        <h3 className="text-sm font-medium text-red-800">
+          {error}
+        </h3>
+      </div>
+    </div>
+  </div>
+)}
 {/* Submit */}
 <button
   type="submit"
+  disabled={isLoading}
   className="w-full flex justify-center items-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:ring-2 focus:ring-offset-1 focus:ring-primary"
 >
   <IconComponent iconName="LogIn" size={18} />
   Sign In
+  {isLoading && <IconComponent iconName="Loader" size={18} className="animate-spin" />}
 </button>
 
         </form>

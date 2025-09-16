@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useRole } from "../../contexts/RoleContext";
-import { useAuth } from "../../contexts/AuthContext";
+import { useRole } from "../../../contexts/RoleContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import * as LucideIcons from "lucide-react";
 
 type LucideIconName = keyof typeof LucideIcons;
