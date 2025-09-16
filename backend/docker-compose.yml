@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+    - "${APP_PORT}:${APP_PORT}"
+    env_file:
+    - .env
+    depends_on:
+    - db
+    command: ["./wait-for-db.sh", "db", "npm", "run", "dev"]
+
+
+  db:
+    image: mysql:8
+    container_name: backend-db
+    environment:
+      MYSQL_ROOT_PASSWORD: brightbuy
+      MYSQL_DATABASE: BrightBuy
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql  # <-- use the correct volume name
+      - ./initdb:/docker-entrypoint-initdb.d 
+
+volumes:
+  db_data: 

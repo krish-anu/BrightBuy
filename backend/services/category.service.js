@@ -26,7 +26,7 @@ const fetchParent = async (parentId, selfId) => {
     return parent;
 };
 
-
+  
 
 module.exports = {
     fetchCategory,

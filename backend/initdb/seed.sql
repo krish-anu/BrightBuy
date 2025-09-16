@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL UNIQUE,
+  role ENUM('Admin','Customer','WarehouseStaff','DeliveryStaff') NOT NULL DEFAULT 'Customer',
   password VARCHAR(255) NOT NULL,
+  role_accepted BOOLEAN DEFAULT FALSE,
+  phone VARCHAR(15) NULL,
   address JSON NULL,
   cityId INT NULL,
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -19,6 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
     ON DELETE SET NULL
     ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+insert into users (email,password,name,role) VALUES(
+'anu@gmail.com','anu','Anu','Admin'
+);
 
 -- 3. Categories table
 CREATE TABLE IF NOT EXISTS categories (
