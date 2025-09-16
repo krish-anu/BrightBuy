@@ -22,6 +22,39 @@ export const products: Product[] = [
         { name: "Storage", value: "128GB" }
       ]
     },
+    {
+      id: "v2",
+      price: 1399.99,
+      stock: 10,
+      sku: "123457",
+      attributes: [
+        { name: "Color", value: "Blue" },
+        { name: "RAM", value: "8GB" },
+        { name: "Storage", value: "256GB" }
+      ]
+    },
+    {
+      id: "v3",
+      price: 1499.99,
+      stock: 8,
+      sku: "123458",
+      attributes: [
+        { name: "Color", value: "Black" },
+        { name: "RAM", value: "16GB" },
+        { name: "Storage", value: "256GB" }
+      ]
+    },
+    {
+      id: "v4",
+      price: 1599.99,
+      stock: 5,
+      sku: "123459",
+      attributes: [
+        { name: "Color", value: "White" },
+        { name: "RAM", value: "16GB" },
+        { name: "Storage", value: "512GB" }
+      ]
+    },
     // More variants...
   ],
 
