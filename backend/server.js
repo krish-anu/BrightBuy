@@ -21,7 +21,7 @@ const userRouter = require("./routes/user");
 const paymentRouter = require('./routes/payment');
 const deliveryRouter = require('./routes/delivery');
 const attributeRouter = require('./routes/attribute');
-
+const imageRouter=require('./routes/image.upload')
 
 
 
@@ -44,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 
+
 app.use('/api/auth', authRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
@@ -54,6 +55,7 @@ app.use('/api/users', userRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/delivery', deliveryRouter);
 app.use('/api/attribute', attributeRouter);
+app.use('/api/image', imageRouter);
 
 
 

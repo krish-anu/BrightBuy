@@ -17,7 +17,6 @@ const { order: Order,
   delivery: Delivery, } = db;
 
 
-/* get all orders*/
 const getOrders = async (req, res, next) => {
   try {
     const { limit } = req.query;
@@ -284,11 +283,13 @@ const getCategoryWiseOrders = async (req, res, next) => {
 
 const getTotalRevenue = async (req, res, next) => {
   try {
+    console.log('Calculating total revenue...');
+    
     const totalRevenue = await Order.sum('totalPrice');
+    console.log('Total revenue calculated:', totalRevenue); 
     res.status(200).json({ success: true, data: totalRevenue });
   } catch (error) { next(error); }
 };
-
 
 
 module.exports = {
