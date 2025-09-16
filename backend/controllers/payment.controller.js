@@ -1,31 +1,41 @@
 const db = require('../models');
-const Order = db.order;
 const ApiError = require('../utils/ApiError');
-const Payment = db.payment;
-const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
-const { getOrderDetails, restock } = require('../services/order.service');
-const stripe = require('stripe')(STRIPE_SECRET_KEY);
+const { getOrderDetails, updateStatus } = require('../services/order.service');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+const { order: Order,
+  payment: Payment,
+  delivery: Delivery, } = db;
 
 const successPayment = async (req, res, next) => {
     try {
         const sessionId = req.query.session_id;
-        if (!sessionId) {
-            throw new ApiError('Session ID is required', 400);
-        }
+        if (!sessionId) throw new ApiError('Session ID is required', 400);
 
         const result = await db.sequelize.transaction(async t => {
             const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-            if (session.payment_status === 'paid') {
-                const orderId = session.metadata.orderId;
-                const order = await getOrderDetails(orderId, t);
-                return { paymentStatus: session.payment_status, order };
-            }
+            const orderId = session.metadata?.orderId;
+            if (!orderId) throw new ApiError('Invalid session - no order info', 400);
 
-            return { paymentStatus: session.payment_status };
+            const order = await Order.findByPk(orderId,{ transaction: t });
+            if (!order) throw new ApiError('Order not found', 404);
+
+            if (req.user && order.userId !== req.user.id) throw new ApiError('Unauthorized', 403);
+
+            // if (session.payment_status === 'paid') {
+            //     const payment = await Payment.findOne({ where: { orderId }, transaction: t });
+            //     await payment.update({ status: 'Paid' }, { transaction: t });
+            //     await order.update({ status: 'Confirmed' }, { transaction: t });
+            // }
+
+            return {
+                paymentStatus: session.payment_status,
+                order: await getOrderDetails(orderId, t)
+            };
         });
 
-        return res.status(200).json({ success: true, data: result });
+        res.status(200).json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -34,45 +44,50 @@ const successPayment = async (req, res, next) => {
 const cancelledPayment = async (req, res, next) => {
     try {
         const sessionId = req.query.session_id;
-        if (!sessionId) {
-            throw new ApiError('Session ID is required', 400);
-        }
+        if (!sessionId) throw new ApiError('Session ID is required', 400);
 
-        await db.sequelize.transaction(async t => {
+        const result = await db.sequelize.transaction(async t => {
             const session = await stripe.checkout.sessions.retrieve(sessionId);
-            const { orderId, userId } = session.metadata;
-
-            if (!orderId) {
-                return res.status(200).json({ success: true, message: 'No order to cancel' });
-            }
+            const orderId = session.metadata?.orderId;
+            if (!orderId) return { message: 'No order linked to this session' };
 
             const order = await Order.findByPk(orderId, { transaction: t });
-            if (!order) {
-                return res.status(404).json({ success: false, message: 'Order not found' });
-            }
+            if (!order) throw new ApiError('Order not found', 404);
 
-            // Only cancel if order is still pending
-            if (order.status === 'Pending') {
-                await order.update({
-                    status: 'Cancelled',
-                    cancelReason: 'UserCancelled'
-                }, { transaction: t });
-
+            if (order.status !== 'Cancelled') {
                 const payment = await Payment.findOne({ where: { orderId }, transaction: t });
-                if (payment) {
-                    await payment.update({ status: 'Cancelled' }, { transaction: t });
+                await updateStatus(order, payment, 'User Cancelled', t);
+
+                if (order.deliveryMode === 'Standard Delivery') {
+                    const delivery = await Delivery.findOne({ where: { orderId }, transaction: t });
+                    if (delivery) await delivery.update({ status: 'Returned' }, { transaction: t });
                 }
-
-                // Restock items that were not backordered
-                await restock(orderId, t);
             }
-
-            res.status(200).json({
-                success: true,
-                message: 'Payment cancelled successfully',
-                orderStatus: order.status
-            });
+            return { message: 'Order cancelled successfully' };
         });
+
+        res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const checkPaymentStatus = async (req, res, next) => {
+    try {
+        const { orderId } = req.params;
+        const result = await db.sequelize.transaction(async t => {
+            const order = await Order.findByPk(orderId, { transaction: t });
+            if (!order) throw new ApiError('Order not found', 404);
+
+            const payment = await Payment.findOne({ where: { orderId }, transaction: t });
+            return {
+                orderStatus: order.status,
+                paymentStatus: payment?.status || 'Not Found',
+                orderDetails: await getOrderDetails(orderId, t)
+            };
+        });
+
+        res.status(200).json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -81,4 +96,5 @@ const cancelledPayment = async (req, res, next) => {
 module.exports = {
     successPayment,
     cancelledPayment,
+    checkPaymentStatus
 };

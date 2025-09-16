@@ -24,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull:true,
         }
   },{
-        indexes:[{fields:['brand']}]
+        indexes:[{fields:['name','brand']}]
     });
   return Product;
 };

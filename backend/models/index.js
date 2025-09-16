@@ -42,7 +42,9 @@ db.order = require("./order.model")(sequelize, DataTypes);
 db.orderItem = require("./orderItem.model")(sequelize, DataTypes);
 db.payment = require("./payment.model")(sequelize, DataTypes);
 db.city = require("./city.model")(sequelize, DataTypes);
-
+db.categoryAttribute = require("./categoryAttribute.model")(sequelize, DataTypes);
+db.address = require("./address.model")(sequelize, DataTypes);
+db.delivery=require("./delivery.model")(sequelize,DataTypes)
 // ====================== Associations ======================
 
 // User ↔ Order
@@ -71,6 +73,18 @@ db.category.belongsToMany(db.product, {
   through: db.productCategory,
   foreignKey: "categoryId",
   otherKey: "productId",
+});
+
+// Category ↔ Attribute (Many-to-Many)
+db.category.belongsToMany(db.variantAttribute, {
+  through: db.categoryAttribute,
+  foreignKey: "categoryId",
+  otherKey: "attributeId"
+});
+db.variantAttribute.belongsToMany(db.category, {
+  through: db.categoryAttribute,
+  foreignKey: "attributeId",
+  otherKey: "categoryId"
 });
 
 // ProductCategory (join table with optional extra fields, no PK override!)
@@ -132,11 +146,32 @@ db.user.hasMany(db.payment, { foreignKey: "userId" });
 db.payment.belongsTo(db.user, { foreignKey: "userId" });
 
 // City ↔ User
-db.city.hasMany(db.user, { foreignKey: "cityId" });
-db.user.belongsTo(db.city, { foreignKey: "cityId" });
+// db.city.hasMany(db.user, { foreignKey: "cityId" });
+// db.user.belongsTo(db.city, { foreignKey: "cityId" });
+
+// User ↔ Address
+db.user.hasMany(db.address, { foreignKey: "userId" });
+db.address.belongsTo(db.user, { foreignKey: "userId" });
+
+// City ↔ Address
+db.city.hasMany(db.address, { foreignKey: "cityId" });
+db.address.belongsTo(db.city, { foreignKey: "cityId" });
+
+// User(Delivery Staff) ↔ Delivery
+db.user.hasMany(db.delivery, { foreignKey: "staffId" })
+db.delivery.belongsTo(db.user,{foreignKey:"staffId"})
+
+// Order↔ Delivery
+db.order.hasOne(db.delivery, { foreignKey: "orderId" });
+db.delivery.belongsTo(db.order, { foreignKey: "orderId" })
+
+
+db.address.hasMany(db.order, { foreignKey: 'addressId' })
+db.order.belongsTo(db.address,{foreignKey:'addressId'})
+
 
 // ====================== Sync ======================
-db.sequelize.sync({ alter: false }).then(() => {
+db.sequelize.sync({ force:false}).then(() => {
   console.log("Yes re-sync done");
 });
 

@@ -2,13 +2,15 @@ const ApiError = require('../utils/ApiError');
 const { Op, fn, col } = require('sequelize');
 const db = require('../models');
 const generateSKU = require('../utils/generateSKU');
-const {updateStock}=require('../services/order.service')
 
-const Product = db.product;
-const ProductVariant = db.productVariant;
-const VariantAttribute = db.variantAttribute;
-const ProductVariantOption = db.productVariantOption;
-const OrderItem = db.orderItem;
+const { handlePreOrdered,updateStock, } = require('../services/variant.service');
+
+const { product: Product,
+    productVariant: ProductVariant,
+    variantAttribute: VariantAttribute,
+    productVariantOption: ProductVariantOption,
+    orderItem: OrderItem } = db;
+
 
 const getVariants = async (req, res, next) => {
     try {
@@ -52,8 +54,6 @@ const getVariant = async (req, res, next) => {
 
 const addVariant = async (req, res, next) => {
     try {
-        console.log('req.body:', req.body);
-
         const { variantName, productId, price, stockQnt, attributes } = req.body;
         if (!productId || !price || !attributes) {
             throw new ApiError('Product id, price, attributes are required', 400);
@@ -71,15 +71,17 @@ const addVariant = async (req, res, next) => {
                 { productId, variantName: name, SKU, stockQnt: stockQnt || 1, price },
                 { transaction: t }
             );
-
+            const attributeIds = attributes.map(attr => attr.id);
+            const existingAttributes = await VariantAttribute.findAll({
+                where: { id: attributeIds },
+                transaction: t
+            });
+            if (existingAttributes.length !== attributes.length) {
+                throw new ApiError('One or more attributes not found', 400);
+            }
             for (const attr of attributes) {
-                const [attribute] = await VariantAttribute.findOrCreate({
-                    where: { name: attr.name },
-                    defaults: { name: attr.name },
-                    transaction: t,
-                });
                 await ProductVariantOption.create(
-                    { variantId: variant.id, attributeId: attribute.id, value: attr.value },
+                    { variantId: variant.id, attributeId: attr.id, value: attr.value },
                     { transaction: t }
                 );
             }
@@ -182,26 +184,13 @@ const updateVariant = async (req, res, next) => {
     }
 };
 
-// const replaceStock = async (req, res, next) => {
-//     try {
-//         const variant = await ProductVariant.findByPk(req.params.id);
-//         if (!variant) throw new ApiError('Variant not found', 404);
-//         const { stockQnt } = req.body;
-//         if (stockQnt < 0) throw new ApiError('Quantity shouldnot be negative', 400);
-//         await variant.update({ stockQnt });
-//         res.status(200).json({ success: true, data: variant });
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
 const updateVariantStock = async (req, res, next) => {
     // use transaction and lock
     try {
         await db.sequelize.transaction(async (t) => {
             const { qnt } = req.body;
-            const variant=await this.updateStock(req.params.id,qnt,t)
-            
+            const variant = await updateStock(req.params.id, qnt, t,);
+            await handlePreOrdered(variant,t)
             res.status(200).json({ success: true, data: variant });
         });
     } catch (error) {
@@ -227,34 +216,58 @@ const deleteVariant = async (req, res, next) => {
         const variant = await ProductVariant.findByPk(req.params.id);
         if (!variant) throw new ApiError('Variant not found', 404);
         await variant.destroy();
-        res.status(200).json({ success: true, message: 'Variant deleted successfully' });
+        res.status(200).json({ success: true, data: variant });
     } catch (error) {
         next(error);
     }
 };
 
-
+/*weekly monthly or all time most sold variants*/
 const getPopularVariants = async (req, res, next) => {
     try {
-        const limit = req.query.limit ? parseInt(req.query.limit) : 7;
-        // weekly popular
-        let startDate = new Date();
-        startDate.setDate(startDate.getDate() - 7);
+        const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+        const period = req.query.period || 'all'; // 'weekly', 'monthly', 'all'
+
+        let orderItemFilter = {};
+
+        if (period === 'weekly') {
+            const fromDate = new Date();
+            fromDate.setDate(fromDate.getDate() - 7);
+            orderItemFilter = { createdAt: { [Op.gte]: fromDate } };
+        } else if (period === 'monthly') {
+            const fromDate = new Date();
+            fromDate.setMonth(fromDate.getMonth() - 1);
+            orderItemFilter = { createdAt: { [Op.gte]: fromDate } };
+        }
 
         const variants = await ProductVariant.findAll({
-            attributes: ['id', 'variantName', 'SKU', 'price',
-                [fn('SUM', col('OrderItems.quantity')), 'soldQuantity']],
-            include: [{ model: OrderItem, attributes: [], required: true, where: { createdAt: { [Op.gte]: startDate } } }],
+            attributes: [
+                'id',
+                'variantName',
+                'SKU',
+                [fn('SUM', col('OrderItems.quantity')), 'soldQuantity']
+            ],
+            include: [{
+                model: OrderItem,
+                attributes: [],
+                required: true,
+                where: orderItemFilter
+            }],
             group: ['ProductVariant.id'],
             order: [[fn('SUM', col('OrderItems.quantity')), 'DESC']],
             limit,
             subQuery: false
         });
+
         res.status(200).json({ success: true, data: variants });
     } catch (error) {
         next(error);
     }
 };
+
+
+// add new attribute to an existing variant
+
 
 
 module.exports = {

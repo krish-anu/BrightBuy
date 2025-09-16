@@ -1,10 +1,11 @@
+// controllers/stripeWebhook.controller.js
 const { STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY } = require("../config/dbConfig");
 const ApiError = require("../utils/ApiError");
 const db = require("../models");
-const { getOrderDetails, restock } = require("../services/order.service"); // Added restock import
+const { getOrderDetails, } = require("../services/order.service"); 
+const { restock, }=require('../services/variant.service')
 
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
-
 const Order = db.order;
 const Payment = db.payment;
 
@@ -23,79 +24,102 @@ const stripeWebhook = async (req, res, next) => {
 
         console.log('Received webhook:', event.type);
 
+        let responseData;
+
         await db.sequelize.transaction(async t => {
             const session = event.data.object;
 
             switch (event.type) {
                 case 'checkout.session.completed': {
-                    const orderId = session.metadata.orderId;
-                    const userId = session.metadata.userId;
-
-                    const order = await Order.findByPk(orderId, { transaction: t });
-                    if (!order) throw new ApiError('Order not found', 404);
-                    if (order.userId.toString() !== userId.toString()) throw new ApiError('Order user mismatch', 400);
-
-                    const payment = await Payment.findOne({ where: { orderId }, transaction: t });
-                    if (!payment) throw new ApiError('Payment record not found', 404);
-
-                    // Update order status to Confirmed
-                    await order.update({ status: 'Confirmed' }, { transaction: t });
-
-                    // Update payment status to Paid and add payment intent ID
-                    await payment.update({
-                        status: 'Paid',
-                        paymentIntentId: session.payment_intent
-                    }, { transaction: t });
-
-                    const finalOrder = await getOrderDetails(order.id, t);
-                    res.status(200).json({ success: true, data: finalOrder });
-                    break;
-                }
-
-                case 'payment_intent.payment_failed':
-                case 'checkout.session.expired': {
                     const orderId = session.metadata?.orderId;
-                    if (!orderId) {
-                        console.log('No orderId in metadata, skipping');
-                        res.status(200).json({ received: true });
+                    const userId = session.metadata?.userId;
+                    if (!orderId || !userId) {
+                        console.log('Missing metadata in session');
+                        responseData = { received: true };
                         break;
                     }
 
                     const order = await Order.findByPk(orderId, { transaction: t });
                     if (!order) {
-                        console.log('Order not found, skipping');
-                        res.status(200).json({ received: true });
+                        console.log(`Order ${ orderId } not found`);
+                        responseData = { received: true };
                         break;
+                    }
+                    if (order.userId.toString() !== userId.toString()) {
+                        throw new ApiError('Order user mismatch', 400);
                     }
 
                     const payment = await Payment.findOne({ where: { orderId }, transaction: t });
                     if (!payment) {
-                        console.log('Payment not found, skipping');
-                        res.status(200).json({ received: true });
+                        console.log(`Payment record for order ${ orderId } not found`);
+                        responseData = { received: true };
+                        break;
+                    }
+                    if (payment.status === 'Pending') {
+                        await order.update({ status: 'Confirmed' }, { transaction: t });
+                        await payment.update(
+                            {
+                                status: 'Paid',
+                                paymentIntentId: session.payment_intent,
+                            },
+                            { transaction: t }
+                        );
+                    }
+                    const finalOrder = await getOrderDetails(order.id, t);
+                    responseData = { success: true, data: finalOrder };
+                    break;
+                }
+                case 'payment_intent.payment_failed':
+                case 'checkout.session.expired': {
+                    const orderId = session.metadata?.orderId;
+                    if (!orderId) {
+                        console.log('No orderId in metadata, skipping');
+                        responseData = { received: true };
                         break;
                     }
 
-                    // Update order status to Cancelled with reason
-                    await order.update({
-                        status: 'Cancelled',
-                        cancelReason: event.type === 'payment_intent.payment_failed' ? 'PaymentFailed' : 'Expired'
-                    }, { transaction: t });
+                    const order = await Order.findByPk(orderId, { transaction: t });
+                    if (!order) {
+                        console.log(`Order ${ orderId } not found, skipping`);
+                        responseData = { received: true };
+                        break;
+                    }
+                    if (order.status === 'Pending') {
+                        const payment = await Payment.findOne({
+                            where: { orderId },
+                            transaction: t
+                        });
 
-                    // Update payment status to Failed
-                    await payment.update({ status: 'Failed' }, { transaction: t });
+                        await order.update(
+                            {
+                                status: 'Cancelled',
+                                cancelReason: event.type === 'payment_intent.payment_failed'
+                                    ? 'PaymentFailed'
+                                    : 'Expired'
+                            },
+                            { transaction: t }
+                        );
 
-                    // Restock items that were not backordered
-                    await restock(order.id, t);
+                        if (payment) {
+                            await payment.update({
+                                status: 'Failed',
+                            }, { transaction: t });
+                        }
 
-                    res.status(200).json({ success: false, message: 'Payment failed, order cancelled' });
+                        await restock(order.id, t);
+                    }
+
+                    responseData = { success: false, message: 'Payment failed, order cancelled' };
                     break;
                 }
 
                 default:
                     console.log(`Ignoring event type: ${ event.type }`);
-                    res.status(200).json({ received: true });
+                    responseData = { received: true };
             }
         });
+
+        res.status(200).json(responseData);
     } catch (error) {
         next(error);
     }

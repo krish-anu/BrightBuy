@@ -1,6 +1,7 @@
 const db = require('../models');
 const ApiError = require('../utils/ApiError');
-const { createPayment } = require('./payment.service');
+
+const { restock,updateStock, }=require('../services/variant.service')
 
 const Order = db.order;
 const OrderItem = db.orderItem;
@@ -8,48 +9,102 @@ const ProductVariant = db.productVariant;
 const ProductVariantOption = db.productVariantOption;
 const VariantAttribute = db.variantAttribute;
 
-
-const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, transaction, paymentMethod, paymentIntentId = null) => {
-    const order = await createOrder(userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge,paymentMethod, transaction);
-    await addOrderItems(order.id, items, transaction);
-    await createPayment(order.id, totalPrice, deliveryCharge, paymentMethod, paymentIntentId, transaction);
-    return getOrderDetails(order.id, transaction);
+const estimateDeliveryDate = (daysToAdd) => {
+    const now = new Date();
+    const deliveryDate = new Date(now);
+    deliveryDate.setDate(deliveryDate.getDate() + daysToAdd);
+    return deliveryDate;
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod,transaction) => {
-    const status = paymentMethod === 'COD' ? 'Confirmed' : 'Pending';
-    const order = await Order.create({
-        totalPrice, // without delivery
-        deliveryMode,
-        estimatedDeliveryDate,
-        deliveryAddress,
-        deliveryCharge,
-        userId,
-        status,
-    }, { transaction });
-    return order;
-};
+const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, transaction) => {
+    let totalPrice = 0;
+    let hasOutOfStock = false;
+    const orderedItems = [];
 
-const addOrderItems = async (orderId, items, transaction) => {
     for (const item of items) {
+        if (!item.variantId || !item.quantity || item.preOrdered)
+            throw new ApiError('Invalid item format',400)
+        const variant = await ProductVariant.findByPk(item.variantId, { transaction });
+
+        if (!variant) {
+            console.log(item)
+            throw new ApiError('Item not found', 404);
+            
+        } 
+
+        let preOrdered = item.preOrdered;
+        const inStock = variant.stockQnt >= item.quantity;
+        if (!inStock) preOrdered = true;
+        if (preOrdered) hasOutOfStock = true;
+
+        const itemTotal = variant.price * item.quantity;
+        totalPrice += itemTotal;
+
+        orderedItems.push({
+            variantId: variant.id,
+            variantName: variant.variantName,
+            price: variant.price,
+            quantity: item.quantity,
+            totalPrice: itemTotal,
+            preOrdered
+        });
+    }
+
+    let deliveryCharge = deliveryMode === 'Standard Delivery' ? 150.0 : 0;
+    let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
+
+    if (deliveryMode === 'Standard Delivery' && deliveryAddress.City?.isMainCity) {
+        deliveryDays = 5;
+    }
+    if (hasOutOfStock) deliveryDays += 3;
+
+    const deliveryDate = estimateDeliveryDate(deliveryDays);
+
+    return { totalPrice, deliveryCharge, deliveryDate, orderedItems };
+};
+
+async function createOrderInDB(
+    orderedItems,
+    userId,
+    deliveryMode,
+    deliveryAddress,
+    estimatedDeliveryDate,
+    totalPrice,
+    deliveryCharge,
+    status,
+    transaction,
+) {
+    const totalAmount = totalPrice + deliveryCharge;
+    const orderData = {
+        userId,
+        deliveryMode,
+        totalAmount,
+        deliveryCharge,
+        estimatedDeliveryDate,
+        status,
+    };
+    if (deliveryMode === 'Standard Delivery') orderData.addressId = deliveryAddress.id;
+
+    const order = await Order.create(orderData, { transaction });
+
+    for (const item of orderedItems) {
         const variant = await ProductVariant.findByPk(item.variantId, { transaction });
         if (!variant) throw new ApiError('Variant not found', 404);
 
-        const isBackOrdered = variant.stockQnt < item.quantity;
         await OrderItem.create({
+            orderId: order.id,
             variantId: item.variantId,
-            orderId,
             quantity: item.quantity,
-            unitPrice: variant.price,
-            totalPrice: variant.price * item.quantity,
-            isBackOrdered
+            unitPrice: item.price,
+            totalPrice: item.totalPrice,
+            preOrdered: item.preOrdered
         }, { transaction });
-        if (!isBackOrdered) {
-            await updateStock(item.variantId,-item.quantity,transaction);
-        }
-       
+
+        if (!item.preOrdered)
+            await updateStock(item.variantId, -item.quantity, transaction);
     }
-};
+    return order;
+}
 
 const getOrderDetails = async (orderId, transaction) => {
     return await Order.findByPk(orderId, {
@@ -71,56 +126,38 @@ const getOrderDetails = async (orderId, transaction) => {
     });
 };
 
-const updateStock = async (variantId, quantityChange, transaction) => {
-    const variant = await ProductVariant.findByPk(variantId, {
-        transaction,
-        lock: true
-    });
-    if (!variant) throw new ApiError('Variant not found', 404);
-    const newStock = variant.stockQnt + quantityChange;
-    if (newStock < 0) throw new ApiError('Stock cannot go below 0', 400);
-    await variant.update({ stockQnt: newStock }, { transaction });
-    return variant;
+const isValidOrderUpdate = async (newStatus, order) => {
+    const validStatus = { Pending: 0, Confirmed: 1, Shipped: 2, Delivered: 3, Cancelled: 4 };
+    const currStatus = order.status;
+
+    if (!(newStatus in validStatus)) throw new ApiError('Invalid status', 400);
+    if (validStatus[newStatus] <= validStatus[currStatus]) throw new ApiError('Invalid update', 400);
+    return true;
 };
 
-//increment stock after order cancelled
-const restock = async (orderId, transaction) => {
-    try {
-        const order = await Order.findByPk(orderId, { transaction });
-        if (!order) throw new ApiError('Order not found', 404);
-
-        // Allow restocking for cancelled orders
-        if (order.status !== 'Cancelled') {
-            console.log(`Order ${ orderId } is not cancelled, skipping restock`);
-            return;
-        }
-
-        const orderedItems = await OrderItem.findAll({
-            where: { orderId },
-            attributes: ['id', 'quantity', 'isBackOrdered', 'variantId'],
-            transaction,
-        });
-
-        for (const item of orderedItems) {
-            // Only restock items that were actually deducted from stock
-            if (!item.isBackOrdered) {
-                await updateStock(item.variantId, item.quantity, transaction);
-            }
-        }
-
-        console.log(`Successfully restocked items for order ${ orderId }`);
-    } catch (error) {
-        console.error('Error in restock:', error);
-        throw error; // Re-throw to be handled by the calling function
-    }
+const updateStatus = async (order, payment, cancelReason, transaction) => {
+    await order.update({ status: 'Cancelled', cancelReason }, { transaction });
+    await restock(order.id, transaction);
+    await payment.update({ status: 'Cancelled' }, { transaction });
+    return order;
 };
 
+const isValidOrderCancel = async (newStatus, order, payment, cancelReason) => {
+    await isValidOrderUpdate(newStatus, order);
+    if (payment.status === 'Paid') throw new ApiError('Cannot cancel', 400);
+
+    const validCancelReasons = ['User Cancelled', 'Payment Failed', 'Expired'];
+    if (!cancelReason || !validCancelReasons.includes(cancelReason))
+        throw new ApiError('Valid cancel reason required', 400);
+
+    return order;
+};
 
 module.exports = {
-    saveOrderToDatabase, addOrderItems,
     getOrderDetails,
-    createOrder,
-    restock,
-    updateStock
-    
+    createOrderInDB,
+    calculateOrderDetails,
+    isValidOrderCancel,
+    isValidOrderUpdate,
+    updateStatus,
 };

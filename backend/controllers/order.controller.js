@@ -1,55 +1,20 @@
-const ApiError = require('../utils/ApiError');
-const { fn, col } = require('sequelize');
-const { calculateOrderDetails } = require('../utils/calculateOrderDetails');
 const db = require('../models');
-const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
-const stripe = require('stripe')(STRIPE_SECRET_KEY);
+const ApiError = require('../utils/ApiError');
+const { calculateOrderDetails, isValidOrderCancel, updateStatus,createOrderInDB } = require('../services/order.service');
+const { createPayment } = require('../services/payment.service');
+const ROLES = require('../roles');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const Order = db.order;
-const OrderItem = db.orderItem;
-const City = db.city;
-const ProductVariant = db.productVariant;
-const Product = db.product;
-const Category = db.category;
-const User = db.user;
-
-// Helper function to save order and order items in DB
-// Helper function to save order and order items in DB
-async function createOrderInDB(
-  orderedItems,
-  userId,
-  deliveryMode,
-  deliveryAddress,
-  estimatedDeliveryDate,
-  totalPrice,
-  deliveryCharge,
-  transaction,
-  paymentMethod
-) {
-  // Create the main order
-  const order = await Order.create({
-    UserId: userId,
-    deliveryMode,
-    deliveryAddress,
-    estimatedDeliveryDate,
-    totalPrice,
-    deliveryCharge,
-    paymentMethod
-  }, { transaction });
-
-  // Create each order item
-  for (const item of orderedItems) {
-    await OrderItem.create({
-      OrderId: order.id,
-      ProductVariantId: item.variantId,
-      quantity: item.quantity,
-      unitPrice: item.price,                // price per single item
-      totalPrice: item.price * item.quantity // total price for this line item
-    }, { transaction });
-  }
-
-  return order;
-}
+const { order: Order,
+  orderItem: OrderItem,
+  city: City,
+  product: Product,
+  productVariant: ProductVariant,
+  category: Category,
+  user: User,
+  payment: Payment,
+  address: Address,
+  delivery: Delivery, } = db;
 
 
 const getOrders = async (req, res, next) => {
@@ -67,13 +32,18 @@ const getOrders = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+/* get an order by id*/
 const getOrder = async (req, res, next) => {
   try {
-    const order = await Order.findByPk(req.params.id, {
+    const { id } = req.params;
+    const order = await Order.findByPk(id, {
       attributes: { exclude: ['createdAt', 'updatedAt'] },
       include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }]
     });
     if (!order) throw new ApiError('Order not found', 404);
+    if (req.user.role === ROLES.USER && order.userId !== req.user.id) {
+      throw new ApiError('Forbidden access', 403);
+    }
     res.status(200).json({ success: true, data: order });
   } catch (error) { next(error); }
 };
@@ -87,14 +57,48 @@ const addOrder = async (req, res, next) => {
 
     const result = await db.sequelize.transaction(async t => {
       const user = await User.findByPk(req.user.id, {
-        attributes: ['address', 'cityId'],
-        include: [{ model: City, attributes: ['name', 'isMainCity'] }],
+        include: [
+          {
+            model: Address,
+            include: [{model: City,attributes: ['name', 'isMainCity']}]
+          }
+        ],
         transaction: t
       });
+      
+      let finalAddress = null;
+      if (deliveryMode === 'Standard Delivery') {
+        if (typeof deliveryAddress === 'number' || typeof deliveryAddress === 'string' && !isNaN(deliveryAddress)) {
+          const existingAddress = user.Addresses.find(addr => addr.id === parseInt(deliveryAddress));
+          if (!existingAddress)
+            throw new ApiError('Address not found', 404);
+          finalAddress = existingAddress;
+        } else if (typeof deliveryAddress === 'object') {
+          const { addressLine1, addressLine2, postalCode, cityId } = deliveryAddress;
+          if (!addressLine1 || !postalCode || !cityId)
+            throw new ApiError('Invalid address format',400)
+          const city = await City.findByPk(cityId, { transaction: t });
+          if (!city) throw new ApiError('City not found', 404);
 
-      const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
-        await calculateOrderDetails(items, deliveryMode, deliveryAddress, user, t);
+          const newAddress = await Address.create({
+            userId: req.user.id,
+            addressLine1,
+            addressLine2,
+            cityId,
+            postalCode
+          }, { transaction: t, });
+          finalAddress = await Address.findByPk(newAddress.id, {
+            include: [{ model: City, attributes: ['name', 'isMainCity'] }],
+            transaction: t
+          });
+        } else {
+          throw new ApiError('Invalid Address', 400);
+        }
+      }
 
+      const { totalPrice, deliveryCharge, deliveryDate,orderedItems } =
+        await calculateOrderDetails(items, deliveryMode, deliveryAddress, t);
+      const status = paymentMethod === 'COD' ? 'Confirmed' : 'Pending';
       const order = await createOrderInDB(
         orderedItems,
         req.user.id,
@@ -103,9 +107,20 @@ const addOrder = async (req, res, next) => {
         deliveryDate,
         totalPrice,
         deliveryCharge,
-        t,
-        paymentMethod
+        status,
+        t
       );
+
+      const totalAmount=totalPrice+deliveryCharge
+
+      await createPayment(order.id, totalAmount,  paymentMethod, req.user.id, t);
+      // create delivery if standard delivery mode
+      if (deliveryMode === 'Standard Delivery') {    
+        await Delivery.create({
+          orderId: order.id,
+          status: 'Pending'
+        }, { transaction:t });
+      }
 
       if (paymentMethod === 'COD') {
         return { type: 'order', order };
@@ -117,20 +132,20 @@ const addOrder = async (req, res, next) => {
           line_items: orderedItems.map(item => ({
             price_data: {
               currency: 'lkr',
-              product_data: { name: item.productName },
+              product_data: { name: item.variantName },
               unit_amount: Math.round(item.price * 100)
             },
             quantity: item.quantity
           })),
           mode: 'payment',
-          success_url: `http://localhost:8081/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `http://localhost:8081/payment/cancel`,
+          success_url: `http://localhost:8081/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `http://localhost:8081/api/payment/cancel`,
           metadata: {
             userId: req.user.id,
             orderId: order.id
           }
         });
-        return { type: 'checkout', checkoutUrl: session.url };
+        return { type: 'checkout', sessionId: session.id };
       }
 
       throw new ApiError('Invalid payment method', 400);
@@ -145,10 +160,15 @@ const addOrder = async (req, res, next) => {
   }
 };
 
+/*get all orders of a user*/
 const getUserOrders = async (req, res, next) => {
   try {
+    const { id } = req.params;
+    if (req.user.role === ROLES.USER && parseInt(id) !== req.user.id) {
+      throw new ApiError('Forbidden access',403)
+    }
     const options = {
-      where: { UserId: req.user.id },
+      where: { userId:id},
       attributes: { exclude: ['createdAt', 'updatedAt'] },
       include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
       order: [['createdAt', 'DESC']],
@@ -160,29 +180,29 @@ const getUserOrders = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-const getUserOrder = async (req, res, next) => {
-  try {
-    const order = await Order.findOne({
-      where: { id: req.params.id, UserId: req.user.id },
-      attributes: { exclude: ['createdAt', 'updatedAt'] },
-      include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }]
-    });
-    if (!order) throw new ApiError('Order not found', 404);
-    res.status(200).json({ success: true, data: order });
-  } catch (error) { next(error); }
-};
-
 const cancelOrder = async (req, res, next) => {
   try {
+    const { id } = req.params;
+    const { cancelReason } = req.body;
     const cancelledOrder = await db.sequelize.transaction(async t => {
-      const order = await Order.findByPk(req.params.id, { transaction: t });
+      let order = await Order.findByPk(req.params.id, {
+        include:{model:Payment},
+        transaction: t
+      });
       if (!order) throw new ApiError('Order not found', 404);
-      if (order.UserId !== req.user.id)
-        throw new ApiError('Forbidden: You cannot cancel this order', 403);
-      if (['Confirmed', 'Shipped', 'Delivered'].includes(order.status))
-        throw new ApiError('Order shipped or delivered cannot be cancelled', 400);
+      if (req.user.role === ROLES.USER && order.userId !== req.user.id) {
+        throw new ApiError('Forbidden access', 403);
+      }
+      const payment = order.Payment;
+      order = await isValidOrderCancel('Cancelled', order, payment, cancelReason, t);
+      if (order) {
+        order=await updateStatus(order, payment, cancelReason,t);
+      }
 
-      await order.update({ status: 'Cancelled' }, { transaction: t });
+      if (order.deliveryMode === 'Standard Delivery') {
+        const delivery = await Delivery.findOne({ where: { orderId: order.id }, transaction: t });
+        await delivery.update({ status: 'Returned' }, { transaction :t})
+      }
       return order;
     });
     res.status(200).json({ success: true, data: cancelledOrder });
@@ -191,7 +211,11 @@ const cancelOrder = async (req, res, next) => {
 
 const getOrderStatus = async (req, res, next) => {
   try {
-    const order = await Order.findByPk(req.params.id, {
+    const { id } = req.params;
+    if (req.user.role === ROLES.USER && parseInt(id) !== req.user.id) {
+      throw new ApiError('Forbidden access', 403);
+    }
+    const order = await Order.findByPk(id, {
       attributes: ['id', 'status', 'deliveryMode', 'deliveryAddress', 'estimatedDeliveryDate', 'UserId']
     });
     if (!order) throw new ApiError('Order not found', 404);
@@ -267,15 +291,15 @@ const getTotalRevenue = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
- 
+
 module.exports = {
   getOrders,
   getOrder,
   addOrder,
-  getUserOrder,
   getUserOrders,
   cancelOrder,
   getOrderStatus,
   getCategoryWiseOrders,
-  getTotalRevenue
+  getTotalRevenue,
+
 };

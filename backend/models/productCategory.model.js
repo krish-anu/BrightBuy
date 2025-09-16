@@ -9,6 +9,7 @@ module.exports = (sequelize, DataTypes) => {
           model: "Products", // refers to table `Products`
           key: "id",
         },
+        primaryKey:true,
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
@@ -19,6 +20,7 @@ module.exports = (sequelize, DataTypes) => {
           model: "Categories", // refers to table `Categories`
           key: "id",
         },
+        primaryKey: true,
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
@@ -35,12 +37,12 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       tableName: "ProductCategories", // make sure table name is consistent
-      indexes: [
-        {
-          unique: true,
-          fields: ["productId", "categoryId"], // prevent duplicate pairs
-        },
-      ],
+      // indexes: [
+      //   {
+      //     unique: true,
+      //     fields: ["productId", "categoryId"], // prevent duplicate pairs
+      //   },
+      // ],
     }
   );
 

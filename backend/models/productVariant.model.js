@@ -34,6 +34,16 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             validate: { min: 0 },
         },
+        productId: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: "Products",
+                key: "id",
+            },
+            onUpdate: "CASCADE",
+            onDelete: "CASCADE",
+        },
     });
     return ProductVariant;
 };
