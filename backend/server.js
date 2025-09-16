@@ -5,6 +5,7 @@ require('dotenv').config()
 
 const { port } = require("./config/dbConfig");
 const errorMiddleware = require("./middlewares/error.middleware");
+const { pool } = require('./config/db'); // your mysql helper
 
 
 
@@ -66,8 +67,22 @@ app.get("/", (req, res) => {
 });
 
 //port
-const PORT = port || 8080;
+const PORT = process.env.APP_PORT || 8081;
 
+async function testConnection() {
+  try {
+    const connection = await pool.getConnection();
+    console.log('Database connected successfully!');
+    connection.release(); // release back to pool
+  } catch (error) {
+    console.error('Database connection failed:', error.message);
+    process.exit(1); // stop server if DB fails
+  }
+}
+
+testConnection();
+
+ 
 //server
 app.listen(PORT, () => {
   console.log(`Server is now running on PORT ${ PORT }`);

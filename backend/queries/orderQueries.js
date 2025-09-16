@@ -1,0 +1,86 @@
+// Orders Queries
+const getAllOrders = `SELECT * FROM orders ORDER BY createdAt DESC`;
+
+const getOrderById = `SELECT * FROM orders WHERE id = ?`;
+
+const getOrderItemsByOrderId = `
+  SELECT oi.*, pv.id AS variantId, pv.SKU, pv.variantName, pv.price, pv.stockQnt,
+         p.id AS productId, p.name AS productName
+  FROM order_items oi
+  JOIN product_variants pv ON oi.ProductVariantId = pv.id
+  JOIN products p ON pv.ProductId = p.id
+  WHERE oi.OrderId = ?
+`;
+
+const insertOrder = `
+  INSERT INTO orders 
+    (UserId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+const insertOrderItem = `
+  INSERT INTO order_items
+    (OrderId, ProductVariantId, quantity, unitPrice, totalPrice)
+  VALUES (?, ?, ?, ?, ?)
+`;
+
+const getOrdersByUserId = `SELECT * FROM orders WHERE UserId = ? ORDER BY createdAt DESC`;
+
+const getUserOrderById = `SELECT * FROM orders WHERE id = ? AND UserId = ?`;
+
+const cancelOrderById = `UPDATE orders SET status = 'Cancelled' WHERE id = ?`;
+
+const getCategoryWiseOrders = `
+  SELECT c.id AS categoryId, c.name AS categoryName, c.parentId, COUNT(oi.id) AS orderCount
+  FROM order_items oi
+  JOIN product_variants pv ON oi.ProductVariantId = pv.id
+  JOIN products p ON pv.ProductId = p.id
+  JOIN product_categories pc ON p.id = pc.productId
+  JOIN categories c ON pc.categoryId = c.id
+  GROUP BY c.id
+`;
+
+const getOrderStatusById = `
+  SELECT id, status, deliveryMode, deliveryAddress, estimatedDeliveryDate, UserId
+  FROM orders
+  WHERE id = ?
+`;
+
+const getTotalRevenue = `SELECT SUM(totalPrice) AS totalRevenue FROM orders`;
+
+// --- Stripe webhook related queries ---
+const updateOrderStatus = `
+  UPDATE orders
+  SET status = ?, cancelReason = ?, updatedAt = NOW()
+  WHERE id = ?
+`;
+
+const updatePaymentStatus = `
+  UPDATE payments
+  SET status = ?, paymentIntentId = ?, updatedAt = NOW()
+  WHERE id = ?
+`;
+
+const restockItems = `
+  UPDATE product_variants v
+  JOIN order_items oi ON v.id = oi.ProductVariantId
+  SET v.stockQnt = v.stockQnt + oi.quantity
+  WHERE oi.OrderId = ?
+`;
+
+module.exports = {
+  getAllOrders,
+  getOrderById,
+  getOrderItemsByOrderId,
+  insertOrder,
+  insertOrderItem,
+  getOrdersByUserId,
+  getUserOrderById,
+  cancelOrderById,
+  getCategoryWiseOrders,
+  getTotalRevenue,
+  getOrderStatusById,
+  updateOrderStatus,
+  updatePaymentStatus,
+  restockItems,
+};

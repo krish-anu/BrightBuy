@@ -1,214 +1,135 @@
+const { query } = require('../config/db');
 const ApiError = require('../utils/ApiError');
-const { fn, col } = require('sequelize');
-
-const db = require('../models');
 const generateSKU = require('../utils/generateSKU');
-const Product = db.product;
-const ProductVariant = db.productVariant;
-const Category = db.category;
-const VariantAttribute = db.variantAttribute;
-const ProductVariantOption = db.productVariantOption;
-const OrderItem = db.orderItem;
+const productQueries = require('../queries/productQueries');
 
+// Get all products
 const getProducts = async (req, res, next) => {
-    try {
-        const { limit } = req.query;
-
-        const products = await Product.findAll({
-            attributes: ['id', 'name', 'description', 'brand'],
-            include: [
-                { model: Category, attributes: ['id', 'name'], through: { attributes: [] } },
-                { model: ProductVariant, attributes: ['id', 'variantName', 'price', 'stockQnt'] },
-            ],
-            limit: limit ? parseInt(limit) : undefined,
-            order: [['name', 'ASC']],
-            distinct: true,
-        });
-
-        res.status(200).json({ success: true, data: products });
-    } catch (error) {
-        next(error);
-    }
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 1000;
+    const rows = await query(productQueries.getAllProducts, [limit]);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
 };
 
+// Get single product with variants
 const getProduct = async (req, res, next) => {
-    try {
-        const product = await Product.findByPk(req.params.id, {
-            attributes: ['id', 'name', 'description'],
-            include: [{ model: Category, attributes: ['id', 'name', 'parentId'], through: { attributes: [] } },
-            { model: ProductVariant, include: [{ model: VariantAttribute, attributes: ['id', 'name'], through: { model: ProductVariantOption, attributes: ['value'] } }] }]
-        });
-        if (!product) throw new ApiError('Product not found', 404);
-        res.status(200).json({ success: true, data: product });
-    } catch (error) {
-        next(error);
-    }
+  try {
+    const rows = await query(productQueries.getProductById, [req.params.id]);
+    if (!rows.length) throw new ApiError('Product not found', 404);
+
+    const variants = await query(productQueries.getVariantsByProduct, [req.params.id]);
+    const product = rows[0];
+    product.variants = variants;
+
+    res.status(200).json({ success: true, data: product });
+  } catch (err) { next(err); }
 };
 
+// Add new product with variants & attributes
 const addProduct = async (req, res, next) => {
-    try {
-        const { name, description, categoryIds, brand, attributes, stockQnt, price } = req.body;
-        if (!name || !description || !attributes || !price) throw new ApiError('Name, description,price and attributes are required', 400);
+  try {
+    const { name, description, brand, attributes, stockQnt, price } = req.body;
+    if (!name || !description || !attributes || !price)
+      throw new ApiError('Name, description, price and attributes are required', 400);
 
-        const existing = await Product.findOne({ where: { name } });
-        if (existing) throw new ApiError('Product exists', 409);
+    const existing = await query(productQueries.getProductByName, [name]);
+    if (existing.length) throw new ApiError('Product exists', 409);
 
-        const newProduct = await db.sequelize.transaction(async (t) => {
-            const productData = { name, description };
-            if (brand) productData.brand = brand;
-            const product = await Product.create(productData, { transaction: t });
+    // Insert product
+    const result = await query(productQueries.insertProduct, [name, description, brand || null]);
+    const productId = result.insertId;
 
-            if (Array.isArray(categoryIds) && categoryIds.length) {
-                const categories = await Category.findAll({ where: { id: categoryIds } });
-                await product.setCategories(categories, { transaction: t });
-            }
+    // Create variant
+    const variantName = `${name} ${attributes.map(a => a.value).join(' ')}`;
+    const SKU = generateSKU(name, variantName);
+    const variantResult = await query(productQueries.insertVariant, [productId, variantName, SKU, stockQnt || 1, price]);
+    const variantId = variantResult.insertId;
 
-            const attrName = attributes.map((attr) => attr.value).join(' ');
-            const variantName = `${ product.name } ${ attrName }`;
-            const SKU = generateSKU(product.name, variantName);
-
-
-            const variant = await ProductVariant.create(
-                { productId: product.id, variantName: variantName, SKU, stockQnt: stockQnt || 1, price },
-                { transaction: t }
-            );
-
-            for (const attr of attributes) {
-                const [attribute] = await VariantAttribute.findOrCreate({
-                    where: { name: attr.name },
-                    defaults: { name: attr.name },
-                    transaction: t,
-                });
-                await ProductVariantOption.create(
-                    { variantId: variant.id, attributeId: attribute.id, value: attr.value },
-                    { transaction: t }
-                );
-            }
-            return product;
-        });
-        res.status(201).json({ success: true, data: newProduct });
+    // Create attributes and variant options
+    for (const attr of attributes) {
+      await query(productQueries.insertAttributeIfNotExists, [attr.name]);
+      const [attribute] = await query(productQueries.getAttributeByName, [attr.name]);
+      await query(productQueries.insertVariantOption, [variantId, attribute.id, attr.value]);
     }
-    catch (error) { next(error); }
+
+    const newProduct = await query(productQueries.getProductById, [productId]);
+    res.status(201).json({ success: true, data: newProduct[0] });
+  } catch (err) { next(err); }
 };
 
-/**Get variant count of each product */
-const getProductVariantCount = async (req, res, next) => {
-    try {
-        const productCount = await Product.findAll({
-            attributes: ['id', 'name', [fn('COUNT', col('ProductVariants.id')), 'count']],
-            include: [{ model: ProductVariant, attributes: [] }],
-            group: ['Product.id'],
-            order: [['name', 'ASC']],
-        });
-        res.status(200).json({ success: true, data: productCount });
-    } catch (error) {
-        next(error);
-    }
-};
-
-const getVariantsOfProduct = async (req, res, next) => {
-    try {
-        const { productId } = req.params;
-        const product = await db.product.findByPk(productId);
-        if (!product) throw new ApiError('Product not found', 404);
-        const variants = await db.productVariant.findAll({
-            where: { productId },
-            include: [{
-                model: VariantAttribute,
-                attributes: ['id', 'name'],
-                through: {
-                    model: ProductVariantOption,
-                    attributes: ['value']
-                }
-            }],
-            order: [['variantName', 'ASC']]
-        });
-        res.status(200).json({ success: true, data: variants });
-    } catch (error) {
-        next(error);
-    }
-};
-
-const getProductCount = async (req, res, next) => {
-    try {
-        const count = await Product.count();
-        res.status(200).json({ success: true, data: { totalProducts: count } });
-    } catch (error) {
-        next(error);
-    }
-};
-
+// Update product
 const updateProduct = async (req, res, next) => {
-    try {
-        const product = await Product.findByPk(req.params.id);
-        if (!product) throw new ApiError('Product not found', 404);
+  try {
+    const { name, description, brand } = req.body;
+    const rows = await query(productQueries.getProductById, [req.params.id]);
+    if (!rows.length) throw new ApiError('Product not found', 404);
 
-        if (req.body.name) {
-            const existing = await Product.findOne({ where: { name: req.body.name } });
-            if (existing && existing.id !== product.id) throw new ApiError('Product name already exists', 409);
-        }
+    await query(productQueries.updateProduct, [
+      name || rows[0].name,
+      description || rows[0].description,
+      brand || rows[0].brand,
+      req.params.id
+    ]);
 
-        await product.update({
-            name: name || product.name,
-            description: description || product.description,
-            brand: brand || product.brand
-        });
-
-        res.status(200).json({ success: true, data: product });
-    } catch (error) {
-        next(error);
-    }
+    const updated = await query(productQueries.getProductById, [req.params.id]);
+    res.status(200).json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
 };
 
+// Delete product
 const deleteProduct = async (req, res, next) => {
-    try {
-        const product = await Product.findByPk(req.params.id);
-        if (!product) throw new ApiError('Product not found', 404);
-        if (product.ProductVariants && product.ProductVariants.length > 0) {
-            throw new ApiError('Cannot delete product with existing variants', 400);
-        }
-        await product.destroy();
-        res.status(200).json({ success: true, message: 'Product deleted successfully' });
+  try {
+    const rows = await query(productQueries.getProductById, [req.params.id]);
+    if (!rows.length) throw new ApiError('Product not found', 404);
 
-    } catch (error) {
-        next(error);
-    }
+    await query(productQueries.deleteProduct, [req.params.id]);
+    res.status(200).json({ success: true, message: 'Product deleted successfully' });
+  } catch (err) { next(err); }
 };
 
+// Get variant count of each product
+const getProductVariantCount = async (req, res, next) => {
+  try {
+    const rows = await query(productQueries.getProductVariantCount);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+// Get variants of a product
+const getVariantsOfProduct = async (req, res, next) => {
+  try {
+    const variants = await query(productQueries.getVariantsByProduct, [req.params.productId]);
+    if (!variants.length) throw new ApiError('Variants not found', 404);
+    res.status(200).json({ success: true, data: variants });
+  } catch (err) { next(err); }
+};
+
+// Get total product count
+const getProductCount = async (req, res, next) => {
+  try {
+    const [count] = await query(productQueries.countProducts);
+    res.status(200).json({ success: true, data: count });
+  } catch (err) { next(err); }
+};
+
+// Get popular products
 const getPopularProduct = async (req, res, next) => {
-    try {
-        const limit = req.query.limit ? parseInt(req.query.limit) : 10;
-        const products = await Product.findAll({
-            attributes: [
-                'id', 'name', 'brand', 'description',
-                [fn('SUM', col('ProductVariants.OrderItems.quantity')), 'soldQuantity']
-            ],
-            include: [{
-                model: ProductVariant, attributes: [],
-                include: [{ model: OrderItem, attributes: [], required: true }],
-                required: true
-            }],
-            group: ['Product.id'],
-            order: [[fn('SUM', col('ProductVariants.OrderItems.quantity')), 'DESC']],
-            limit,
-            subQuery: false
-        });
-
-        res.status(200).json({ success: true, data: products });
-    } catch (error) {
-        next(error);
-    }
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+    const rows = await query(productQueries.getPopularProducts, [limit]);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
 };
-
 
 module.exports = {
-    getProducts,
-    getProduct,
-    addProduct,
-    getProductVariantCount,
-    updateProduct,
-    deleteProduct,
-    getVariantsOfProduct,
-    getProductCount,
-    getPopularProduct
+  getProducts,
+  getProduct,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  getProductVariantCount,
+  getVariantsOfProduct,
+  getProductCount,
+  getPopularProduct
 };

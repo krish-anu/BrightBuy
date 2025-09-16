@@ -1,252 +1,126 @@
+const { query } = require('../config/db');
+const orderQueries = require('../queries/orderQueries');
 const ApiError = require('../utils/ApiError');
-const { fn, col } = require('sequelize');
 const { calculateOrderDetails } = require('../utils/calculateOrderDetails');
-const db = require('../models');
 const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
-const Order = db.order;
-const OrderItem = db.orderItem;
-const City = db.city;
-const ProductVariant = db.productVariant;
-const Product = db.product;
-const Category = db.category;
-const User = db.user;
+// Helper function to save order and items
+async function createOrderInDB(orderedItems, userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod) {
+  const result = await query(orderQueries.insertOrder, [
+    userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, 'Pending'
+  ]);
+  const orderId = result.insertId;
 
-// Helper function to save order and order items in DB
-// Helper function to save order and order items in DB
-async function createOrderInDB(
-  orderedItems,
-  userId,
-  deliveryMode,
-  deliveryAddress,
-  estimatedDeliveryDate,
-  totalPrice,
-  deliveryCharge,
-  transaction,
-  paymentMethod
-) {
-  // Create the main order
-  const order = await Order.create({
-    UserId: userId,
-    deliveryMode,
-    deliveryAddress,
-    estimatedDeliveryDate,
-    totalPrice,
-    deliveryCharge,
-    paymentMethod
-  }, { transaction });
-
-  // Create each order item
   for (const item of orderedItems) {
-    await OrderItem.create({
-      OrderId: order.id,
-      ProductVariantId: item.variantId,
-      quantity: item.quantity,
-      unitPrice: item.price,                // price per single item
-      totalPrice: item.price * item.quantity // total price for this line item
-    }, { transaction });
+    await query(orderQueries.insertOrderItem, [
+      orderId, item.variantId, item.quantity, item.price, item.price * item.quantity
+    ]);
   }
 
-  return order;
+  return { id: orderId, UserId: userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status: 'Pending' };
 }
 
-
+// Get all orders
 const getOrders = async (req, res, next) => {
   try {
-    const { limit } = req.query;
-    const options = {
-      attributes: { exclude: ['createdAt', 'updatedAt'] },
-      include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
-      order: [['createdAt', 'DESC']],
-      distinct: true
-    };
-    if (limit) options.limit = parseInt(limit);
-    const orders = await Order.findAll(options);
-    res.status(200).json({ success: true, data: orders });
-  } catch (error) { next(error); }
+    const rows = await query(orderQueries.getAllOrders);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
 };
 
+// Get single order by ID
 const getOrder = async (req, res, next) => {
   try {
-    const order = await Order.findByPk(req.params.id, {
-      attributes: { exclude: ['createdAt', 'updatedAt'] },
-      include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }]
-    });
-    if (!order) throw new ApiError('Order not found', 404);
-    res.status(200).json({ success: true, data: order });
-  } catch (error) { next(error); }
+    const orders = await query(orderQueries.getOrderById, [req.params.id]);
+    if (!orders.length) throw new ApiError('Order not found', 404);
+
+    const orderItems = await query(orderQueries.getOrderItemsByOrderId, [req.params.id]);
+    res.status(200).json({ success: true, data: { ...orders[0], items: orderItems } });
+  } catch (err) { next(err); }
 };
 
+// Add order
 const addOrder = async (req, res, next) => {
   try {
     const { items, paymentMethod, deliveryMode, deliveryAddress } = req.body;
-    if (!items || !deliveryMode || !paymentMethod) {
-      throw new ApiError('Items, delivery mode, and payment method are required', 400);
+    if (!items || !deliveryMode || !paymentMethod) throw new ApiError('Items, delivery mode, and payment method are required', 400);
+
+    const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
+      await calculateOrderDetails(items, deliveryMode, deliveryAddress, { id: req.user.id });
+
+    const order = await createOrderInDB(
+      orderedItems,
+      req.user.id,
+      deliveryMode,
+      finalAddress,
+      deliveryDate,
+      totalPrice,
+      deliveryCharge,
+      paymentMethod
+    );
+
+    if (paymentMethod === 'COD') return res.status(201).json({ success: true, data: order });
+
+    if (paymentMethod === 'Card') {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: orderedItems.map(item => ({
+          price_data: { currency: 'lkr', product_data: { name: item.productName }, unit_amount: Math.round(item.price * 100) },
+          quantity: item.quantity
+        })),
+        mode: 'payment',
+        success_url: `http://localhost:8081/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `http://localhost:8081/payment/cancel`,
+        metadata: { userId: req.user.id, orderId: order.id }
+      });
+      return res.status(200).json({ success: true, data: { checkoutUrl: session.url } });
     }
 
-    const result = await db.sequelize.transaction(async t => {
-      const user = await User.findByPk(req.user.id, {
-        attributes: ['address', 'cityId'],
-        include: [{ model: City, attributes: ['name', 'isMainCity'] }],
-        transaction: t
-      });
-
-      const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
-        await calculateOrderDetails(items, deliveryMode, deliveryAddress, user, t);
-
-      const order = await createOrderInDB(
-        orderedItems,
-        req.user.id,
-        deliveryMode,
-        finalAddress,
-        deliveryDate,
-        totalPrice,
-        deliveryCharge,
-        t,
-        paymentMethod
-      );
-
-      if (paymentMethod === 'COD') {
-        return { type: 'order', order };
-      }
-
-      if (paymentMethod === 'Card') {
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ['card'],
-          line_items: orderedItems.map(item => ({
-            price_data: {
-              currency: 'lkr',
-              product_data: { name: item.productName },
-              unit_amount: Math.round(item.price * 100)
-            },
-            quantity: item.quantity
-          })),
-          mode: 'payment',
-          success_url: `http://localhost:8081/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `http://localhost:8081/payment/cancel`,
-          metadata: {
-            userId: req.user.id,
-            orderId: order.id
-          }
-        });
-        return { type: 'checkout', checkoutUrl: session.url };
-      }
-
-      throw new ApiError('Invalid payment method', 400);
-    });
-
-    if (result.type === 'order')
-      return res.status(201).json({ success: true, data: result.order });
-
-    return res.status(200).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
+    throw new ApiError('Invalid payment method', 400);
+  } catch (err) { next(err); }
 };
 
+// Get orders of a user
 const getUserOrders = async (req, res, next) => {
   try {
-    const options = {
-      where: { UserId: req.user.id },
-      attributes: { exclude: ['createdAt', 'updatedAt'] },
-      include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }],
-      order: [['createdAt', 'DESC']],
-      distinct: true
-    };
-    if (req.query.limit) options.limit = parseInt(req.query.limit);
-    const orders = await Order.findAll(options);
-    res.status(200).json({ success: true, data: orders });
-  } catch (error) { next(error); }
+    const rows = await query(orderQueries.getOrdersByUserId, [req.user.id]);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
 };
 
+// Get a user order
 const getUserOrder = async (req, res, next) => {
   try {
-    const order = await Order.findOne({
-      where: { id: req.params.id, UserId: req.user.id },
-      attributes: { exclude: ['createdAt', 'updatedAt'] },
-      include: [{ model: OrderItem, attributes: { exclude: ['createdAt', 'updatedAt'] } }]
-    });
-    if (!order) throw new ApiError('Order not found', 404);
-    res.status(200).json({ success: true, data: order });
-  } catch (error) { next(error); }
+    const orders = await query(orderQueries.getUserOrderById, [req.params.id, req.user.id]);
+    if (!orders.length) throw new ApiError('Order not found', 404);
+
+    const orderItems = await query(orderQueries.getOrderItemsByOrderId, [req.params.id]);
+    res.status(200).json({ success: true, data: { ...orders[0], items: orderItems } });
+  } catch (err) { next(err); }
 };
 
+// Cancel order
 const cancelOrder = async (req, res, next) => {
   try {
-    const cancelledOrder = await db.sequelize.transaction(async t => {
-      const order = await Order.findByPk(req.params.id, { transaction: t });
-      if (!order) throw new ApiError('Order not found', 404);
-      if (order.UserId !== req.user.id)
-        throw new ApiError('Forbidden: You cannot cancel this order', 403);
-      if (['Confirmed', 'Shipped', 'Delivered'].includes(order.status))
-        throw new ApiError('Order shipped or delivered cannot be cancelled', 400);
-
-      await order.update({ status: 'Cancelled' }, { transaction: t });
-      return order;
-    });
-    res.status(200).json({ success: true, data: cancelledOrder });
-  } catch (error) { next(error); }
+    await query(orderQueries.cancelOrderById, [req.params.id]);
+    res.status(200).json({ success: true, message: 'Order cancelled successfully' });
+  } catch (err) { next(err); }
 };
 
-const getOrderStatus = async (req, res, next) => {
-  try {
-    const order = await Order.findByPk(req.params.id, {
-      attributes: ['id', 'status', 'deliveryMode', 'deliveryAddress', 'estimatedDeliveryDate', 'UserId']
-    });
-    if (!order) throw new ApiError('Order not found', 404);
-
-    let result = { id: order.id, status: order.status };
-    if (['Cancelled', 'Delivered'].includes(order.status)) return res.status(200).json({ success: true, data: result });
-
-    if (order.deliveryMode === 'Standard Delivery') {
-      result.deliveryAddress = order.deliveryAddress;
-      result.estimatedDeliveryDate = order.estimatedDeliveryDate;
-    }
-
-    res.status(200).json({ success: true, data: result });
-  } catch (error) { next(error); }
-};
-
+// Get category-wise orders
 const getCategoryWiseOrders = async (req, res, next) => {
   try {
-    const result = await OrderItem.findAll({
-      include: [
-        {
-          model: ProductVariant,
-          include: [
-            {
-              model: Product,
-              include: [
-                {
-                  model: Category,
-                  through: { attributes: [] },
-                  include: [{ model: Category, as: 'parent' }]
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      group: ['ProductVariant.Product.Categories.id'],
-      raw: true,
-      attributes: [
-        [fn('COUNT', col('OrderItem.id')), 'orderCount'],
-        [col('ProductVariant.Product.Categories.id'), 'categoryId'],
-        [col('ProductVariant.Product.Categories.name'), 'categoryName'],
-        [col('ProductVariant.Product.Categories.parentId'), 'parentId'],
-        [col('ProductVariant.Product.Categories.parent.name'), 'parentName']
-      ]
-    });
+    const rows = await query(orderQueries.getCategoryWiseOrders);
 
     const categoryOrders = {};
     let totalOrders = 0;
-    for (const row of result) {
+    for (const row of rows) {
       const parent = row.parentId;
       const child = row.categoryId;
       const count = parseInt(row.orderCount);
       if (parent !== null) {
-        if (!categoryOrders[parent]) categoryOrders[parent] = { category: row.parentName, totalOrders: 0, subcategories: {} };
+        if (!categoryOrders[parent]) categoryOrders[parent] = { category: 'Parent', totalOrders: 0, subcategories: {} };
         categoryOrders[parent].totalOrders += count;
         categoryOrders[parent].subcategories[child] = { categoryName: row.categoryName, order: count };
       }
@@ -254,20 +128,41 @@ const getCategoryWiseOrders = async (req, res, next) => {
     }
 
     res.status(200).json({ success: true, data: { categoryOrders, totalOrders } });
-  } catch (error) { next(error); }
+  } catch (err) { next(err); }
 };
 
+// Get total revenue
 const getTotalRevenue = async (req, res, next) => {
   try {
-    console.log('Calculating total revenue...');
-    
-    const totalRevenue = await Order.sum('totalPrice');
-    console.log('Total revenue calculated:', totalRevenue); 
-    res.status(200).json({ success: true, data: totalRevenue });
-  } catch (error) { next(error); }
+    const rows = await query(orderQueries.getTotalRevenue);
+    res.status(200).json({ success: true, data: rows[0].totalRevenue || 0 });
+  } catch (err) { next(err); }
+};
+// Get order status
+const getOrderStatus = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getOrderStatusById, [req.params.id]);
+    if (!rows.length) throw new ApiError('Order not found', 404);
+
+    const order = rows[0];
+    const result = { id: order.id, status: order.status };
+
+    if (['Cancelled', 'Delivered'].includes(order.status)) {
+      return res.status(200).json({ success: true, data: result });
+    }
+
+    if (order.deliveryMode === 'Standard Delivery') {
+      result.deliveryAddress = order.deliveryAddress;
+      result.estimatedDeliveryDate = order.estimatedDeliveryDate;
+    }
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
 };
 
- 
+
 module.exports = {
   getOrders,
   getOrder,
@@ -275,7 +170,7 @@ module.exports = {
   getUserOrder,
   getUserOrders,
   cancelOrder,
-  getOrderStatus,
   getCategoryWiseOrders,
-  getTotalRevenue
+  getTotalRevenue,
+  getOrderStatus
 };

@@ -1,0 +1,31 @@
+const userQueries = {
+  getAll: `
+    SELECT id, name, email, role, role_accepted, address, phone, cityId, createdAt, updatedAt
+    FROM users
+  `,
+  getById: `
+    SELECT id, name, email, role, role_accepted, address, phone, cityId, createdAt, updatedAt
+    FROM users
+    WHERE id = ?
+  `,
+  getByEmail: `
+    SELECT id, name, email, password, role
+    FROM users
+    WHERE email = ?
+  `,
+  insert: `
+    INSERT INTO users (name, email, password, role, role_accepted, address, phone, cityId)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  update: `
+    UPDATE users
+    SET name = ?, email = ?, password = ?, role = ?, role_accepted = ?, address = ?, phone = ?, cityId = ?
+    WHERE id = ?
+  `,
+  delete: `
+    DELETE FROM users
+    WHERE id = ?
+  `
+};
+
+module.exports = userQueries;
