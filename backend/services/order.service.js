@@ -57,30 +57,30 @@ const getOrderDetails = async (orderId) => {
   return order;
 };
 
-const updateStock = async (variantId, quantityChange) => {
-  const [rows] = await pool.promise().query(`SELECT * FROM product_variants WHERE id = ?`, [variantId]);
-  const variant = rows[0];
-  if (!variant) throw new ApiError('Variant not found', 404);
+// const updateStock = async (variantId, quantityChange) => {
+//   const [rows] = await pool.promise().query(`SELECT * FROM product_variants WHERE id = ?`, [variantId]);
+//   const variant = rows[0];
+//   if (!variant) throw new ApiError('Variant not found', 404);
 
-  const newStock = variant.stockQnt + quantityChange;
-  if (newStock < 0) throw new ApiError('Stock cannot go below 0', 400);
+//   const newStock = variant.stockQnt + quantityChange;
+//   if (newStock < 0) throw new ApiError('Stock cannot go below 0', 400);
 
-  await pool.promise().query(`UPDATE product_variants SET stockQnt = ? WHERE id = ?`, [newStock, variantId]);
-  return { ...variant, stockQnt: newStock };
-};
+//   await pool.promise().query(`UPDATE product_variants SET stockQnt = ? WHERE id = ?`, [newStock, variantId]);
+//   return { ...variant, stockQnt: newStock };
+// };
 
-const restock = async (orderId) => {
-  const [orders] = await pool.promise().query(`SELECT * FROM orders WHERE id = ?`, [orderId]);
-  if (!orders.length) throw new ApiError('Order not found', 404);
-  const order = orders[0];
+// const restock = async (orderId) => {
+//   const [orders] = await pool.promise().query(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+//   if (!orders.length) throw new ApiError('Order not found', 404);
+//   const order = orders[0];
 
-  if (order.status !== 'Cancelled') return;
+//   if (order.status !== 'Cancelled') return;
 
-  const [items] = await pool.promise().query(`SELECT * FROM order_items WHERE OrderId = ?`, [orderId]);
-  for (const item of items) {
-    if (!item.isBackOrdered) await updateStock(item.ProductVariantId, item.quantity);
-  }
-};
+//   const [items] = await pool.promise().query(`SELECT * FROM order_items WHERE OrderId = ?`, [orderId]);
+//   for (const item of items) {
+//     if (!item.isBackOrdered) await updateStock(item.ProductVariantId, item.quantity);
+//   }
+// };
 
 module.exports = {
   saveOrderToDatabase,

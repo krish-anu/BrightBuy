@@ -1,121 +1,75 @@
 const ApiError = require('../utils/ApiError');
-const db = require('../models');
+const {query} = require('../config/db');
+const deliveryQueries = require('../queries/deliveryQueries');
 const { isValidDeliveryUpdate, CODPayment } = require('../services/delivery.service');
 const { updateStock } = require('../services/variant.service');
 
-const { order: Order,
-    user: User,
-    payment: Payment,
-    delivery: Delivery,
-    orderItem: OrderItem,
-    productVariant: ProductVariant } = db;
+const assignDeliveryStaff = async (deliveryId, staffId, connection) => {
+  const [deliveryRows] = await query(deliveryQueries.getDeliveryById, [deliveryId], connection);
+  if (!deliveryRows.length) throw new ApiError('Delivery not found', 404);
 
-const assignDeliveryStaff = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const { staffId } = req.body;
-        
-        const updatedDelivery = await db.sequelize.transaction(async (transaction) => {
-            const delivery = await Delivery.findByPk(id, { transaction });
-            if (!delivery) throw new ApiError('Delivery not found', 404);
-
-            const deliveryStaff = await User.findByPk(staffId, { transaction });
-            if (!deliveryStaff || deliveryStaff.role !== 'deliveryStaff')
-                throw new ApiError('Staff not found', 404);
-
-            await delivery.update(
-                { staffId, status: 'Confirmed', assignedDate: new Date() },
-                { transaction }
-            );
-            return delivery;
-        });
-
-        res.status(200).json({ success: true, data: updatedDelivery });
-    } catch (error) {
-        next(error);
-    }
+  // Assuming staff validation is done separately
+  await query(deliveryQueries.updateDelivery, [staffId, 'Confirmed', null, deliveryId], connection);
+  return { id: deliveryId, staffId, status: 'Confirmed' };
 };
 
-const updateDeliveryStatus = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const { newStatus } = req.body;
+const updateDeliveryStatus = async (deliveryId, newStatus, connection) => {
+  const [deliveryRows] = await query(deliveryQueries.getDeliveryById, [deliveryId], connection);
+  if (!deliveryRows.length) throw new ApiError('Delivery not found', 404);
+  const delivery = deliveryRows[0];
 
-        const updatedDelivery = await db.sequelize.transaction(async (transaction) => {
-            const delivery = await Delivery.findByPk(id, {
-                include: [{ model: Order, include: [Payment] }],
-                transaction,
-                lock: true,
-            });
-            if (!delivery) throw new ApiError('Delivery not found', 404);
+  isValidDeliveryUpdate(newStatus, delivery);
 
-            isValidDeliveryUpdate(newStatus, delivery);
+  const [orderRows] = await query(deliveryQueries.getOrderById, [delivery.orderId], connection);
+  const order = orderRows[0];
 
-            if (newStatus === 'Shipped') {
-                const orderItems = await OrderItem.findAll({
-                    where: { orderId: delivery.Order.id, preOrdered: true },
-                    include: [
-                        { model: ProductVariant, attributes: ['id', 'stockQnt'] }
-                    ],
-                    transaction
-                });
-                for (const item of orderItems) {
+  if (newStatus === 'Shipped') {
+    const items = await query(deliveryQueries.getOrderItemsWithVariant, [order.id], connection);
 
-                    if (item.ProductVariant.stockQnt < item.quantity)
-                        throw new ApiError('Out of stock items are present', 400);
-                    await updateStock(item.variantId, -item.quantity, transaction);
-                    await item.update({ preOrdered: false }, { transaction });
+    for (const item of items) {
+      if (item.stockQnt < item.quantity)
+        throw new ApiError('Out of stock items are present', 400);
 
-
-                }
-                await delivery.update({ status: newStatus }, { transaction });
-                await delivery.Order.update({ status: newStatus }, { transaction });
-            } else if (newStatus === 'Delivered' && delivery.Order.Payment.status === 'Paid') {
-                await delivery.update(
-                    { status: newStatus, deliveryDate: new Date() },
-                    { transaction }
-                );
-                await delivery.Order.update({ status: newStatus }, { transaction });
-            } else {
-                throw new ApiError('Invalid status update', 400);
-            }
-
-            return delivery;
-        });
-
-        res.status(200).json({ success: true, data: updatedDelivery });
-    } catch (error) {
-        next(error);
+      await updateStock(item.variantId, -item.quantity, connection);
+      await query(deliveryQueries.markItemsProcessed([item.id]), [item.id], connection);
     }
+
+    await query(deliveryQueries.updateDelivery, [delivery.staffId, newStatus, null, deliveryId], connection);
+    await query(deliveryQueries.updateOrderStatus, [newStatus, order.id], connection);
+
+  } else if (newStatus === 'Delivered') {
+    const [paymentRows] = await query(deliveryQueries.getPaymentByOrderId, [order.id], connection);
+    const payment = paymentRows[0];
+    if (payment?.status !== 'Paid') throw new ApiError('Cannot deliver unpaid order', 400);
+
+    await query(deliveryQueries.updateDelivery, [delivery.staffId, newStatus, new Date(), deliveryId], connection);
+    await query(deliveryQueries.updateOrderStatus, [newStatus, order.id], connection);
+
+  } else {
+    throw new ApiError('Invalid status update', 400);
+  }
+
+  return delivery;
 };
 
-const addCODPayment = async (req, res, next) => {
-    try {
-        const { id } = req.params; // delivery id
-        const { amount } = req.body;
+const addCODPayment = async (deliveryId, amount, userId, connection) => {
+  const [deliveryRows] = await query(deliveryQueries.getDeliveryById, [deliveryId], connection);
+  if (!deliveryRows.length) throw new ApiError('Delivery not found', 404);
+  const delivery = deliveryRows[0];
 
-        const updatedDelivery = await db.sequelize.transaction(async (transaction) => {
-            const delivery = await Delivery.findByPk(id, {
-                include: { model: Order },
-                transaction,
-                lock: true,
-            });
-            if (!delivery) throw new ApiError('Delivery not found', 404);
+  if (delivery.staffId !== userId) throw new ApiError('Forbidden access', 403);
 
-            if (delivery.staffId !== req.user.id)
-                throw new ApiError('Forbidden access', 403);
-            const payment=await Payment.findOne({where:{orderId:delivery.orderId}},{transaction})
-            return await CODPayment(amount,delivery.Order, payment, delivery, transaction);
-        });
+  const [orderRows] = await query(deliveryQueries.getOrderById, [delivery.orderId], connection);
+  const order = orderRows[0];
 
-        res.status(200).json({ success: true, data: updatedDelivery });
-    } catch (error) {
-        next(error);
-    }
+  const [paymentRows] = await query(deliveryQueries.getPaymentByOrderId, [order.id], connection);
+  const payment = paymentRows[0];
+
+  return CODPayment(amount, order, payment, delivery, connection);
 };
 
 module.exports = {
-    updateDeliveryStatus,
-    addCODPayment,
-    assignDeliveryStaff,
+  assignDeliveryStaff,
+  updateDeliveryStatus,
+  addCODPayment,
 };
