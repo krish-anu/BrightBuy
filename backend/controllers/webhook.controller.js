@@ -1,3 +1,4 @@
+// controllers/stripeWebhook.controller.js
 const { STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY } = require("../config/dbConfig");
 const ApiError = require("../utils/ApiError");
 const pool = require("../config/db");

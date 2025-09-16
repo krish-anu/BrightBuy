@@ -55,6 +55,24 @@ const getHierarchy = `
   ORDER BY c1.id, c2.id;
 `;
 
+// Get multiple attributes
+const getAttributesByIds = (ids) => {
+  const placeholders = ids.map(() => '?').join(',');
+  return `SELECT * FROM variant_attributes WHERE id IN (${placeholders})`;
+};
+
+// Insert category-attribute relations
+const addCategoryAttributes = `INSERT IGNORE INTO category_variant_attributes (categoryId, attributeId) VALUES ?`;
+
+// Get category with attributes
+const getCategoryWithAttributes = `
+  SELECT c.id AS categoryId, c.name AS categoryName,
+         va.id AS attributeId, va.name AS attributeName
+  FROM categories c
+  LEFT JOIN category_variant_attributes cva ON c.id = cva.categoryId
+  LEFT JOIN variant_attributes va ON cva.attributeId = va.id
+  WHERE c.id = ?;
+`;
 module.exports = {
   getAll,
   getById,
@@ -65,5 +83,8 @@ module.exports = {
   delete: deleteCategory,
   getProductsByCategory,
   getCategoryVariants,
-  getHierarchy
+  getHierarchy,
+  getAttributesByIds,
+  addCategoryAttributes,
+  getCategoryWithAttributes,
 };

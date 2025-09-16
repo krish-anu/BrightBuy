@@ -4,7 +4,7 @@
 import React from "react";
 import type { FC } from "react";
 import { Outlet } from "react-router-dom";
-import Sidebar from "./Sidebar";
+import Sidebar from "@/components/Admin/Sidebar";
 
 const AdminLayout: FC = () => {
   return (

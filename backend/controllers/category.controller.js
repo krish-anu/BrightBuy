@@ -181,14 +181,46 @@ const getCategoryHierarchy = async (req, res, next) => {
     next(err);
   }
 };
+const addNewAttributes = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { attributeIds } = req.body;
+
+    if (!Array.isArray(attributeIds) || attributeIds.length === 0) {
+      throw new ApiError('attributeIds must be a non-empty array', 400);
+    }
+
+    // 1. Check category exists
+    const rows = await query(categoryQueries.getById, [id]);
+    if (rows.length === 0) throw new ApiError('Category not found', 404);
+
+    // 2. Fetch attributes
+    const attrRows = await query(categoryQueries.getAttributesByIds(attributeIds), attributeIds);
+    if (attrRows.length === 0) throw new ApiError('No valid attributes found', 404);
+
+    // 3. Insert relations
+    const values = attributeIds.map((attrId) => [id, attrId]);
+    await query(categoryQueries.addCategoryAttributes, [values]);
+
+    // 4. Fetch updated category with attributes
+    const updatedRows = await query(categoryQueries.getCategoryWithAttributes, [id]);
+
+    res.status(200).json({ success: true, data: updatedRows });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
-  getCategories,
-  getCategory,
-  addCategory,
-  updateCategory,
-  deleteCategory,
-  getCategoryVariants,
-  addProductsToCategory,
-  getCategoryHierarchy
+    getCategories,
+    getCategory,
+    addCategory,
+    getCategoryVariants,
+    addProductsToCategory,
+    getCategoryHierarchy,
+    updateCategory,
+    deleteCategory,
+        addNewAttributes,
+
 };

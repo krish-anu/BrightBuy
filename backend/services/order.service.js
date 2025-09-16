@@ -1,6 +1,7 @@
 const pool = require('../config/db'); // MySQL pool
 const ApiError = require('../utils/ApiError');
-const { createPayment } = require('./payment.service');
+
+const { restock,updateStock, }=require('../services/variant.service')
 
 const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, paymentIntentId = null) => {
   const orderId = await createOrder(userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod);

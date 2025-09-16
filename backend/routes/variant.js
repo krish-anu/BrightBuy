@@ -7,7 +7,7 @@ const router = require('express').Router();
 
 router.get('/popular',getPopularVariants)
 router.get('/search', searchAndFilterVariants)
-router.get('/lowStk',getLowStockVariants)
+router.get('/lowStk', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN,ROLES.WAREHOUSE) ,getLowStockVariants)
 router.get('/', getVariants)
 router.get('/:id', getVariant);
 

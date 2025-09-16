@@ -67,7 +67,15 @@ const restockItems = `
   SET v.stockQnt = v.stockQnt + oi.quantity
   WHERE oi.OrderId = ?
 `;
+const getPaymentByOrderId = `SELECT * FROM payments WHERE orderId = ?`;
 
+// Get order details (items)
+const getOrderDetailsByOrderId = `
+  SELECT oi.id AS orderItemId, p.name AS productName, oi.quantity, oi.price
+  FROM order_items oi
+  JOIN products p ON oi.productId = p.id
+  WHERE oi.orderId = ?;
+`;
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -83,4 +91,6 @@ module.exports = {
   updateOrderStatus,
   updatePaymentStatus,
   restockItems,
+  getPaymentByOrderId,
+  getOrderDetailsByOrderId,
 };
