@@ -38,7 +38,7 @@ function App() {
             {/* ========== User Routes ========== */}
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
-              <Route path="login" element={<Login />} />
+              <Route path="login" element={<UserLogin />} />
               <Route path="signup" element={<UserSignup />} />
               <Route path="userlogin" element={<UserLogin />} />
               <Route path="products" element={<ProductsPage />} />
