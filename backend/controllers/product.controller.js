@@ -30,6 +30,8 @@ const getProduct = async (req, res, next) => {
 const addProduct = async (req, res, next) => {
   try {
     const { name, description, brand, attributes, stockQnt, price } = req.body;
+    console.log("Hiiiiiiii",req.body);
+    
     if (!name || !description || !attributes || !price)
       throw new ApiError('Name, description, price and attributes are required', 400);
 
