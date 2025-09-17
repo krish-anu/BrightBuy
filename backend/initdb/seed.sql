@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS product_variants (
   stockQnt INT NOT NULL DEFAULT 1 CHECK (stockQnt >= 0),
   price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
   imageURL VARCHAR(255) NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_productvariants_product FOREIGN KEY (productId) REFERENCES products(id)
     ON DELETE CASCADE
     ON UPDATE CASCADE
@@ -83,7 +85,7 @@ CREATE TABLE IF NOT EXISTS product_variant_options (
     ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
--- 8. Product Categories table
+-- 8. Product Categories table 
 CREATE TABLE IF NOT EXISTS product_categories (
   productId INT NOT NULL,
   categoryId INT NOT NULL,
