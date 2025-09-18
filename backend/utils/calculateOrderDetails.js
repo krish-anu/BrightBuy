@@ -1,6 +1,6 @@
 const { query } = require('../config/db'); // your query helper
 const ApiError = require('../utils/ApiError');
-const estimateDeliveryDate = require('../utils/estimateDeliveryDate');
+const {estimateDeliveryDate} = require('../utils/estimateDeliveryDate');
 
 const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user) => {
     let totalPrice = 0;
