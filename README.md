@@ -1,116 +1,169 @@
+# BrightBuy
 
-# BrightBuy 
+BrightBuy is a full-stack retail inventory and online order management system. It includes a **Node.js backend**, **React + Vite frontend**, and **MySQL database** running via **Docker Compose**.
 
-## Frontend
+---
 
-Frontend is built with `React` and `TypeScript`. UI components are made using `ShadCN` and `Tailwind CSS`.
+## Table of Contents
 
-### Run Frontend
+- [Features](#features)  
+- [Tech Stack](#tech-stack)  
+- [Prerequisites](#prerequisites)  
+- [Project Structure](#project-structure)  
+- [Setup & Running](#setup--running)  
+- [Environment Variables](#environment-variables)  
+- [Docker Commands](#docker-commands)  
+- [Logging](#logging)  
+- [Database Seeding](#database-seeding)  
 
-To run the frontend, navigate to the `frontend` directory and use the following command:
+---
 
-```bash
-npm install
-npm run dev
+## Features
+
+- User authentication with JWT
+- Stripe payment integration
+- Product catalog with categories, variants, and attributes
+- Inventory management
+- Order management
+- File storage using AWS S3
+- Dockerized development and production setup
+
+---
+
+## Tech Stack
+
+- **Backend:** Node.js, Express, Sequelize ORM, MySQL  
+- **Frontend:** React, Vite, Tailwind CSS  
+- **Database:** MySQL 8  
+- **Payment:** Stripe API  
+- **Storage:** AWS S3  
+- **Containerization:** Docker & Docker Compose  
+
+---
+
+## Prerequisites
+
+- Docker >= 24  
+- Docker Compose plugin  
+- Node.js >= 20 (for local dev)  
+- npm >= 9 (for local dev)  
+
+---
+
+## Project Structure
+
+```
+BrightBuy/
+│
+├─ backend/               # Node.js backend
+│  ├─ server.js
+│  ├─ package.json
+│  ├─ .env
+│  └─ ...
+│
+├─ frontend/              # React frontend
+│  ├─ package.json
+│  ├─ vite.config.ts
+│  └─ ...
+│
+├─ seed.sql               # Initial database seed
+├─ docker-compose.dev.yml # Development docker compose file
+├─ docker-compose.prod.yml# Production docker compose file
+└─ README.md
 ```
 
-This will start the development server and open the application in your default browser.
+---
 
-### Push your changes to Git
+## Setup & Running
 
-**Do not push directly to `main` (main isn't protected).**
+### 1. Clone the repo
 
-Follow these steps to contribute:
+```bash
+git clone <your-repo-url>
+cd BrightBuy
+```
 
-1. Create a new branch for your changes:
-    ```bash
-    git checkout -b your-branch-name
-    ```
-2. Make your changes and stage them:
-    ```bash
-    git add .
-    git commit -m "Describe your changes"
-    ```
-3. Before pushing, pull the latest changes from `main`:
-    ```bash
-    git pull origin main
-    ```
-4. Push your branch:
-    ```bash
-    git push origin your-branch-name
-    ```
-5. Go to GitHub and create a pull request from your branch to `main`.
+### 2. Development with Docker Compose
 
-Replace `your-branch-name` with the name of your branch.
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-# Getting Started with Create React App
+- Backend runs on: `http://localhost:8081`  
+- Frontend runs on: `http://localhost:5173`  
+- MySQL database: `BrightBuy`  
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### 3. Access MySQL container
 
-## Available Scripts
+```bash
+docker compose -f docker-compose.dev.yml exec db mysql -u root -p BrightBuy
+```
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## Environment Variables
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+**Backend `.env` example:**
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```env
+DB_HOST=db
+DB_USER=root
+DB_PASSWORD=brightbuy
+DB_NAME=BrightBuy
+DB_DIALECT=mysql
+DB_PORT=3306
+JWT_SECRET=FrenchFriesSecretSauceWithExtraSalt12345
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+AWS_ACCESS_KEY_ID=AKIAYB7IDXKIXUR2IZHB
+AWS_SECRET_ACCESS_KEY=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
+AWS_REGION=ap-south-1
+S3_BUCKET_NAME=brightbuy
+APP_PORT=8081
+```
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Docker Commands
 
-### `npm run build`
+- **Build & start containers:**  
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **Stop & remove containers, networks, volumes:**  
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **View real-time logs (all services):**  
+```bash
+docker compose -f docker-compose.dev.yml logs -f
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **View logs for a specific service (backend):**  
+```bash
+docker compose -f docker-compose.dev.yml logs -f backend
+```
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Logging
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- Backend uses `console.log` for logging actions.  
+- Use `docker compose logs -f backend` to see real-time logs.  
+- To detach from a running container while viewing logs: `Ctrl + C`  
+- For attaching to live container stdout:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+docker attach brightbuy-backend-1
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
 
-## Learn More
+---
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Database Seeding
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-
+- `seed.sql` runs automatically on first container startup.  
+- Contains initial categories, products, and sample data.
