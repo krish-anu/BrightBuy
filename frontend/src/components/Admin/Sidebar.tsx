@@ -30,9 +30,9 @@ const Sidebar: React.FC = () => {
   const {
     getCurrentUserRoutes,
     getCurrentRoleName,
-    switchRole,
-    availableRoles,
-    currentRole,
+    // switchRole,
+    // availableRoles,
+    // currentRole,
   } = useRole();
 
   const { user, logout } = useAuth();

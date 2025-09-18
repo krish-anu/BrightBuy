@@ -1,0 +1,26 @@
+services:
+  backend:
+    image: anusan2003/brightbuy-backend:latest
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8081:8081"
+    depends_on:
+      - db
+
+  frontend:
+    image: anusan2003/brightbuy-frontend:latest
+    ports:
+      - "80:80"
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: brightbuy
+      MYSQL_DATABASE: BrightBuy
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+
+volumes:
+  mysql_data:

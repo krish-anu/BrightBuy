@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { deliveries, orders } from '../../../data/mockData';
 import * as LucideIcons from 'lucide-react';
-import type { Icon as LucideIcon } from 'lucide-react';
+// import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
   id: string;

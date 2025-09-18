@@ -1,9 +1,9 @@
-import React from "react";
+// import React from "react";
 import {
-  BrowserRouter as Router,
+  // BrowserRouter as Router,
   Routes,
   Route,
-  Navigate,
+  // Navigate,
 } from "react-router-dom";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { RoleProvider } from "../../contexts/RoleContext";
@@ -24,7 +24,7 @@ import Layout from "@/components/Layout/Layout";
 import HomePage from "@/pages/User/HomePage";
 import ProductsPage from "@/pages/User/ProductsPage";
 import CartPage from "@/pages/User/CartPage";
-import Login from "@/components/Admin/LoginPage";
+// import Login from "@/components/Admin/LoginPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 import UserLogin from "@/pages/Authpage/UserLogin"; 

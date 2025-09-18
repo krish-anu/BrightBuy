@@ -18,7 +18,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         </AspectRatio>
         <CardTitle className="pt-4 text-lg">{product.title}</CardTitle>
         {/* <CardDescription className="text-md">{product.description}</CardDescription> */}
-        <span className="text-md md:text-lg font-bold text-secondary">LKR {product.price}</span>
+<span className="text-md md:text-lg font-bold text-secondary">
+  LKR {product.variants[0]?.price ?? 0}
+</span>
       </CardContent>
       <CardFooter className="flex justify- px-0">
         <Link to={`/products/${product.id}`} className="w-full">

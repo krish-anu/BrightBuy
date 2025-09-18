@@ -1,23 +1,13 @@
-# Use Node.js LTS
-FROM node:20
+FROM node:20-bullseye
 
-# Install MySQL client for wait-for-db.sh
-RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Switch to npm install (less strict, better for dev, avoids timeout)
+RUN npm install --legacy-peer-deps
 
-# Copy the rest of your project
 COPY . .
 
-# Expose your app port
-EXPOSE 3000
-
-# Command to run your app
+EXPOSE 5173
 CMD ["npm", "run", "dev"]

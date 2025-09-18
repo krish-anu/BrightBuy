@@ -76,10 +76,10 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) =>
-    status === "active"
-      ? "bg-green-100 text-green-800"
-      : "bg-red-100 text-red-800";
+  // const getStatusColor = (status: string) =>
+  //   status === "active"
+  //     ? "bg-green-100 text-green-800"
+  //     : "bg-red-100 text-red-800";
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString();
