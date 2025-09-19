@@ -5,6 +5,15 @@ const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 const { restock } = require('../services/order.service');
 
+const getPayments =async(req, res, next) => {
+  try {
+    const payments = await query(`SELECT * FROM payments`)
+    res.status(200).json({success:true,data:payments})
+  } catch (error) {
+    next(error)
+ }
+}
+
 // Success payment
 const successPayment = async (req, res, next) => {
   try {
@@ -65,6 +74,7 @@ const cancelledPayment = async (req, res, next) => {
     next(err);
   }
 };
+
 const checkPaymentStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
@@ -96,5 +106,6 @@ const checkPaymentStatus = async (req, res, next) => {
 module.exports = {
     successPayment,
     cancelledPayment,
-    checkPaymentStatus
+  checkPaymentStatus,
+    getPayments
 };

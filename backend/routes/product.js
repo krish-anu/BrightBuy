@@ -14,6 +14,7 @@ router.get('/', getProducts);
 router.get('/:id', getProduct);
 
 
+
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addProduct)
 
 router.put('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), updateProduct);

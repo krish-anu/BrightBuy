@@ -4,11 +4,12 @@ const ApiError = require('../utils/ApiError');
 const generateSKU = require('../utils/generateSKU');
 const { query } = require('../config/db');
 const productQueries = require('../queries/productQueries');
+// const { handlePreOrdered } = require('../services/variant.service');
 
 // Get all variants
 const getVariants = async (req, res, next) => {
   try {
-    const [variants] = await pool.query(variantQueries.getAll);
+    const variants = await query(variantQueries.getAll);
     res.status(200).json({ success: true, data: variants });
   } catch (error) {
     next(error);
@@ -18,8 +19,8 @@ const getVariants = async (req, res, next) => {
 // Get single variant
 const getVariant = async (req, res, next) => {
   try {
-    const [rows] = await pool.query(variantQueries.getById, [req.params.id]);
-    if (!rows.length) throw new ApiError('Variant not found', 404);
+    const rows = await query(variantQueries.getById, [req.params.id]);
+    if (!rows) throw new ApiError('Variant not found', 404);
     res.status(200).json({ success: true, data: rows[0] });
   } catch (error) {
     next(error);
@@ -55,18 +56,21 @@ const addVariant = async (req, res, next) => {
     // Insert attributes if provided
     if (attributes && Array.isArray(attributes)) {
       for (const attr of attributes) {
-        if (!attr.name || !attr.value) continue;
+        if (!attr.id|| !attr.value) continue;
 
         // Insert attribute if not exists
-        await query(productQueries.insertAttributeIfNotExists, [attr.name]);
 
         // Get attribute ID
-        const [attribute] = await query(productQueries.getAttributeByName, [attr.name]);
+        const [attribute] = await query(productQueries.getAttributeById, [attr.name]);
+        if (!attribute.length)
+          throw new ApiError('attribute not found',404)
+
+        const attributeId=attribute[0].id
 
         // Insert variant option
         await query(productQueries.insertVariantOption, [
           variantId,
-          attribute.id,
+          attributeId,
           attr.value
         ]);
       }
@@ -105,6 +109,7 @@ const updateVariantStock = async (req, res, next) => {
   try {
     const { qnt } = req.body;
     await pool.query(variantQueries.updateStock, [qnt, req.params.id]);
+    // handle preordered items - decrement
     res.status(200).json({ success: true, message: 'Stock updated successfully' });
   } catch (error) {
     next(error);
@@ -124,9 +129,9 @@ const deleteVariant = async (req, res, next) => {
 // Get stock
 const getStock = async (req, res, next) => {
   try {
-    const [rows] = await pool.query(variantQueries.getStock, [req.params.id]);
-    if (!rows.length) throw new ApiError('Variant not found', 404);
-    res.status(200).json({ success: true, data: rows[0] });
+    const rows= await pool.query(variantQueries.getStock, [req.params.id]);
+    if (!rows) throw new ApiError('Variant not found', 404);
+    res.status(200).json({ success: true, data: rows });
   } catch (error) {
     next(error);
   }
@@ -135,13 +140,16 @@ const getStock = async (req, res, next) => {
 // Search & filter variants
 const searchAndFilterVariants = async (req, res, next) => {
   try {
-    const { keyword, minPrice, maxPrice } = req.query;
-    const [variants] = await pool.query(variantQueries.searchAndFilter, [
+    let { keyword, minPrice, maxPrice } = req.query;
+    keyword = keyword || null;
+    minPrice = minPrice !== undefined ? minPrice : null;
+    maxPrice = maxPrice !== undefined ? maxPrice : null;
+    const variants= await pool.query(variantQueries.searchAndFilter, [
       keyword, keyword, keyword, keyword,
       minPrice, minPrice,
       maxPrice, maxPrice
     ]);
-    if (!variants.length) throw new ApiError('No matching variants found', 404);
+    if (!variants) throw new ApiError('No matching variants found', 404);
     res.status(200).json({ success: true, data: variants });
   } catch (error) {
     next(error);
@@ -152,8 +160,8 @@ const searchAndFilterVariants = async (req, res, next) => {
 const getLowStockVariants = async (req, res, next) => {
   try {
     const qnt = req.query.qnt || 5;
-    const [variants] = await pool.query(variantQueries.getLowStock, [qnt]);
-    if (!variants.length) throw new ApiError('No low stock variants found', 404);
+    const variants = await pool.query(variantQueries.getLowStock, [qnt]);
+    if (!variants) throw new ApiError('No low stock variants found', 404);
     res.status(200).json({ success: true, data: variants });
   } catch (error) {
     next(error);
@@ -163,10 +171,10 @@ const getLowStockVariants = async (req, res, next) => {
 // Get popular variants
 const getPopularVariants = async (req, res, next) => {
   try {
-    const limit = req.query.limit || 7;
+    const limit = parseInt(req.query.limit )|| 7;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
-    const [variants] = await pool.query(variantQueries.getPopular, [startDate, limit]);
+    const [variants] = await pool.query(variantQueries.getPopular, [startDate]);
     res.status(200).json({ success: true, data: variants });
   } catch (error) {
     next(error);
