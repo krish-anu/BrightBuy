@@ -50,6 +50,8 @@ const addCategory = async (req, res, next) => {
       if (parentCheck.length === 0) throw new ApiError('Parent category not found', 404);
     }
 
+    // add category attributes?
+    
     const result = await query(categoryQueries.insert, [name, parentId || null]);
     const newCategoryId = result.insertId;
     const newCatRows = await query(categoryQueries.getById, [newCategoryId]);

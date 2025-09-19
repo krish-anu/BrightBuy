@@ -42,7 +42,7 @@ const insertVariant = `INSERT INTO product_variants (productId, variantName, SKU
 const insertAttributeIfNotExists = `INSERT IGNORE INTO variant_attributes (name) VALUES (?)`;
 
 // Get attribute by name
-const getAttributeByName = `SELECT * FROM variant_attributes WHERE name = ?`;
+const getAttributeById = `SELECT * FROM variant_attributes WHERE id = ?`;
 
 // Insert variant option
 const insertVariantOption = `INSERT INTO product_variant_options (variantId, attributeId, value) VALUES (?, ?, ?)`;
@@ -69,7 +69,7 @@ module.exports = {
   getProductByName,
   insertVariant,
   insertAttributeIfNotExists,
-  getAttributeByName,
+  getAttributeById,
   insertVariantOption,
   getPopularProducts
 };

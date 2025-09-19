@@ -50,9 +50,12 @@ const addProduct = async (req, res, next) => {
 
     // Create attributes and variant options
     for (const attr of attributes) {
-      await query(productQueries.insertAttributeIfNotExists, [attr.name]);
-      const [attribute] = await query(productQueries.getAttributeByName, [attr.name]);
-      await query(productQueries.insertVariantOption, [variantId, attribute.id, attr.value]);
+      const [attribute] = await query(productQueries.getAttributeById, [attr.id]);
+      if (!attribute.length) {
+        throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
+      }
+      const attributeId = attribute[0].id;
+      await query(productQueries.insertVariantOption, [variantId, attributeId, attr.value]);
     }
 
     const newProduct = await query(productQueries.getProductById, [productId]);

@@ -56,18 +56,21 @@ const addVariant = async (req, res, next) => {
     // Insert attributes if provided
     if (attributes && Array.isArray(attributes)) {
       for (const attr of attributes) {
-        if (!attr.name || !attr.value) continue;
+        if (!attr.id|| !attr.value) continue;
 
         // Insert attribute if not exists
-        await query(productQueries.insertAttributeIfNotExists, [attr.name]);
 
         // Get attribute ID
-        const [attribute] = await query(productQueries.getAttributeByName, [attr.name]);
+        const [attribute] = await query(productQueries.getAttributeById, [attr.name]);
+        if (!attribute.length)
+          throw new ApiError('attribute not found',404)
+
+        const attributeId=attribute[0].id
 
         // Insert variant option
         await query(productQueries.insertVariantOption, [
           variantId,
-          attribute.id,
+          attributeId,
           attr.value
         ]);
       }

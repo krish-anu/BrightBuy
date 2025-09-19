@@ -176,14 +176,7 @@ const getOrderStatus = async (req, res, next) => {
   }
 };
 
-const deleteOrders = async (req, res, next) => {
-  try {
-    await query('DELETE FROM orders')
-    await query('DELETE FROM payments')
-  } catch (error) {
-    next(error)
-  }
-}
+
 const checkPaymentStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
@@ -223,5 +216,5 @@ module.exports = {
   getCategoryWiseOrders,
   getTotalRevenue,
   getOrderStatus,
-  deleteOrders,
+
 };
