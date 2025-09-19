@@ -1,16 +1,27 @@
 // stockService.js
 const ApiError = require('../utils/ApiError');
 const {query} = require('../config/db');
-const stockQueries = require('../queries/variantQueries');
+const variantQueries = require('../queries/variantQueries');
 
 const handlePreOrdered = async (variantId, connection) => {
-  try {
-    const [variantRows] = await query(stockQueries.getVariantById, [variantId], connection);
-    if (!variantRows) throw new ApiError('Variant not found', 404);
-    let currStock = variantRows.stockQnt;
+  // Get all pre-ordered items
+  const [items] = await connection.query(variantQueries.getPreOrderedItems, [variantId]);
 
-    const items = await query(stockQueries.getPreOrderedItems, [variantId], connection);
-    if (!items.length) throw new ApiError('No preordered items found', 404);
+  if (!items.length) return { processedItems: 0, remainingStock: null, updatedItems: [] };
+
+  // Calculate how many can be fulfilled
+  const totalQtyToProcess = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Atomic stock update
+  const [result] = await connection.query(
+    variantQueries.updateStockAtomic,
+    [-totalQtyToProcess, variantId, -totalQtyToProcess]
+  );
+
+  if (result.affectedRows === 0) {
+    // Not enough stock to process all items, process partially
+    let currStockResult = await connection.query(`SELECT stockQnt FROM product_variants WHERE id = ?`, [variantId]);
+    let currStock = currStockResult[0][0].stockQnt;
 
     const updatedItems = [];
     for (const item of items) {
@@ -20,18 +31,28 @@ const handlePreOrdered = async (variantId, connection) => {
     }
 
     if (updatedItems.length > 0) {
-      const itemIds = updatedItems.map((i) => i.id);
-      await query(stockQueries.markItemsAsProcessed(itemIds), itemIds, connection);
+      const itemIds = updatedItems.map(i => i.id);
+      await connection.query(variantQueries.markItemsAsProcessed(itemIds), itemIds);
 
-      const change = variantRows.stockQnt - currStock;
-      await query(stockQueries.updateVariantStock, [-change, variantId], connection);
+      await connection.query(
+        variantQueries.updateStockAtomic,
+        [-updatedItems.reduce((sum, i) => sum + i.quantity, 0), variantId, -updatedItems.reduce((sum, i) => sum + i.quantity, 0)]
+      );
     }
 
     return { processedItems: updatedItems.length, remainingStock: currStock, updatedItems };
-  } catch (error) {
-    throw error;
   }
+
+  // All items processed
+  const itemIds = items.map(i => i.id);
+  await connection.query(variantQueries.markItemsAsProcessed(itemIds), itemIds);
+
+  const [currStockRow] = await connection.query(`SELECT stockQnt FROM product_variants WHERE id = ?`, [variantId]);
+  const remainingStock = currStockRow[0].stockQnt;
+
+  return { processedItems: items.length, remainingStock, updatedItems: items };
 };
+
 
 const updateStock = async (variantId, quantityChange, connection) => {
   const [variantRows] = await query(stockQueries.getVariantById, [variantId], connection);

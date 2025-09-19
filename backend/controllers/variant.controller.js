@@ -1,9 +1,10 @@
-const pool = require('../config/db'); 
+const { pool } = require('../config/db'); 
 const variantQueries = require('../queries/variantQueries');
 const ApiError = require('../utils/ApiError');
 const generateSKU = require('../utils/generateSKU');
 const { query } = require('../config/db');
 const productQueries = require('../queries/productQueries');
+const { handlePreOrdered } = require('../services/variant.service');
 // const { handlePreOrdered } = require('../services/variant.service');
 
 // Get all variants
@@ -106,15 +107,34 @@ const updateVariant = async (req, res, next) => {
 
 // Update variant stock
 const updateVariantStock = async (req, res, next) => {
+  const connection = await pool.getConnection();
   try {
     const { qnt } = req.body;
-    await pool.query(variantQueries.updateStock, [qnt, req.params.id]);
-    // handle preordered items - decrement
+    await connection.beginTransaction();
+
+    // Update stock (can be positive or negative)
+    const [result] = await connection.query(
+      variantQueries.updateStockAtomic,
+      [qnt, req.params.id, qnt]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new ApiError('Not enough stock to update', 400);
+    }
+
+    // Handle pre-ordered items
+    await handlePreOrdered(req.params.id, connection);
+
+    await connection.commit();
     res.status(200).json({ success: true, message: 'Stock updated successfully' });
   } catch (error) {
+    await connection.rollback();
     next(error);
+  } finally {
+    connection.release();
   }
 };
+
 
 // Delete variant
 const deleteVariant = async (req, res, next) => {

@@ -73,30 +73,36 @@ const variantQueries = {
     WHERE id = ?
   `,
   // Get preordered order items for a variant, ordered by createdAt
-getPreOrderedItems : `
-  SELECT id, orderId, quantity
-  FROM order_items
-  WHERE variantId = ? AND preOrdered = TRUE
-  ORDER BY createdAt ASC;
-`,
+  getPreOrderedItems: `
+   SELECT oi.id, oi.orderId, oi.quantity
+   FROM order_items oi
+   JOIN orders o ON oi.orderId = o.id
+   WHERE oi.variantId = ? AND oi.isBackOrdered = TRUE
+   ORDER BY o.orderDate ASC;
+  `,
 
-// Update preOrdered flag for order items
- markItemsAsProcessed : (itemIds) => {
-  const placeholders = itemIds.map(() => '?').join(',');
-  return `UPDATE order_items SET preOrdered = FALSE WHERE id IN (${placeholders});`;
-},
+  // Update preOrdered flag for order items
+  markItemsAsProcessed: (itemIds) => {
+    const placeholders = itemIds.map(() => '?').join(',');
+    return `UPDATE order_items SET isBackOrdered = FALSE WHERE id IN (${ placeholders });`;
+  },
 
-// Get product variant by ID
- getVariantById : `SELECT id, stockQnt FROM product_variants WHERE id = ? FOR UPDATE;`,
+  // Get product variant by ID
+  getVariantById: `SELECT * FROM product_variants WHERE id = ?`,
 
-// Update stock quantity for a variant
- updateVariantStock : `UPDATE product_variants SET stockQnt = stockQnt + ? WHERE id = ?;`,
+  updateStockAtomic: `
+    UPDATE product_variants
+    SET stockQnt = stockQnt + ?
+    WHERE id = ? AND (stockQnt + ?) >= 0;
+  `,
+  // Update stock quantity for a variant
+  updateVariantStock: `UPDATE product_variants SET stockQnt = stockQnt + ? WHERE id = ?;`,
 
-// Get order by ID
- getOrderById : `SELECT * FROM orders WHERE id = ?;`,
+  // Get order by ID
+  getOrderById: `SELECT * FROM orders WHERE id = ?;`,
 
-// Get all items for an order
- getOrderItemsByOrderId : `
+  // Get all items for an order
+  getOrderItemsByOrderId: `
   SELECT id, quantity, preOrdered, variantId
   FROM order_items
   WHERE orderId = ?;

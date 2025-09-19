@@ -7,7 +7,7 @@ const productQueries = require('../queries/productQueries');
 const getProducts = async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 1000;
-    const rows = await query(productQueries.getAllProducts, [20]);
+    const rows = await query(productQueries.getAllProducts, [limit]);
     res.status(200).json({ success: true, data: rows });
   } catch (err) { next(err); }
 };
