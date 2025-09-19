@@ -6,15 +6,15 @@ BrightBuy is a full-stack retail inventory and online order management system. I
 
 ## Table of Contents
 
-- [Features](#features)  
-- [Tech Stack](#tech-stack)  
-- [Prerequisites](#prerequisites)  
-- [Project Structure](#project-structure)  
-- [Setup & Running](#setup--running)  
-- [Environment Variables](#environment-variables)  
-- [Docker Commands](#docker-commands)  
-- [Logging](#logging)  
-- [Database Seeding](#database-seeding)  
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Project Structure](#project-structure)
+- [Setup & Running](#setup--running)
+- [Environment Variables](#environment-variables)
+- [Docker Commands](#docker-commands)
+- [Logging](#logging)
+- [Database Seeding](#database-seeding)
 
 ---
 
@@ -32,21 +32,21 @@ BrightBuy is a full-stack retail inventory and online order management system. I
 
 ## Tech Stack
 
-- **Backend:** Node.js, Express, Sequelize ORM, MySQL  
-- **Frontend:** React, Vite, Tailwind CSS  
-- **Database:** MySQL 8  
-- **Payment:** Stripe API  
-- **Storage:** AWS S3  
-- **Containerization:** Docker & Docker Compose  
+- **Backend:** Node.js, Express, Sequelize ORM, MySQL
+- **Frontend:** React, Vite, Tailwind CSS
+- **Database:** MySQL 8
+- **Payment:** Stripe API
+- **Storage:** AWS S3
+- **Containerization:** Docker & Docker Compose
 
 ---
 
 ## Prerequisites
 
-- Docker >= 24  
-- Docker Compose plugin  
-- Node.js >= 20 (for local dev)  
-- npm >= 9 (for local dev)  
+- Docker >= 24
+- Docker Compose plugin
+- Node.js >= 20 (for local dev)
+- npm >= 9 (for local dev)
 
 ---
 
@@ -89,9 +89,9 @@ cd BrightBuy
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-- Backend runs on: `http://localhost:8081`  
-- Frontend runs on: `http://localhost:5173`  
-- MySQL database: `BrightBuy`  
+- Backend runs on: `http://localhost:8081`
+- Frontend runs on: `http://localhost:5173`
+- MySQL database: `BrightBuy`
 
 ### 3. Access MySQL container
 
@@ -126,22 +126,26 @@ APP_PORT=8081
 
 ## Docker Commands
 
-- **Build & start containers:**  
+- **Build & start containers:**
+
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-- **Stop & remove containers, networks, volumes:**  
+- **Stop & remove containers, networks, volumes:**
+
 ```bash
 docker compose -f docker-compose.dev.yml down -v
 ```
 
-- **View real-time logs (all services):**  
+- **View real-time logs (all services):**
+
 ```bash
 docker compose -f docker-compose.dev.yml logs -f
 ```
 
-- **View logs for a specific service (backend):**  
+- **View logs for a specific service (backend):**
+
 ```bash
 docker compose -f docker-compose.dev.yml logs -f backend
 ```
@@ -150,9 +154,9 @@ docker compose -f docker-compose.dev.yml logs -f backend
 
 ## Logging
 
-- Backend uses `console.log` for logging actions.  
-- Use `docker compose logs -f backend` to see real-time logs.  
-- To detach from a running container while viewing logs: `Ctrl + C`  
+- Backend uses `console.log` for logging actions.
+- Use `docker compose logs -f backend` to see real-time logs.
+- To detach from a running container while viewing logs: `Ctrl + C`
 - For attaching to live container stdout:
 
 ```bash
@@ -165,5 +169,47 @@ Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
 
 ## Database Seeding
 
-- `seed.sql` runs automatically on first container startup.  
+- `seed.sql` runs automatically on first container startup.
 - Contains initial categories, products, and sample data.
+
+## API CALLS
+
+**api/auth/register**
+
+```
+{
+  "name":"anu",
+  "email": "anucustomer@example.com",
+  "password": "anu",
+  "role": "Customer",
+  "phone":"0778778694"
+
+}
+
+```
+
+- retuns
+
+```
+{
+    "message": "User registered successfully"
+}
+```
+**api/auth/login**
+```
+{
+
+  "email": "anuadmin@example.com",
+  "password": "anu"
+  
+}
+```
+- returns
+```
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwicm9sZSI6IkFkbWluIiwiaWF0IjoxNzU4MzI0NDI5LCJleHAiOjE3NTgzMjgwMjl9.ESkTK8dPSuEKd1JkbhizirfLXVE6B3lPeF06vY_laPk",
+    "role": "Admin",
+    "email": "anuadmin@example.com"
+}
+```
+-
