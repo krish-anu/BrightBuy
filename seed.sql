@@ -155,6 +155,23 @@ CREATE TABLE IF NOT EXISTS payments (
     ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS deliveries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  staffId INT NULL,
+  orderId INT NOT NULL,
+  assignedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deliveryDate DATETIME NULL DEFAULT NULL,
+  status ENUM('Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Confirmed',
+  INDEX idx_status (status),
+  CONSTRAINT fk_deliveries_user FOREIGN KEY (staffId) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT fk_deliveries_order FOREIGN KEY (orderId) REFERENCES orders(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+
 
 -- Insert Main Categories
 INSERT INTO categories (name, isMainCategory, parentId) VALUES

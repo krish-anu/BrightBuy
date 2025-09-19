@@ -4,6 +4,16 @@ const deliveryQueries = require('../queries/deliveryQueries');
 const { isValidDeliveryUpdate, CODPayment } = require('../services/delivery.service');
 const { updateStock } = require('../services/variant.service');
 
+const getDeliveries = async (req, res, next) => {
+  try {
+    const alldeliveries = await query('SELECT * FROM deliveries')
+    console.log(alldeliveries)
+    res.status(200).json({success:true,data:alldeliveries})
+  } catch (error) {
+    next(error)
+  }
+}
+
 const assignDeliveryStaff = async (deliveryId, staffId, connection) => {
   const [deliveryRows] = await query(deliveryQueries.getDeliveryById, [deliveryId], connection);
   if (!deliveryRows.length) throw new ApiError('Delivery not found', 404);
@@ -72,4 +82,5 @@ module.exports = {
   assignDeliveryStaff,
   updateDeliveryStatus,
   addCODPayment,
+  getDeliveries
 };

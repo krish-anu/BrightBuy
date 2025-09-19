@@ -3,6 +3,8 @@ const orderQueries = require('../queries/orderQueries');
 const ApiError = require('../utils/ApiError');
 const { calculateOrderDetails } = require('../utils/calculateOrderDetails');
 const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
+const { saveOrderToDatabase } = require('../services/order.service');
+const { createPayment } = require('../services/payment.service');
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
 // Helper function to save order and items
@@ -45,11 +47,14 @@ const addOrder = async (req, res, next) => {
   try {
     const { items, paymentMethod, deliveryMode, deliveryAddress } = req.body;
     if (!items || !deliveryMode || !paymentMethod) throw new ApiError('Items, delivery mode, and payment method are required', 400);
-
+    // delivery address required?
+    if (deliveryMode === 'Store Pickup' && paymentMethod === 'CashOnDelivery')
+      throw new ApiError('Invalid payment method',400)
+    const address = deliveryAddress || null;
     const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
-      await calculateOrderDetails(items, deliveryMode, deliveryAddress, { id: req.user.id });
+      await calculateOrderDetails(items, deliveryMode, address, { id: req.user.id });
 
-    const order = await createOrderInDB(
+    const order = await saveOrderToDatabase(
       orderedItems,
       req.user.id,
       deliveryMode,
@@ -59,8 +64,17 @@ const addOrder = async (req, res, next) => {
       deliveryCharge,
       paymentMethod
     );
+    const totalAmount = totalPrice + deliveryCharge;
+    await createPayment(req.user.id, order.id, totalAmount, deliveryCharge, paymentMethod);
 
-    if (paymentMethod === 'COD') return res.status(201).json({ success: true, data: order });
+    if (deliveryMode === 'Standard Delivery') {
+      await query(
+        `INSERT INTO deliveries (orderId) VALUES (?)`,
+        [order.id]
+      );
+    }
+
+    if (paymentMethod === 'CashOnDelivery') return res.status(201).json({ success: true, data: order });
 
     if (paymentMethod === 'Card') {
       const session = await stripe.checkout.sessions.create({
@@ -74,7 +88,7 @@ const addOrder = async (req, res, next) => {
         cancel_url: `http://localhost:8081/payment/cancel`,
         metadata: { userId: req.user.id, orderId: order.id }
       });
-      return res.status(200).json({ success: true, data: { checkoutUrl: session.url } });
+      return res.status(200).json({ success: true, data: { sessionId: session.id } });
     }
 
     throw new ApiError('Invalid payment method', 400);
@@ -161,6 +175,15 @@ const getOrderStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+const deleteOrders = async (req, res, next) => {
+  try {
+    await query('DELETE FROM orders')
+    await query('DELETE FROM payments')
+  } catch (error) {
+    next(error)
+  }
+}
 const checkPaymentStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
@@ -199,5 +222,6 @@ module.exports = {
   cancelOrder,
   getCategoryWiseOrders,
   getTotalRevenue,
-  getOrderStatus
+  getOrderStatus,
+  deleteOrders,
 };

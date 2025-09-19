@@ -1,4 +1,5 @@
-const { addOrder, getOrders, getOrder, cancelOrder, getOrderStatus, getUserOrders, getUserOrder, getCategoryWiseOrders,getTotalRevenue, updateOrderStatus } = require('../controllers/order.controller');
+const { REAL } = require('sequelize');
+const { addOrder, getOrders, getOrder, cancelOrder, getOrderStatus, getUserOrders, getUserOrder, getCategoryWiseOrders,getTotalRevenue, updateOrderStatus, deleteOrders } = require('../controllers/order.controller');
 
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
@@ -14,6 +15,8 @@ router.get('/:id', verifyToken, authorizeRoles( ROLES.USER,ROLES.ADMIN, ROLES.SU
 
 router.post('/', verifyToken, authorizeRoles(ROLES.USER), addOrder);
 
-router.patch('/cancel/:id', verifyToken, authorizeRoles(ROLES.USER), cancelOrder);
+router.patch('/cancel/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN), cancelOrder);
+
+router.delete('/',deleteOrders)
 
 module.exports = router;

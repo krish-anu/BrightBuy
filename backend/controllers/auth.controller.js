@@ -23,7 +23,7 @@ const registerUser = async (req, res, next) => {
       name,
       email,
       hashedPassword,
-      role || 'user',
+      role || 'customer',
       false, // role_accepted default
       address || null,
       phone || null,

@@ -61,10 +61,10 @@ const variantQueries = {
     SELECT v.id, v.variantName, v.SKU, v.price, SUM(oi.quantity) AS soldQuantity
     FROM product_variants v
     JOIN order_items oi ON v.id = oi.variantId
-    WHERE oi.createdAt >= ?
-    GROUP BY v.id
+    JOIN orders o ON oi.orderId=o.id
+    WHERE DATE(o.orderDate) >= DATE(?)
+    GROUP BY v.id, v.variantName, v.SKU, v.price
     ORDER BY soldQuantity DESC
-    LIMIT ?
   `,
 
   getStock: `
