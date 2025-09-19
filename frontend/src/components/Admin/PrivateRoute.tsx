@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useRole } from "../../../contexts/RoleContext";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -9,15 +10,31 @@ interface PrivateRouteProps {
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
   const { isAuthenticated, user } = useAuth();
+  const { currentRole } = useRole();
   const location = useLocation();
+
+  // Not logged in → go to login
   if (!isAuthenticated()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Role mismatch → redirect to correct dashboard for current role
   if (roles && user && !roles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    switch (currentRole) {
+      case "SuperAdmin":
+        return <Navigate to="/superadmin" replace />;
+      case "Admin":
+        return <Navigate to="/admin" replace />;
+      case "WarehouseStaff":
+        return <Navigate to="/admin/inventory" replace />;
+      case "DeliveryStaff":
+        return <Navigate to="/admin/deliveries" replace />;
+      default:
+        return <Navigate to="/shop" replace />; // normal user
+    }
   }
 
+  // User has access
   return <>{children}</>;
 };
 

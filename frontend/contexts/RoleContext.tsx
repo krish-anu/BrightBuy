@@ -40,26 +40,31 @@ interface RoleProviderProps {
 // RoleProvider component
 export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   const { user } = useAuth();
-  const [currentRole, setCurrentRole] = useState<string>("user"); // Default role
+  const [currentRole, setCurrentRole] = useState<string>("User"); // Default role
 
   // Update role when user changes
   useEffect(() => {
     if (user && user.role) {
+      console.log("RoleProvider setting currentRole to:", user.role);
       setCurrentRole(user.role);
     }
   }, [user]);
 
   // Define role configurations and sidebar routes
   const roleConfig: Record<string, { name: string; routes: RouteItem[] }> = {
-    superAdmin: {
+    SuperAdmin: {
       name: "Super Admin",
       routes: [
         { path: "/superadmin", label: "Overview", icon: "LayoutDashboard" },
-        { path: "/superadmin/settings", label: "System Settings", icon: "Settings" },
+        {
+          path: "/superadmin/settings",
+          label: "System Settings",
+          icon: "Settings",
+        },
         { path: "/superadmin/logs", label: "System Logs", icon: "FileText" },
       ],
     },
-    admin: {
+    Admin: {
       name: "Main Admin",
       routes: [
         { path: "/admin", label: "Dashboard", icon: "LayoutDashboard" },
@@ -69,21 +74,29 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         { path: "/admin/reports", label: "Reports", icon: "BarChart3" },
       ],
     },
-    warehouseStaff: {
+    WarehouseStaff: {
       name: "Warehouse Staff",
       routes: [
         { path: "/admin/inventory", label: "Inventory", icon: "Package" },
         { path: "/admin/orders", label: "Orders", icon: "ShoppingCart" },
       ],
     },
-    deliveryStaff: {
+    DeliveryStaff: {
       name: "Delivery Staff",
       routes: [
-        { path: "/admin/deliveries", label: "Assigned Deliveries", icon: "Truck" },
-        { path: "/admin/delivery-status", label: "Update Status", icon: "RefreshCw" },
+        {
+          path: "/admin/deliveries",
+          label: "Assigned Deliveries",
+          icon: "Truck",
+        },
+        {
+          path: "/admin/delivery-status",
+          label: "Update Status",
+          icon: "RefreshCw",
+        },
       ],
     },
-    user: {
+    User: {
       name: "Customer",
       routes: [
         { path: "/shop", label: "Shop", icon: "ShoppingBag" },

@@ -2,12 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
 import { loginUser } from "../src/services/auth.services";
+import { useNavigate } from "react-router-dom";
 
 // Types
 interface User {
   id: number;
   username: string;
-  role: "user" | "admin" | "superAdmin" | "warehouseStaff" | "deliveryStaff";
+  role: "User" | "Admin" | "SuperAdmin" | "WarehouseStaff" | "DeliveryStaff";
   name: string;
   email: string;
 }
@@ -41,6 +42,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Check for existing user session on app load
   useEffect(() => {
@@ -58,32 +60,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const foundUser = await loginUser(email, password);
-      console.log("foundUser", foundUser);
+const login = async (email: string, password: string) => {
+  setIsLoading(true);
+  try {
+    const foundUser = await loginUser(email, password);
+    console.log("foundUser", foundUser);
 
-      if (foundUser?.success) {
-        const userWithoutPassword = foundUser.user;
-        setUser(userWithoutPassword);
-        Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-          expires: 7,
-        });
-        return { success: true, user: userWithoutPassword };
+    if (foundUser?.success) {
+      const backendUser = foundUser.user;
+
+      // Map backend response into our User type
+      const userWithoutPassword: User = {
+        id: backendUser.id ?? 0,         // if backend didn’t send, give default
+        username: backendUser.username ?? backendUser.email.split("@")[0],
+        name: backendUser.name ?? "Unknown",
+        email: backendUser.email,
+        role: backendUser.role,
+      };
+
+      setUser(userWithoutPassword);
+      Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
+        expires: 7,
+      });
+
+      console.log("User logged in:", userWithoutPassword);
+
+      // Redirect based on role
+      if (userWithoutPassword.role === "SuperAdmin") {
+        navigate("/superadmin");
+      } else if (userWithoutPassword.role === "Admin") {
+        navigate("/admin");
+      } else if (userWithoutPassword.role === "WarehouseStaff") {
+        navigate("/admin/inventory");
+      } else if (userWithoutPassword.role === "DeliveryStaff") {
+        navigate("/admin/deliveries");
       } else {
-        return {
-          success: false,
-          error: foundUser?.error || "Invalid username or password",
-        };
+        navigate("/shop");
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      return { success: false, error: "Something went wrong" };
-    } finally {
-      setIsLoading(false);
+
+      return { success: true, user: userWithoutPassword };
+    } else {
+      return {
+        success: false,
+        error: foundUser?.error || "Invalid username or password",
+      };
     }
-  };
+  } catch (error) {
+    console.error("Login error:", error);
+    return { success: false, error: "Something went wrong" };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Logout function
   const logout = () => {

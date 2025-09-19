@@ -19,33 +19,44 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const { login, isLoading } = useAuth();
+  const { login, isLoading,user } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setError('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      return;
-    }
-    console.log("email", email);
+  if (!email || !password) {
+    setError('Please enter both email and password');
+    return;
+  }
 
-    try {
-      const result = await login(email, password);
-      console.log("REs",result);
-      
+  try {
+    const result = await login(email, password);
+    console.log("REs", result);
 
-      if (result?.success === true) {
-        navigate('/admin'); // Redirect after success
+    if (result?.success === true) {
+      // Redirect based on role
+      const role = result.user?.role || user?.role;
+
+      if (role === "SuperAdmin") {
+        navigate("/superadmin");
+      } else if (role === "Admin") {
+        navigate("/admin");
+      } else if (role === "WarehouseStaff") {
+        navigate("/admin/inventory");
+      } else if (role === "DeliveryStaff") {
+        navigate("/admin/deliveries");
       } else {
-        setError(result?.error || 'Login failed');
+        navigate("/shop"); // default User
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
+    } else {
+      setError(result?.error || 'Login failed');
     }
-  };
+  } catch (err) {
+    setError('Something went wrong. Please try again.');
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

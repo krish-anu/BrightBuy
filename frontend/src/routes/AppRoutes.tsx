@@ -1,10 +1,4 @@
-// import React from "react";
-import {
-  // BrowserRouter as Router,
-  Routes,
-  Route,
-  // Navigate,
-} from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { RoleProvider } from "../../contexts/RoleContext";
 
@@ -24,45 +18,44 @@ import Layout from "@/components/Layout/Layout";
 import HomePage from "@/pages/User/HomePage";
 import ProductsPage from "@/pages/User/ProductsPage";
 import CartPage from "@/pages/User/CartPage";
-// import Login from "@/components/Admin/LoginPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
-import UserLogin from "@/pages/Authpage/UserLogin"; 
+import UserLogin from "@/pages/Authpage/UserLogin";
 
 function App() {
   return (
     <AuthProvider>
       <RoleProvider>
-        <div className="App">
-          <Routes>
-            {/* ========== User Routes ========== */}
-            <Route path="/" element={<Layout />}>
-              <Route index element={<HomePage />} />
-              <Route path="login" element={<UserLogin />} />
-              <Route path="signup" element={<UserSignup />} />
-              <Route path="userlogin" element={<UserLogin />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="cart" element={<CartPage />} />
-              <Route path="products/:id" element={<ProductDetailPage />} />
+        <Routes>
+          {/* ========== User Routes ========== */}
+          <Route path="/" element={<Layout />}>
+            <Route index element={<HomePage />} />
+            <Route path="login" element={<UserLogin />} />
+            <Route path="signup" element={<UserSignup />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="cart" element={<CartPage />} />
+            <Route path="products/:id" element={<ProductDetailPage />} />
+          </Route>
 
-            </Route>
-
-            {/* ========== Admin Routes (Protected) ========== */}
-            <Route path="admin" element={
-              <PrivateRoute roles={['admin']}>
+          {/* ========== Admin Routes ========== */}
+          {/* All admin roles use same PrivateRoute and AdminLayout */}
+          <Route
+            path="admin/*"
+            element={
+              <PrivateRoute roles={["Admin", "SuperAdmin", "WarehouseStaff", "DeliveryStaff"]}>
                 <AdminLayout />
               </PrivateRoute>
-            }>
-              <Route index element={<Dashboard />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="orders" element={<Orders />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="deliveries" element={<AssignedDeliveries />} />
-              <Route path="delivery-status" element={<DeliveryStatus />} />
-            </Route>
-          </Routes>
-        </div>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="deliveries" element={<AssignedDeliveries />} />
+            <Route path="delivery-status" element={<DeliveryStatus />} />
+          </Route>
+        </Routes>
       </RoleProvider>
     </AuthProvider>
   );
