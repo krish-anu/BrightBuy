@@ -148,9 +148,19 @@ const getCategoryWiseOrders = async (req, res, next) => {
 // Get total revenue
 const getTotalRevenue = async (req, res, next) => {
   try {
+    console.log("Fetching total revenue...");
+
+    // Use alias for cleaner result
     const rows = await query(orderQueries.getTotalRevenue);
-    res.status(200).json({ success: true, data: rows[0].totalRevenue || 0 });
-  } catch (err) { next(err); }
+    console.log("Rows:", rows);
+
+    // Handle case when no orders exist (SUM returns null)
+    const totalRevenue = rows[0]?.totalRevenue ?? 0;
+
+    res.status(200).json({ success: true, data: totalRevenue });
+  } catch (err) {
+    next(err);
+  }
 };
 // Get order status
 const getOrderStatus = async (req, res, next) => {
@@ -216,5 +226,6 @@ module.exports = {
   getCategoryWiseOrders,
   getTotalRevenue,
   getOrderStatus,
+  checkPaymentStatus
 
 };
