@@ -1,4 +1,3 @@
-// backend/utils/cart.js
 
 function calculateTotalPrice(items, discount = 0) {
   // items = [{ price: number, quantity: number }]
