@@ -22,7 +22,7 @@ const getUserById = `
 // Update delivery
 const updateDelivery = `
   UPDATE deliveries
-  SET staffId = ?, status = ?, assignedDate = ?
+  SET staffId = ?, assignedDate = ?
   WHERE id = ?;
 `;
 
@@ -49,9 +49,9 @@ const getOrderItemsByOrderId = `
 `;
 
 // Update order item preOrdered flag
-const markOrderItemsProcessed = (itemIds) => {
+const markItemsProcessed = (itemIds) => {
   const placeholders = itemIds.map(() => '?').join(',');
-  return `UPDATE order_items SET preOrdered = FALSE WHERE id IN (${placeholders});`;
+  return `UPDATE order_items SET isBackordered = FALSE WHERE id IN (${placeholders});`;
 };
 
 module.exports = {
@@ -62,5 +62,5 @@ module.exports = {
   updateDeliveryStatus,
   updateOrderStatus,
   getOrderItemsByOrderId,
-  markOrderItemsProcessed,
+  markItemsProcessed,
 };

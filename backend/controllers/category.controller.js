@@ -17,18 +17,39 @@ const getCategories = async (req, res, next) => {
 // Get category by ID
 const getCategory = async (req, res, next) => {
   try {
-    const rows = await query(categoryQueries.getById, [req.params.id]);
-    if (rows.length === 0) throw new ApiError('Category not found', 404);
+    const categoryId = req.params.id;
 
-    const category = rows[0];
+    const rows = await query(`
+      SELECT 
+        c.id AS categoryId,
+        c.name AS categoryName,
+        c.parentId,
+        va.id AS attributeId,
+        va.name AS attributeName
+      FROM categories c
+      LEFT JOIN category_attributes cva ON c.id = cva.categoryId
+      LEFT JOIN variant_attributes va ON cva.attributeId = va.id
+      WHERE c.id = ?
+    `, [categoryId]);
 
-    // Get parent
-    const parentRows = await query(categoryQueries.getById, [category.parentId]);
-    category.parent = parentRows[0] || null;
+    if (!rows.length) throw new ApiError('Category not found', 404);
 
-    // Get subcategories
-    const subRows = await query(categoryQueries.getSubcategories, [category.id]);
-    category.subcategories = subRows;
+    // Group attributes
+    const category = {
+      categoryId: rows[0].categoryId,
+      categoryName: rows[0].categoryName,
+      parentId: rows[0].parentId,
+      attributes: []
+    };
+
+    rows.forEach(row => {
+      if (row.attributeId) {
+        category.attributes.push({
+          attributeId: row.attributeId,
+          attributeName: row.attributeName
+        });
+      }
+    });
 
     res.status(200).json({ success: true, data: category });
   } catch (err) {
@@ -36,29 +57,47 @@ const getCategory = async (req, res, next) => {
   }
 };
 
+
 // Add new category
 const addCategory = async (req, res, next) => {
+  const connection = await pool.getConnection();
   try {
-    const { name, parentId } = req.body;
+    const { name, parentId, attributes } = req.body;
+
     if (!name) throw new ApiError('Name is required', 400);
 
-    const existing = await query(categoryQueries.getByName, [name]);
-    if (existing.length > 0) throw new ApiError('Category exists', 409);
+    await connection.beginTransaction();
+
+    const existing = await connection.query(categoryQueries.getByName, [name]);
+    if (existing[0].length > 0) throw new ApiError('Category exists', 409);
 
     if (parentId) {
-      const parentCheck = await query(categoryQueries.getById, [parentId]);
-      if (parentCheck.length === 0) throw new ApiError('Parent category not found', 404);
+      const parentCheck = await connection.query(categoryQueries.getById, [parentId]);
+      if (parentCheck[0].length === 0) throw new ApiError('Parent category not found', 404);
     }
 
-    // add category attributes?
-    
-    const result = await query(categoryQueries.insert, [name, parentId || null]);
+    const [result] = await connection.query(categoryQueries.insert, [name, parentId || null]);
     const newCategoryId = result.insertId;
-    const newCatRows = await query(categoryQueries.getById, [newCategoryId]);
 
-    res.status(201).json({ success: true, data: newCatRows[0] });
+    if (attributes && Array.isArray(attributes) && attributes.length > 0) {
+      const values = attributes.map(attrId => [newCategoryId, attrId]);
+      await connection.query(categoryQueries.addCategoryAttributes, [values]);
+    }
+
+    await connection.commit();
+
+    const [newCatRows] = await connection.query(categoryQueries.getById, [newCategoryId]);
+
+    res.status(201).json({
+      success: true,
+      data: newCatRows
+    });
+
   } catch (err) {
+    if (connection) await connection.rollback();
     next(err);
+  } finally {
+    if (connection) connection.release();
   }
 };
 
@@ -183,6 +222,7 @@ const getCategoryHierarchy = async (req, res, next) => {
     next(err);
   }
 };
+
 const addNewAttributes = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -196,22 +236,49 @@ const addNewAttributes = async (req, res, next) => {
     const rows = await query(categoryQueries.getById, [id]);
     if (rows.length === 0) throw new ApiError('Category not found', 404);
 
-    // 2. Fetch attributes
+    // 2. Fetch attributes by IDs
     const attrRows = await query(categoryQueries.getAttributesByIds(attributeIds), attributeIds);
     if (attrRows.length === 0) throw new ApiError('No valid attributes found', 404);
+    if (attrRows.length !== attributeIds.length) {
+      throw new ApiError('Some attribute IDs are invalid', 400);
+    }
 
-    // 3. Insert relations
-    const values = attributeIds.map((attrId) => [id, attrId]);
-    await query(categoryQueries.addCategoryAttributes, [values]);
+    // 3. Insert relations into category_attributes table
+    const values = attributeIds.map(attrId => [id, attrId]);
+    const placeholders = values.map(() => '(?, ?)').join(',');
+    const flattenedValues = values.flat();
+    const sql = `INSERT IGNORE INTO category_attributes (categoryId, attributeId) VALUES ${ placeholders }`;
+    await query(sql, flattenedValues);
 
     // 4. Fetch updated category with attributes
     const updatedRows = await query(categoryQueries.getCategoryWithAttributes, [id]);
 
-    res.status(200).json({ success: true, data: updatedRows });
+    // 5. Group attributes under category
+    const grouped = {};
+    updatedRows.forEach(row => {
+      if (!grouped[row.categoryId]) {
+        grouped[row.categoryId] = {
+          categoryId: row.categoryId,
+          categoryName: row.categoryName,
+          attributes: []
+        };
+      }
+      if (row.attributeId) {
+        grouped[row.categoryId].attributes.push({
+          attributeId: row.attributeId,
+          attributeName: row.attributeName
+        });
+      }
+    });
+
+    const response = Object.values(grouped);
+
+    res.status(200).json({ success: true, data: response });
   } catch (error) {
     next(error);
   }
 };
+
 
 
 module.exports = {
@@ -223,6 +290,6 @@ module.exports = {
     getCategoryHierarchy,
     updateCategory,
     deleteCategory,
-        addNewAttributes,
+    addNewAttributes,
 
 };

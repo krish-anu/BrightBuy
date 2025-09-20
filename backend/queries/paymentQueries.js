@@ -1,5 +1,5 @@
 // Get order by ID
-const getOrderById = `SELECT * FROM orders WHERE id = ?`;
+const getPaymentById = `SELECT * FROM payments WHERE id = ?`;
 
 // Update order status
 const updateOrderStatus = `UPDATE orders SET status = ?, cancelReason = ? WHERE id = ?`;
@@ -11,7 +11,7 @@ const getPaymentByOrderId = `SELECT * FROM payments WHERE orderId = ?`;
 const updatePaymentStatus = `UPDATE payments SET status = ? WHERE id = ?`;
 
 module.exports = {
-  getOrderById,
+  getPaymentById,
   updateOrderStatus,
   getPaymentByOrderId,
   updatePaymentStatus

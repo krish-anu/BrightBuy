@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS product_categories (
   UNIQUE KEY uq_product_category (productId, categoryId)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS category_attributes (
+  categoryId INT NOT NULL,
+  attributeId INT NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_categoryattributes_attribute FOREIGN KEY (attributeId) REFERENCES variant_attributes(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT fk_categoryattributes_category FOREIGN KEY (categoryId) REFERENCES categories(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  UNIQUE KEY uq_category_attribute (categoryId,attributeId)
+) ENGINE=InnoDB;
+
 -- 9. Orders table 
 CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -145,7 +159,7 @@ CREATE TABLE IF NOT EXISTS payments (
   paymentDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
   paymentMethod ENUM('COD','Card') NOT NULL,
-  status ENUM('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
+  status ENUM('Pending','Paid','Failed','Cancelled') NOT NULL DEFAULT 'Pending',
   paymentIntentId VARCHAR(100) UNIQUE,
   CONSTRAINT fk_payments_order FOREIGN KEY (orderId) REFERENCES orders(id)
     ON DELETE CASCADE

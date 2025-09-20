@@ -1,5 +1,5 @@
 // Get all products with optional limit
-const getAllProducts = `SELECT id, name, description, brand FROM products ORDER BY name ASC LIMIT ?`;
+const getAllProducts = `SELECT id, name, description, brand FROM products ORDER BY name ASC `;
 
 // Get product by ID
 const getProductById = `SELECT id, name, description, brand FROM products WHERE id = ?`;
@@ -15,15 +15,25 @@ const deleteProduct = `DELETE FROM products WHERE id = ?`;
 
 // Count products
 const countProducts = `SELECT COUNT(*) AS totalProducts FROM products`;
-
+ 
 // Get product variants with attributes
 const getVariantsByProduct = `
-SELECT pv.id AS variantId, pv.variantName, pv.price, pv.stockQnt,
-       va.id AS attributeId, va.name AS attributeName, pvo.value AS attributeValue
+SELECT
+    pv.id AS variantId,
+    pv.variantName,
+    pv.price,
+    pv.stockQnt,
+    JSON_ARRAYAGG(JSON_OBJECT(
+        'attributeId', va.id,
+        'attributeName', va.name,
+        'attributeValue', pvo.value
+    )) AS attributes
 FROM product_variants pv
 LEFT JOIN product_variant_options pvo ON pv.id = pvo.variantId
 LEFT JOIN variant_attributes va ON pvo.attributeId = va.id
-WHERE pv.productId = ?`;
+WHERE pv.productId = ?
+GROUP BY pv.id, pv.variantName, pv.price, pv.stockQnt;
+`;
 
 // Count variants per product
 const getProductVariantCount = `
@@ -52,10 +62,14 @@ const getPopularProducts = `
 SELECT p.id, p.name, p.brand, p.description, SUM(oi.quantity) AS soldQuantity
 FROM products p
 JOIN product_variants pv ON pv.productId = p.id
-JOIN order_items oi ON oi.productVariantId = pv.id
+JOIN order_items oi ON oi.variantId = pv.id
 GROUP BY p.id
 ORDER BY soldQuantity DESC
-LIMIT ?`;
+`;
+
+const insertProductCategory = `
+INSERT INTO product_categories (productId, categoryId) VALUES (?, ?)
+`;
 
 module.exports = {
   getAllProducts,
@@ -71,5 +85,6 @@ module.exports = {
   insertAttributeIfNotExists,
   getAttributeById,
   insertVariantOption,
-  getPopularProducts
+  getPopularProducts,
+  insertProductCategory
 };

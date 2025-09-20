@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query ,pool} = require('../config/db');
 const ApiError = require('../utils/ApiError');
 const orderQueries = require('../queries/orderQueries');
 const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
@@ -103,9 +103,65 @@ const checkPaymentStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+const handleCODPayment = async (req, res, next) => {
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+  try {
+    const paymentId = req.params.id;
+    const userId = req.user.id;
+    const { amount } = req.body;
+
+    const [paymentRows] = await connection.query(
+      `SELECT p.*, o.id AS orderId, o.userId AS orderUserId, o.status AS orderStatus
+       FROM payments p
+       INNER JOIN orders o ON o.id = p.orderId
+       WHERE p.id = ?`,
+      [paymentId]
+    );
+    if (!paymentRows.length) throw new ApiError('Payment not found', 404);
+    const payment = paymentRows[0];
+
+    const [deliveryRows] = await connection.query(
+      `SELECT * FROM deliveries WHERE orderId = ?`,
+      [payment.orderId]
+    );
+    if (!deliveryRows.length) throw new ApiError('Delivery not found', 404);
+    const delivery = deliveryRows[0];
+    if (delivery.staffId !== userId) {
+      throw new ApiError('Forbidden access', 403);
+    }
+    if (parseFloat(payment.amount) !== parseFloat(amount)) {
+      throw new ApiError('Invalid payment amount', 400);
+    }
+    await connection.query(
+      `UPDATE payments SET status = ? WHERE id = ?`,
+      ['Paid', payment.id]
+    );
+    await connection.query(
+      `UPDATE orders SET status = ? WHERE id = ?`,
+      ['Delivered', payment.orderId]
+    );
+    await connection.query(
+      `UPDATE deliveries SET status = ?, deliveryDate = ? WHERE id = ?`,
+      ['Delivered', new Date(), delivery.id]
+    );
+
+    await connection.commit();
+    res.status(200).json({ success: true, message: 'COD payment processed successfully' });
+  } catch (error) {
+    await connection.rollback();
+    next(error);
+  } finally {
+    connection.release();
+  }
+};
+
+
 module.exports = {
     successPayment,
     cancelledPayment,
-  checkPaymentStatus,
-    getPayments
+    checkPaymentStatus,
+    getPayments,
+    handleCODPayment
 };

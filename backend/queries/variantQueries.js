@@ -1,20 +1,23 @@
 const variantQueries = {
   getAll: `
     SELECT v.id, v.SKU, v.variantName, v.price, v.stockQnt, v.productId, v.imageURL,
-           p.name as productName, p.brand, p.description
+           p.name as productName, p.brand, p.description, va.id as attributeId, va.name as attributeName, vo.value as attributeValue
     FROM product_variants v
     JOIN products p ON v.productId = p.id
-    ORDER BY v.createdAt DESC
+    LEFT JOIN product_variant_options vo ON vo.variantId=v.id
+    LEFT JOIN variant_attributes va ON vo.attributeId=va.id
   `,
-
+ 
   getById: `
     SELECT v.id, v.SKU, v.variantName, v.price, v.stockQnt, v.productId, v.imageURL,
-           p.name as productName, p.brand, p.description
+           p.name as productName, p.brand, p.description, va.id as attributeId, va.name as attributeName, vo.value as attributeValue
     FROM product_variants v
     JOIN products p ON v.productId = p.id
+    LEFT JOIN product_variant_options vo ON vo.variantId=v.id
+    LEFT JOIN variant_attributes va ON vo.attributeId=va.id
     WHERE v.id = ?
   `,
-
+ 
   insert: `
     INSERT INTO product_variants
       (productId, variantName, SKU, price, stockQnt, imageURL, createdAt, updatedAt)
@@ -84,7 +87,8 @@ const variantQueries = {
   // Update preOrdered flag for order items
   markItemsAsProcessed: (itemIds) => {
     const placeholders = itemIds.map(() => '?').join(',');
-    return `UPDATE order_items SET isBackOrdered = FALSE WHERE id IN (${ placeholders });`;
+    const sql = `UPDATE order_items SET isBackOrdered = FALSE WHERE id IN (${ placeholders })`;
+    return { sql, values: itemIds };
   },
 
   // Get product variant by ID
