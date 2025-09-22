@@ -10,9 +10,9 @@ router.get('/hierarchy', getCategoryHierarchy);
 router.get('/variant/:id', getCategoryVariants);
 router.get('/', getCategories);
 router.get('/:id', getCategory);
-
-router.post('/addAttributes/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,addNewAttributes)
-router.post('/addProductsCategory', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addProductsToCategory);
+ 
+router.patch('/addAttributes/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,addNewAttributes)
+router.post('/addProducts', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addProductsToCategory);
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addCategory);
 
 router.put('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN),updateCategory);

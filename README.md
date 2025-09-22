@@ -172,9 +172,118 @@ Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
 - `seed.sql` runs automatically on first container startup.
 - Contains initial categories, products, and sample data.
 
-## API CALLS
 
-**api/auth/register**
+
+# API Usage
+
+// 1. Create New Attribute
+POST /api/attribute
+Content-Type: application/json
+
+{
+  "name": "RAM"
+}
+
+// 2. Create New Category
+POST /api/category
+Content-Type: application/json
+
+{
+  "name": "Projectors",
+  "attributes": [3],
+  "parentId": [5]
+}
+
+// 3. Add Attributes to Existing Category
+PATCH /api/category/addAttributes/11
+Content-Type: application/json
+
+{
+  "attributeIds": [1, 2]
+}
+
+// 4. Create Product
+POST /api/product
+Content-Type: application/json
+
+{
+  "name": "Epson Home Cinema Projector",
+  "description": "Full HD 1080p home cinema projector, perfect for movies and presentations.",
+  "brand": "Epson",
+  "categoryIds": [5],
+  "attributes": [{"id":3,"value":"1920x1080"}],
+  "stockQnt": 50,
+  "price": 749.99
+}
+
+// 5. Create Product Variant
+POST /api/variant
+Content-Type: application/json
+
+{
+  "productId": 1,
+  "variantName": "Galaxy S25 Ultra Green 128GB",
+  "attributes": [
+    {"id":1,"value":"Green"},
+    {"id":2,"value":"128GB"}
+  ],
+  "categoryIds": [11],
+  "price": 1199.99,
+  "stockQnt": 100
+}
+
+// 6. Update Variant Stock
+PATCH /api/variant/stock/:variantId
+Content-Type: application/json
+
+{
+  "qnt": 4
+}
+
+// 7. Assign Staff to Delivery
+PATCH /api/delivery/:deliveryId/assignStaff
+Content-Type: application/json
+
+{
+  "staffId": 4
+}
+
+// 8. Place Order
+POST /api/order
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "items": [
+    {"variantId": "2", "quantity": 200, "isBackOrdered": true},
+    {"variantId": "10", "quantity": 20, "isBackOrdered": false}
+  ],
+  "paymentMethod": "Card",
+  "deliveryMode": "Standard Delivery",
+  "deliveryAddress": {
+    "address": "1, Galle Rd, Colombo",
+    "city": "Colombo"
+  }
+}
+
+// 9. Update Order Status
+PATCH /api/order/update/:orderId
+Content-Type: application/json
+
+{
+  "status": "Shipped"
+}
+
+// 10. Record COD Payment
+PATCH /api/payment/codPayment/:paymentId
+Content-Type: application/json
+
+{
+  "amount": 12454
+}
+
+//11. Register a user
+POST api/auth/register
 
 ```
 {
@@ -195,7 +304,9 @@ Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
     "message": "User registered successfully"
 }
 ```
-**api/auth/login**
+
+12. Login a user
+POST api/auth/login
 ```
 {
 

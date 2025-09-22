@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { pool,query } = require('../config/db');
 const ApiError = require('../utils/ApiError');
 const generateSKU = require('../utils/generateSKU');
 const productQueries = require('../queries/productQueries');
@@ -7,7 +7,7 @@ const productQueries = require('../queries/productQueries');
 const getProducts = async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 1000;
-    const rows = await query(productQueries.getAllProducts, [20]);
+    const rows = await query(productQueries.getAllProducts);
     res.status(200).json({ success: true, data: rows });
   } catch (err) { next(err); }
 };
@@ -28,39 +28,65 @@ const getProduct = async (req, res, next) => {
 
 // Add new product with variants & attributes
 const addProduct = async (req, res, next) => {
+  const connection = await pool.getConnection();
   try {
-    const { name, description, brand, attributes, stockQnt, price } = req.body;
-    console.log("Hiiiiiiii",req.body);
-    
-    if (!name || !description || !attributes || !price)
+    const { name, description, brand, attributes, stockQnt, price,categoryIds } = req.body;
+
+    if (!name || !description || !attributes || !price )
       throw new ApiError('Name, description, price and attributes are required', 400);
 
-    const existing = await query(productQueries.getProductByName, [name]);
+    await connection.beginTransaction();
+
+    const [existing] = await connection.query(productQueries.getProductByName, [name]);
     if (existing.length) throw new ApiError('Product exists', 409);
 
-    // Insert product
-    const result = await query(productQueries.insertProduct, [name, description, brand || null]);
-    const productId = result.insertId;
+    const [productResult] = await connection.query(
+      productQueries.insertProduct,
+      [name, description, brand || null]
+    );
+    const productId = productResult.insertId;
 
-    // Create variant
-    const variantName = `${name} ${attributes.map(a => a.value).join(' ')}`;
-    const SKU = generateSKU(name, variantName);
-    const variantResult = await query(productQueries.insertVariant, [productId, variantName, SKU, stockQnt || 1, price]);
-    const variantId = variantResult.insertId;
-
-    // Create attributes and variant options
-    for (const attr of attributes) {
-      const [attribute] = await query(productQueries.getAttributeById, [attr.id]);
-      if (!attribute.length) {
-        throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
+    if (Array.isArray(categoryIds)) {
+      for (const categoryId of categoryIds) {
+        await connection.query(productQueries.insertProductCategory, [productId, categoryId]);
       }
-      const attributeId = attribute[0].id;
-      await query(productQueries.insertVariantOption, [variantId, attributeId, attr.value]);
     }
 
-    const newProduct = await query(productQueries.getProductById, [productId]);
+    const variantName = `${ name } ${ attributes.map(a => a.value).join(' ') }`;
+    const SKU = generateSKU(name, variantName);
+
+    const [variantResult] = await connection.query(productQueries.insertVariant, [
+      productId,
+      variantName,
+      SKU,
+      stockQnt || 1,
+      price,
+    ]);
+    const variantId = variantResult.insertId;
+    for (const attr of attributes) {
+      if (!attr.id || !attr.value) continue;
+
+      const [attribute] = await connection.query(productQueries.getAttributeById, [attr.id]);
+      if (!attribute.length) throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
+
+      const attributeId = attribute[0].id;
+      await connection.query(productQueries.insertVariantOption, [
+        variantId,
+        attributeId,
+        attr.value,
+      ]);
+    }
+
+    await connection.commit();
+    const [newProduct] = await connection.query(productQueries.getProductById, [productId]);
+
     res.status(201).json({ success: true, data: newProduct[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (connection) await connection.rollback();
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
 };
 
 // Update product
@@ -87,7 +113,10 @@ const deleteProduct = async (req, res, next) => {
   try {
     const rows = await query(productQueries.getProductById, [req.params.id]);
     if (!rows.length) throw new ApiError('Product not found', 404);
-
+    const variantRows = await query(productQueries.getVariantsByProduct, [req.params.id]);
+    if (variantRows.length > 0) {
+      throw new ApiError('Cannot delete a product with variants', 400);
+    }
     await query(productQueries.deleteProduct, [req.params.id]);
     res.status(200).json({ success: true, message: 'Product deleted successfully' });
   } catch (err) { next(err); }

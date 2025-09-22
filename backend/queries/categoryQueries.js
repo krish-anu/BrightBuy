@@ -1,5 +1,15 @@
 // Get all categories
-const getAll = `SELECT * FROM categories ORDER BY id ASC`;
+const getAll = `SELECT 
+  c.id AS categoryId,
+  c.name AS categoryName,
+  c.parentId,
+  JSON_ARRAYAGG(JSON_OBJECT('attributeId', va.id, 'attributeName', va.name)) AS attributes
+FROM categories c
+LEFT JOIN category_attributes cva ON c.id = cva.categoryId
+LEFT JOIN variant_attributes va ON cva.attributeId = va.id
+GROUP BY c.id
+ORDER BY c.id ASC;
+`;
 
 // Get category by ID
 const getById = `SELECT * FROM categories WHERE id = ?`;
@@ -23,7 +33,7 @@ const deleteCategory = `DELETE FROM categories WHERE id = ?`;
 const getProductsByCategory = `
   SELECT p.id, p.name FROM products p
   INNER JOIN product_categories pc ON pc.productId = p.id
-  WHERE pc.categoryId = ?;
+  WHERE pc.categoryId = ?
 `;
 
 // Get all variants of a category
@@ -36,23 +46,27 @@ const getCategoryVariants = `
     pv.stockQnt,
     p.id AS productId,
     p.name AS productName,
-    a.id AS attributeId,
-    a.name AS attributeName,
+    va.id AS attributeId,
+    va.name AS attributeName,
     pa.value AS attributeValue
-  FROM product_variants pv
-  INNER JOIN products p ON p.id = pv.productId
-  LEFT JOIN product_variant_attributes pa ON pa.variantId = pv.id
-  LEFT JOIN attributes a ON a.id = pa.attributeId
-  INNER JOIN product_categories pc ON pc.productId = p.id
-  WHERE pc.categoryId = ?;
+FROM product_variants pv
+INNER JOIN products p ON p.id = pv.productId
+LEFT JOIN product_variant_attributes pa ON pa.variantId = pv.id
+LEFT JOIN variant_attributes va ON va.id = pa.attributeId
+INNER JOIN product_categories pc ON pc.productId = p.id
+WHERE pc.categoryId = ?
 `;
 
 // Get category hierarchy
 const getHierarchy = `
-  SELECT c1.id AS parentId, c1.name AS parentName, c2.id AS subId, c2.name AS subName
-  FROM categories c1
-  LEFT JOIN categories c2 ON c2.parentId = c1.id
-  ORDER BY c1.id, c2.id;
+  SELECT
+  c1.id AS parentId,
+  c1.name AS parentName,
+  JSON_ARRAYAGG(JSON_OBJECT('id', c2.id, 'name', c2.name)) AS subcategories
+FROM categories c1
+LEFT JOIN categories c2 ON c2.parentId = c1.id
+GROUP BY c1.id, c1.name;
+
 `;
 
 // Get multiple attributes
@@ -62,14 +76,14 @@ const getAttributesByIds = (ids) => {
 };
 
 // Insert category-attribute relations
-const addCategoryAttributes = `INSERT IGNORE INTO category_variant_attributes (categoryId, attributeId) VALUES ?`;
+const addCategoryAttributes = `INSERT IGNORE INTO category_attributes (categoryId, attributeId) VALUES ?`;
 
 // Get category with attributes
 const getCategoryWithAttributes = `
   SELECT c.id AS categoryId, c.name AS categoryName,
          va.id AS attributeId, va.name AS attributeName
   FROM categories c
-  LEFT JOIN category_variant_attributes cva ON c.id = cva.categoryId
+  LEFT JOIN category_attributes cva ON c.id = cva.categoryId
   LEFT JOIN variant_attributes va ON cva.attributeId = va.id
   WHERE c.id = ?;
 `;

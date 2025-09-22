@@ -16,8 +16,8 @@ const getAttributeById = `
 
 // Insert new attribute
 const insertAttribute = `
-  INSERT INTO variant_attributes (name, createdAt, updatedAt)
-  VALUES (?, NOW(), NOW());
+  INSERT INTO variant_attributes (name)
+  VALUES (?);
 `;
 
 // Check if attribute exists by name

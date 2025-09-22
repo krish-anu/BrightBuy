@@ -16,6 +16,7 @@ router.get('/:id', verifyToken, authorizeRoles( ROLES.USER,ROLES.ADMIN, ROLES.SU
 router.post('/', verifyToken, authorizeRoles(ROLES.USER), addOrder);
 
 router.patch('/cancel/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN), cancelOrder);
+router.patch('/update/:id',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN,ROLES.DELIVERY),updateOrderStatus)
 
 
 

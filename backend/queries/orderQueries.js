@@ -8,13 +8,13 @@ const getOrderItemsByOrderId = `
          p.id AS productId, p.name AS productName
   FROM order_items oi
   JOIN product_variants pv ON oi.variantId = pv.id
-  JOIN products p ON pv.ProductId = p.id
+  JOIN products p ON pv.productId = p.id
   WHERE oi.orderId = ?
 `;
 
 const insertOrder = `
   INSERT INTO orders 
-    (UuerId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
+    (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
@@ -37,7 +37,7 @@ const getCategoryWiseOrders = `
   JOIN products p ON pv.ProductId = p.id
   JOIN product_categories pc ON p.id = pc.productId
   JOIN categories c ON pc.categoryId = c.id
-  GROUP BY c.id
+  GROUP BY c.id,c.name,c.parentId
 `;
 
 const getOrderStatusById = `
@@ -83,6 +83,7 @@ const getPaymentByOrderId = `SELECT * FROM payments WHERE orderId = ?`;
 const getOrderDetailsByOrderId = `
   SELECT oi.id AS orderItemId, p.name AS productName, oi.quantity, oi.price
   FROM order_items oi
+  JOIN product_variants pv ON oi.variantId = pv.id
   JOIN products p ON oi.productId = p.id
   WHERE oi.orderId = ?;
 `;
