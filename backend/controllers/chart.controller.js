@@ -50,7 +50,15 @@ const getSalesByMonth = async (req, res, next) => {
     next(error);
   }
 };
+const mainCategoryProducts = async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(chartQueries.mainCategoryProducts);
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+}
 
 module.exports = {
-  getSalesByMonth,
+  getSalesByMonth,mainCategoryProducts
 };

@@ -68,10 +68,21 @@ const salesByCategoryLastMonth = `
     ORDER BY totalRevenue DESC;
   `;
 
+ const mainCategoryProducts = `
+  SELECT c.id AS categoryId, c.name AS categoryName, COUNT(p.id) AS productCount
+  FROM categories c
+  LEFT JOIN product_categories pc ON c.id = pc.categoryId
+  LEFT JOIN products p ON pc.productId = p.id
+  WHERE c.parentId IS NULL  -- Only main categories
+  GROUP BY c.id, c.name
+  ORDER BY productCount DESC;
+`;   
+
 module.exports = {
   getSalesByMonth,
   getSalesByCategory,
   salesLast7Days,
   topProductsLastMonth,
   salesByCategoryLastMonth,
+  mainCategoryProducts
 };

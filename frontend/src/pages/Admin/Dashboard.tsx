@@ -11,22 +11,32 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { reports, chartData } from "../../../data/mockData";
+import { reports } from "../../../data/mockData"; // keep reports but remove chartData
 import * as LucideIcons from "lucide-react";
 import { getTotalRevenue, getTotalOrders } from "../../services/order.services";
 import { totalLowStock } from "../../services/variant.services";
-import { getMonthlySales } from "../../services/chart.services";
+import { getMonthlySales,maincategoryproducts } from "../../services/chart.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
   size?: number;
   color?: string;
 }
+interface CategoryProducts {
+  categoryId: number;
+  categoryName: string;
+  productCount: number;
+}
 
-// Type for monthly sales chart
 type MonthlySalesChart = {
-  month: string; // month name like Jan, Feb, etc.
+  month: string;
   sales: number;
+};
+
+type CategoryChart = {
+  name: string;
+  value: number;
+  color: string;
 };
 
 const IconComponent: React.FC<IconComponentProps> = ({
@@ -34,7 +44,9 @@ const IconComponent: React.FC<IconComponentProps> = ({
   size = 24,
   color = "currentColor",
 }) => {
-  const Icon = LucideIcons[iconName] as React.FC<React.SVGProps<SVGSVGElement>>;
+  const Icon = LucideIcons[iconName] as React.FC<
+    React.SVGProps<SVGSVGElement>
+  >;
   return Icon ? (
     <Icon width={size} height={size} color={color} />
   ) : (
@@ -88,6 +100,7 @@ const Dashboard: React.FC = () => {
   const [salesOverTime, setSalesOverTime] = React.useState<MonthlySalesChart[]>(
     []
   );
+  const [categoryData, setCategoryData] = React.useState<CategoryChart[]>([]); // ✅ state for pie chart
 
   useEffect(() => {
     const fetchTotalRevenue = async () => {
@@ -135,7 +148,7 @@ const Dashboard: React.FC = () => {
         ];
 
         const formattedData: MonthlySalesChart[] = data.map((item) => {
-          const [year, month] = item.month.split("-"); // "2025-09" → ["2025", "09"]
+          const [year, month] = item.month.split("-");
           return {
             month: monthNames[parseInt(month) - 1],
             sales: Number(item.totalSales),
@@ -148,6 +161,37 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchSales();
+
+    const fetchCategories = async () => {
+      try {
+        const categories = await maincategoryproducts();
+        const colors = [
+          "#8884d8",
+          "#82ca9d",
+          "#ffc658",
+          "#ff8042",
+          "#0088fe",
+          "#00c49f",
+          "#d0ed57",
+          "#a4de6c",
+          "#ffbb28",
+          "#ff6666",
+          "#888888",
+        ];
+
+        const formatted = categories.map((cat: CategoryProducts, index: number) => ({
+  name: cat.categoryName,
+  value: cat.productCount,
+  color: colors[index % colors.length],
+}));
+
+
+        setCategoryData(formatted);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
   }, []);
 
   return (
@@ -163,7 +207,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Total Revenue"
-          value={`$${Number(totRevenue).toFixed(2)}`} // <--- convert to number
+          value={`$${Number(totRevenue).toFixed(2)}`}
           icon="DollarSign"
           color="#10B981"
           change="12.5"
@@ -219,14 +263,14 @@ const Dashboard: React.FC = () => {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={chartData.productCategories}
+                data={categoryData}
                 cx="50%"
                 cy="50%"
                 outerRadius={100}
                 dataKey="value"
-                label={({ name, value }) => `${name}: ${value}%`}
+                label={({ name, value }) => `${name}: ${value}`}
               >
-                {chartData.productCategories.map((entry, index) => (
+                {categoryData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
