@@ -13,11 +13,9 @@ import {
 } from "recharts";
 import { reports, chartData } from "../../../data/mockData";
 import * as LucideIcons from "lucide-react";
-// import { get } from 'http';
 import { getTotalRevenue, getTotalOrders } from "../../services/order.services";
-import {totalLowStock} from "../../services/variant.services";
-
-// import type { Icon as LucideIconType } from 'lucide-react';
+import { totalLowStock } from "../../services/variant.services";
+import { getMonthlySales } from "../../services/chart.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -25,12 +23,17 @@ interface IconComponentProps {
   color?: string;
 }
 
+// Type for monthly sales chart
+type MonthlySalesChart = {
+  month: string; // month name like Jan, Feb, etc.
+  sales: number;
+};
+
 const IconComponent: React.FC<IconComponentProps> = ({
   iconName,
   size = 24,
   color = "currentColor",
 }) => {
-  // Cast the dynamic icon to a React component that accepts SVG props
   const Icon = LucideIcons[iconName] as React.FC<React.SVGProps<SVGSVGElement>>;
   return Icon ? (
     <Icon width={size} height={size} color={color} />
@@ -81,7 +84,11 @@ const StatsCard: React.FC<StatsCardProps> = ({
 const Dashboard: React.FC = () => {
   const [totRevenue, setTotRevenue] = React.useState<number>(0);
   const [totOrder, setTotOrders] = React.useState<number>(0);
-  const [totLowStock,setTotLowStock]=React.useState<number>(0);
+  const [totLowStock, setTotLowStock] = React.useState<number>(0);
+  const [salesOverTime, setSalesOverTime] = React.useState<MonthlySalesChart[]>(
+    []
+  );
+
   useEffect(() => {
     const fetchTotalRevenue = async () => {
       const revenue = await getTotalRevenue();
@@ -89,7 +96,6 @@ const Dashboard: React.FC = () => {
     };
     fetchTotalRevenue();
 
-    // console.log("Revenue called");
     const fetchTotalOrders = async () => {
       try {
         const totOrders = await getTotalOrders();
@@ -99,20 +105,49 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchTotalOrders();
-    const getTotalLowStock=async()=>{
-      try{
 
-        
-        const totLowStock= await totalLowStock();
-                // console.log("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
-
-        setTotLowStock(totLowStock)
-      }catch(error){
-        console.log("Can not fetch total low stock orders",error);
-        
+    const getTotalLowStock = async () => {
+      try {
+        const totLowStock = await totalLowStock();
+        setTotLowStock(totLowStock);
+      } catch (error) {
+        console.log("Cannot fetch total low stock items:", error);
       }
-    }
+    };
     getTotalLowStock();
+
+    const fetchSales = async () => {
+      try {
+        const data = await getMonthlySales();
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        const formattedData: MonthlySalesChart[] = data.map((item) => {
+          const [year, month] = item.month.split("-"); // "2025-09" → ["2025", "09"]
+          return {
+            month: monthNames[parseInt(month) - 1],
+            sales: Number(item.totalSales),
+          };
+        });
+
+        setSalesOverTime(formattedData);
+      } catch (error) {
+        console.error("Error fetching monthly sales:", error);
+      }
+    };
+    fetchSales();
   }, []);
 
   return (
@@ -128,11 +163,12 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Total Revenue"
-          value={totRevenue.toString()}
+          value={`$${Number(totRevenue).toFixed(2)}`} // <--- convert to number
           icon="DollarSign"
           color="#10B981"
           change="12.5"
         />
+
         <StatsCard
           title="Total Orders"
           value={totOrder.toString()}
@@ -165,7 +201,7 @@ const Dashboard: React.FC = () => {
             Sales Over Time
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData.salesOverTime}>
+            <BarChart data={salesOverTime}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />

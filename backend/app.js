@@ -16,6 +16,8 @@ const paymentRouter = require('./routes/payment');
 const deliveryRouter = require('./routes/delivery');
 const attributeRouter = require('./routes/attribute');
 const imageRouter = require('./routes/image.upload');
+const chartRouter = require("./routes/chart");
+
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/payment', paymentRouter);
 app.use('/api/delivery', deliveryRouter);
 app.use('/api/attribute', attributeRouter);
 app.use('/api/image', imageRouter);
+app.use("/api/chart", chartRouter);
+
 
 app.use(errorMiddleware);
 
@@ -46,3 +50,4 @@ app.get("/", (req, res) => {
 });
 
 module.exports = app;
+ 
