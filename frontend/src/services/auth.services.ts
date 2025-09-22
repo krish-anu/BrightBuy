@@ -7,12 +7,12 @@ export const LOCAL_STORAGE__TOKEN = "brightbuy_token";
 // Login function
 export const loginUser = async (email: string, password: string) => {
   try {
-    console.log("Logging in user:", email);
+    // console.log("Logging in user:", email);
     const response = await axiosInstance.post("/api/auth/login", {
       email,
       password,
     });
-console.log("Res",response);
+// console.log("Res",response);
 
     if (response.status===200) {
       const user = response.data;

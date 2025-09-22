@@ -45,7 +45,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   // Update role when user changes
   useEffect(() => {
     if (user && user.role) {
-      console.log("RoleProvider setting currentRole to:", user.role);
+      // console.log("RoleProvider setting currentRole to:", user.role);
       setCurrentRole(user.role);
     }
   }, [user]);

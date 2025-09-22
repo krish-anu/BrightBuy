@@ -36,7 +36,7 @@ const UserLogin: React.FC = () => {
 
     try {
       const result = await login(email, password);
-      console.log("REs",result);
+      // console.log("REs",result);
       
 
       if (result?.success === true) {
@@ -141,7 +141,7 @@ const UserLogin: React.FC = () => {
 
         {/* Signup link */}
 
-        
+
         <p className="mt-5 text-center text-sm text-gray-600">
           Don’t have an account?{" "}
           <a href="/signup" className="text-primary hover:underline font-medium">

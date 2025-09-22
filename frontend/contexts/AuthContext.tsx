@@ -64,7 +64,7 @@ const login = async (email: string, password: string) => {
   setIsLoading(true);
   try {
     const foundUser = await loginUser(email, password);
-    console.log("foundUser", foundUser);
+    // console.log("foundUser", foundUser);
 
     if (foundUser?.success) {
       const backendUser = foundUser.user;
@@ -83,7 +83,7 @@ const login = async (email: string, password: string) => {
         expires: 7,
       });
 
-      console.log("User logged in:", userWithoutPassword);
+      // console.log("User logged in:", userWithoutPassword);
 
       // Redirect based on role
       if (userWithoutPassword.role === "SuperAdmin") {

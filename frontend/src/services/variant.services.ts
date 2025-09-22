@@ -2,7 +2,7 @@ import axiosInstance   from "@/axiosConfig";
 const totalLowStock=async ()=>{
     try{
     const totLow= await axiosInstance.get("/api/variant/totlowstock")
-    console.log("totLow:", totLow.data.data);
+    // console.log("totLow:", totLow.data.data);
     
     return totLow.data.data
     }catch(error){

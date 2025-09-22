@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
     };
     fetchTotalRevenue();
 
-    console.log("Revenue called");
+    // console.log("Revenue called");
     const fetchTotalOrders = async () => {
       try {
         const totOrders = await getTotalOrders();
