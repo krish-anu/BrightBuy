@@ -179,32 +179,38 @@ Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
 // 1. Create New Attribute
 POST /api/attribute
 Content-Type: application/json
-
+```
 {
   "name": "RAM"
 }
+```
 
 // 2. Create New Category
 POST /api/category
 Content-Type: application/json
+```
 
 {
   "name": "Projectors",
   "attributes": [3],
   "parentId": [5]
 }
+```
 
 // 3. Add Attributes to Existing Category
 PATCH /api/category/addAttributes/11
 Content-Type: application/json
+```
 
 {
   "attributeIds": [1, 2]
 }
+```
 
 // 4. Create Product
 POST /api/product
 Content-Type: application/json
+```
 
 {
   "name": "Epson Home Cinema Projector",
@@ -215,10 +221,12 @@ Content-Type: application/json
   "stockQnt": 50,
   "price": 749.99
 }
+```
 
 // 5. Create Product Variant
 POST /api/variant
 Content-Type: application/json
+```
 
 {
   "productId": 1,
@@ -231,27 +239,33 @@ Content-Type: application/json
   "price": 1199.99,
   "stockQnt": 100
 }
+```
 
 // 6. Update Variant Stock
 PATCH /api/variant/stock/:variantId
 Content-Type: application/json
+```
 
 {
   "qnt": 4
 }
+```
 
 // 7. Assign Staff to Delivery
 PATCH /api/delivery/:deliveryId/assignStaff
 Content-Type: application/json
+```
 
 {
   "staffId": 4
 }
+```
 
 // 8. Place Order
 POST /api/order
 Content-Type: application/json
 Authorization: Bearer <token>
+```
 
 {
   "items": [
@@ -265,10 +279,12 @@ Authorization: Bearer <token>
     "city": "Colombo"
   }
 }
+```
 
 // 9. Update Order Status
 PATCH /api/order/update/:orderId
 Content-Type: application/json
+```
 
 {
   "status": "Shipped"
@@ -281,6 +297,7 @@ Content-Type: application/json
 {
   "amount": 12454
 }
+```
 
 //11. Register a user
 POST api/auth/register
@@ -318,7 +335,7 @@ POST api/auth/login
 - returns
 ```
 {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwicm9sZSI6IkFkbWluIiwiaWF0IjoxNzU4MzI0NDI5LCJleHAiOjE3NTgzMjgwMjl9.ESkTK8dPSuEKd1JkbhizirfLXVE6B3lPeF06vY_laPk",
+    "token": <token>,
     "role": "Admin",
     "email": "anuadmin@example.com"
 }
