@@ -14,7 +14,7 @@ import {
 import { reports, chartData } from "../../../data/mockData";
 import * as LucideIcons from "lucide-react";
 // import { get } from 'http';
-import { getTotalRevenue } from "../../services/order.services";
+import { getTotalRevenue,getTotalOrders } from "../../services/order.services";
 
 // import type { Icon as LucideIconType } from 'lucide-react';
 
@@ -82,6 +82,7 @@ const StatsCard: React.FC<StatsCardProps> = ({
 
 const Dashboard: React.FC = () => {
   const [totRevenue, setTotRevenue] = React.useState<number>(0);
+  const [totOrder,setTotOrders] = React.useState<number>(0);
   useEffect(() => {
     const fetchTotalRevenue = async () => {
       const revenue = await getTotalRevenue();
@@ -90,7 +91,15 @@ const Dashboard: React.FC = () => {
     fetchTotalRevenue();
 
   console.log("Revenue called");
-}, []);
+  const fetchTotalOrders = async () => {
+    try{
+      const totOrders=await getTotalOrders();
+      setTotOrders(totOrders);
+    }catch(error){
+      console.error("Error fetching total orders:", error);
+    }
+  };
+  fetchTotalOrders();},[])
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -112,7 +121,7 @@ const Dashboard: React.FC = () => {
         />
         <StatsCard
           title="Total Orders"
-          value={reports.salesSummary.totalOrders}
+          value={totOrder.toString()}
           icon="ShoppingCart"
           color="#3B82F6"
           change="8.2"

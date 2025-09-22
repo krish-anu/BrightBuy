@@ -11,4 +11,15 @@ const getTotalRevenue = async () => {
   }
 };
 
-export { getTotalRevenue };
+const getTotalOrders = async () => {
+  try {
+    const response = await axiosInstance.get("/api/order/totalOrders");
+    console.log("Response data:", response.data.data);
+    return response.data.data;
+  } catch (error) {
+    console.error("Error fetching total orders:", error);
+    throw error;
+  }
+};
+
+export { getTotalRevenue, getTotalOrders };

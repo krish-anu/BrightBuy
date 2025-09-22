@@ -87,6 +87,8 @@ const getOrderDetailsByOrderId = `
   JOIN products p ON oi.productId = p.id
   WHERE oi.orderId = ?;
 `;
+
+const getTotalOrders = `SELECT COUNT(*) AS totalOrders FROM orders`;
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -104,4 +106,5 @@ module.exports = {
   restockItems,
   getPaymentByOrderId,
   getOrderDetailsByOrderId,
+  getTotalOrders
 };

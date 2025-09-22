@@ -337,6 +337,15 @@ const updateOrderStatus = async (req, res, next) => {
     connection.release();
   }
 };
+const getTotalOrders = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getTotalOrders);
+    const totalOrders = rows[0]?.totalOrders ?? 0;
+    res.status(200).json({ success: true, data: totalOrders });
+  } catch (err) {
+    next(err);
+  }
+}
 
 
 
@@ -350,5 +359,5 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
-
+  getTotalOrders
 };
