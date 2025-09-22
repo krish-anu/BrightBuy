@@ -1,3 +1,4 @@
+
 const variantQueries = {
   getAll: `
     SELECT v.id, v.SKU, v.variantName, v.price, v.stockQnt, v.productId, v.imageURL,
@@ -84,6 +85,11 @@ const variantQueries = {
    ORDER BY o.orderDate ASC;
   `,
 
+  getTotalLowStock: `
+    SELECT COUNT(*) AS total
+    FROM product_variants
+    WHERE stockQnt <= ?
+  `,
   // Update preOrdered flag for order items
   markItemsAsProcessed: (itemIds) => {
     const placeholders = itemIds.map(() => '?').join(',');

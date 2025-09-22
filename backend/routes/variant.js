@@ -1,5 +1,5 @@
 
-const { getVariants, getVariant, addVariant, updateVariant, updateVariantStock, deleteVariant, searchAndFilterVariants,  getLowStockVariants, getPopularVariants,getStock, addVariantAttributes} = require('../controllers/variant.controller');
+const { getVariants, getVariant, addVariant, updateVariant, updateVariantStock, deleteVariant, searchAndFilterVariants,  getLowStockVariants, getPopularVariants,getStock, addVariantAttributes,getTotalLowStockVariants} = require('../controllers/variant.controller');
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
 
@@ -11,7 +11,9 @@ router.get('/popular',getPopularVariants)
 router.get('/search', searchAndFilterVariants)
 router.get('/lowStk', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN,ROLES.WAREHOUSE) ,getLowStockVariants)
 router.get('/', getVariants)
-router.get('/:id', getVariant);
+router.get('/totlowstock', getTotalLowStockVariants);
+
+router.get('/:id', getVariant); 
 
 router.patch('/addAttribute/:id',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),addVariantAttributes)
 
