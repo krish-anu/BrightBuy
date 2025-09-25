@@ -25,7 +25,7 @@ export const products: Product[] = [
     {
       id: "v2",
       price: 1399.99,
-      stock: 10,
+      stock: 0,
       sku: "123457",
       attributes: [
         { name: "Color", value: "Blue" },
@@ -53,6 +53,39 @@ export const products: Product[] = [
         { name: "Color", value: "White" },
         { name: "RAM", value: "16GB" },
         { name: "Storage", value: "512GB" }
+      ]
+    },
+    {
+      id: "v5",
+      price: 1699.99,
+      stock: 3,
+      sku: "123460",
+      attributes: [
+        { name: "Color", value: "Green" },
+        { name: "RAM", value: "16GB" },
+        { name: "Storage", value: "1TB" }
+      ]
+    },
+    {
+      id: "v6",
+      price: 1799.99,
+      stock: 2,
+      sku: "123461",
+      attributes: [
+        { name: "Color", value: "Gold" },
+        { name: "RAM", value: "32GB" },
+        { name: "Storage", value: "1TB" }
+      ]
+    },
+    {
+      id: "v7",
+      price: 1899.99,
+      stock: 1,
+      sku: "123462",
+      attributes: [
+        { name: "Color", value: "Silver" },
+        { name: "RAM", value: "32GB" },
+        { name: "Storage", value: "2TB" }
       ]
     },
     // More variants...

@@ -33,53 +33,28 @@ export interface product {
 }
 
 export default function ProductInfo({ product }: ProductPageProps) {
-    const {variants} = product;
-    //get unique attribute names
+    const { variants } = product;
     const attributeNames = getUniqueAttributes(variants);
-    //get attribute values
     const attributeValues = getAttributeValues(new Set(attributeNames), variants);
 
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(getInitialOptions(variants));
     const [displayVariant, setDisplayVariant] = useState<Variant | undefined>(undefined);
+    const [stockStatus, setStockStatus] = useState<string>("");
 
-    //to show no stock available for no variant matched
-    const [notAvailable, setNotAvailable] = useState<boolean>(false);
-
-
+    
 
     useEffect(() => {
         const variant = findByOptions(variants, selectedOptions);
         setDisplayVariant(variant);
-        setNotAvailable(!variant);
-
+        setStockStatus(checkStock(variant));
     }, [selectedOptions, variants]);
 
-    function handleSelect(attrName: string, value: string){
-        setSelectedOptions(prevOptions => ({
+    function handleSelect(attrName: string, value: string) {
+        setSelectedOptions((prevOptions) => ({
             ...prevOptions,
-            [attrName]: value
+            [attrName]: value,
         }));
     }
-
-    // const getAvailableValues = (attrName: string): string[] => {
-    //     const matchingVariants = variants.filter(variant =>
-    //         Object.entries(selectedOptions).every(([key,val]) =>
-    //             key===attrName || variant.attributes.some(attr => attr.name === key && attr.value === val)
-    //         )
-    //     );
-    //     const values = new Set<string>();
-    //     matchingVariants.forEach(variant => {
-    //         variant.attributes.forEach(attr => {
-    //             if (attr.name === attrName) {
-    //                 values.add(attr.value);
-    //             }
-    //         });
-    //     });
-    //     return Array.from(values);
-    // };
-    // console.log("display variant\n",displayVariant)
-    // console.log("selected options\n",selectedOptions)
-    // console.log("finded obj:\n",findByOptions(variants, selectedOptions))
 
 
     return (
@@ -98,13 +73,21 @@ export default function ProductInfo({ product }: ProductPageProps) {
                     <Separator />
 
                     <div className="flex flex-col  font-black text-lg md:text-2xl text-secondary">
-                        <span className="">LKR {displayVariant?.price}</span>
+                        {stockStatus === "not-available" ? (
+                            <span className="text-destructive ">Selected combination is not available</span>
+                        ) : (
+                            <span className="">LKR {displayVariant?.price}</span>
+                        )}
                     </div>
                     <Separator />
                     <div className="flex flex-col gap-2 px-4 text-md md:text-lg text-foreground">
                         <div className="flex flex-row justify-between">
                             <span className="text-sm text-muted-foreground">SKU: {displayVariant?.sku}</span>
-                            <Badge variant="outline" className="text-sm text-chart-3"><span><Dot strokeWidth={3} size={16} className="inline-block" />In stock</span></Badge>
+                            {stockStatus === "in-stock" ? (
+                                <Badge variant="outline" className="text-sm text-chart-3"><span><Dot strokeWidth={3} size={16} className="inline-block" />In Stock</span></Badge>
+                            ) : stockStatus === "out-of-stock" ? (
+                                <Badge variant="outline" className="text-sm text-destructive"><span><Dot strokeWidth={3} size={16} className="inline-block" />Low Stock</span></Badge>
+                            ) : null}
                         </div>
                         <div className="flex flex-row justify-between">
                             <span className="text-sm text-muted-foreground">Category: <Badge variant="outline" className="text-sm text-muted-foreground">{product.category}</Badge></span>
@@ -132,9 +115,17 @@ export default function ProductInfo({ product }: ProductPageProps) {
 
                     </div>
                     <Separator />
+                    {stockStatus === "in-stock" ? (
+                        <span className="text-md text-muted-foreground">Available Stock: <span className="font-bold text-chart-3">{displayVariant?.stock}</span></span>
+
+                    ):null}
                     <div className="flex flex-row justify-start sm:gap-2 gap-6 text-md">
-                        <Button variant="order" size="lg" className="hover:bg-foreground  "><ShoppingBagIcon className="inline-block mr-2" />Buy Now</Button>
-                        <Button variant="order" size="lg" className="bg-primary text-primary-foreground hover:bg-foreground  hover:text-background"> <ShoppingCart className="inline-block mr-2" />Add to Cart</Button>
+                        {stockStatus === "not-available" ? null : <Button variant="order" size="lg" className="hover:bg-foreground  ">
+                            <ShoppingBagIcon className="inline-block mr-2" /> {stockStatus === "in-stock" ? "Buy Now" : stockStatus==="out-of-stock"? "Pre Order" : null}
+                        </Button>}
+                        {stockStatus==="not-available"?null:
+                            <Button variant="order" size="lg" className="bg-primary text-primary-foreground hover:bg-foreground  hover:text-background"> <ShoppingCart className="inline-block mr-2" /> Add to Cart</Button>
+                        }
                     </div>
                 </div>
             </div>
@@ -142,25 +133,6 @@ export default function ProductInfo({ product }: ProductPageProps) {
             <div>
                 {product.description}
             </div>
-            {notAvailable && (
-                <>
-                    {/* Backdrop */}
-                    <div className="relative inset-0 bg-foreground bg-opacity-10 z-10"></div>
-                    {/* Popup */}
-                    <div className="fixed inset-0 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-                            <h2 className="text-red-600 font-bold text-lg">This product is not available.</h2>
-                            <p className="text-gray-600 mt-2">Please select different options.</p>
-                            <button
-                                className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                                onClick={() => setNotAvailable(false)}
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
         </div>
     );
 }
@@ -228,5 +200,14 @@ function getInitialOptions(variants: Variant[]): Record<string, string> {
     return initialOptions;
 }
 
+
+function checkStock(variant: Variant | undefined): string {
+    if (!variant) return "not-available";
+    else if (variant.stock > 0) {
+        return "in-stock";
+    } 
+    else {return "out-of-stock";
+    }
+}
 
 
