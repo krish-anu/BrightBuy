@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   BarChart,
   Bar,
@@ -11,18 +11,21 @@ import {
   Line,
   PieChart,
   Pie,
-  Cell
-} from 'recharts';
-import { reports, chartData } from '../../../data/mockData';
-import * as LucideIcons from 'lucide-react';
-import type { LucideProps } from 'lucide-react';
+  Cell,
+} from "recharts";
+import { reports, chartData } from "../../../data/mockData";
+import * as LucideIcons from "lucide-react";
+import type { LucideProps } from "lucide-react";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
   size?: number;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 24 }) => {
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 24,
+}) => {
   const Icon = LucideIcons[iconName] as React.ComponentType<LucideProps>;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
@@ -31,8 +34,12 @@ const Reports: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-        <p className="text-gray-600 mt-2">Comprehensive business insights and analytics</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Reports & Analytics
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Comprehensive business insights and analytics
+        </p>
       </div>
 
       {/* Key Metrics */}
@@ -41,8 +48,12 @@ const Reports: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${reports.salesSummary.totalRevenue}</p>
-              <p className="text-sm text-green-600 mt-1">+12.5% from last month</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${reports.salesSummary.totalRevenue}
+              </p>
+              <p className="text-sm text-green-600 mt-1">
+                +12.5% from last month
+              </p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
               <IconComponent iconName="DollarSign" />
@@ -53,9 +64,15 @@ const Reports: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Average Order Value</p>
-              <p className="text-2xl font-bold text-gray-900">${reports.salesSummary.averageOrderValue}</p>
-              <p className="text-sm text-blue-600 mt-1">+5.2% from last month</p>
+              <p className="text-sm font-medium text-gray-600">
+                Average Order Value
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${reports.salesSummary.averageOrderValue}
+              </p>
+              <p className="text-sm text-blue-600 mt-1">
+                +5.2% from last month
+              </p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full">
               <IconComponent iconName="ShoppingCart" />
@@ -67,8 +84,12 @@ const Reports: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.salesSummary.totalOrders}</p>
-              <p className="text-sm text-purple-600 mt-1">+8.1% from last month</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {reports.salesSummary.totalOrders}
+              </p>
+              <p className="text-sm text-purple-600 mt-1">
+                +8.1% from last month
+              </p>
             </div>
             <div className="p-3 bg-purple-100 rounded-full">
               <IconComponent iconName="Package" />
@@ -80,8 +101,12 @@ const Reports: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Top Product</p>
-              <p className="text-lg font-bold text-gray-900">{reports.salesSummary.topSellingProduct}</p>
-              <p className="text-sm text-orange-600 mt-1">Best seller this month</p>
+              <p className="text-lg font-bold text-gray-900">
+                {reports.salesSummary.topSellingProduct}
+              </p>
+              <p className="text-sm text-orange-600 mt-1">
+                Best seller this month
+              </p>
             </div>
             <div className="p-3 bg-orange-100 rounded-full">
               <IconComponent iconName="TrendingUp" />
@@ -107,15 +132,22 @@ const Reports: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip formatter={(value: number) => [`$${value}`, 'Sales']} />
-              <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} />
+              <Tooltip formatter={(value: number) => [`$${value}`, "Sales"]} />
+              <Line
+                type="monotone"
+                dataKey="sales"
+                stroke="#3B82F6"
+                strokeWidth={3}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         {/* Order Status Distribution */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status Distribution</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Order Status Distribution
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -140,42 +172,74 @@ const Reports: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Inventory Analytics */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Analytics</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Inventory Analytics
+          </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Total Products</span>
-              <span className="text-lg font-bold text-gray-900">{reports.inventoryStats.totalProducts}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Total Products
+              </span>
+              <span className="text-lg font-bold text-gray-900">
+                {reports.inventoryStats.totalProducts}
+              </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Low Stock Items</span>
-              <span className="text-lg font-bold text-yellow-600">{reports.inventoryStats.lowStockItems}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Low Stock Items
+              </span>
+              <span className="text-lg font-bold text-yellow-600">
+                {reports.inventoryStats.lowStockItems}
+              </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Total Inventory Value</span>
-              <span className="text-lg font-bold text-green-600">${reports.inventoryStats.totalValue.toLocaleString()}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Total Inventory Value
+              </span>
+              <span className="text-lg font-bold text-green-600">
+                ${reports.inventoryStats.totalValue.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Delivery Performance */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery Performance</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Delivery Performance
+          </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Assigned Deliveries</span>
-              <span className="text-lg font-bold text-blue-600">{reports.deliveryStats.assigned}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Assigned Deliveries
+              </span>
+              <span className="text-lg font-bold text-blue-600">
+                {reports.deliveryStats.assigned}
+              </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-              <span className="text-sm font-medium text-gray-700">In Transit</span>
-              <span className="text-lg font-bold text-yellow-600">{reports.deliveryStats.inTransit}</span>
+              <span className="text-sm font-medium text-gray-700">
+                In Transit
+              </span>
+              <span className="text-lg font-bold text-yellow-600">
+                {reports.deliveryStats.inTransit}
+              </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Delivered</span>
-              <span className="text-lg font-bold text-green-600">{reports.deliveryStats.delivered}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Delivered
+              </span>
+              <span className="text-lg font-bold text-green-600">
+                {reports.deliveryStats.delivered}
+              </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-red-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Failed Deliveries</span>
-              <span className="text-lg font-bold text-red-600">{reports.deliveryStats.failed}</span>
+              <span className="text-sm font-medium text-gray-700">
+                Failed Deliveries
+              </span>
+              <span className="text-lg font-bold text-red-600">
+                {reports.deliveryStats.failed}
+              </span>
             </div>
           </div>
         </div>
@@ -183,13 +247,17 @@ const Reports: React.FC = () => {
 
       {/* Product Categories Performance */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Categories Performance</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Product Categories Performance
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData.productCategories}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
             <YAxis />
-            <Tooltip formatter={(value: number) => [`${value}%`, 'Market Share']} />
+            <Tooltip
+              formatter={(value: number) => [`${value}%`, "Market Share"]}
+            />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               {chartData.productCategories.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />

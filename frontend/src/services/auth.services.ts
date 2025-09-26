@@ -1,6 +1,5 @@
 import axiosInstance from "../axiosConfig";
 
-
 // Local Storage Token Key
 export const LOCAL_STORAGE__TOKEN = "brightbuy_token";
 
@@ -12,11 +11,11 @@ export const loginUser = async (email: string, password: string) => {
       email,
       password,
     });
-// console.log("Res",response);
+    // console.log("Res",response);
 
-    if (response.status===200) {
+    if (response.status === 200) {
       const user = response.data;
-  
+
       // Optionally store token in localStorage
       if (response.data.token) {
         localStorage.setItem(LOCAL_STORAGE__TOKEN, response.data.token);

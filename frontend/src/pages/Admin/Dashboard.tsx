@@ -15,7 +15,10 @@ import { reports } from "../../../data/mockData"; // keep reports but remove cha
 import * as LucideIcons from "lucide-react";
 import { getTotalRevenue, getTotalOrders } from "../../services/order.services";
 import { totalLowStock } from "../../services/variant.services";
-import { getMonthlySales,maincategoryproducts } from "../../services/chart.services";
+import {
+  getMonthlySales,
+  maincategoryproducts,
+} from "../../services/chart.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -44,9 +47,7 @@ const IconComponent: React.FC<IconComponentProps> = ({
   size = 24,
   color = "currentColor",
 }) => {
-  const Icon = LucideIcons[iconName] as React.FC<
-    React.SVGProps<SVGSVGElement>
-  >;
+  const Icon = LucideIcons[iconName] as React.FC<React.SVGProps<SVGSVGElement>>;
   return Icon ? (
     <Icon width={size} height={size} color={color} />
   ) : (
@@ -98,7 +99,7 @@ const Dashboard: React.FC = () => {
   const [totOrder, setTotOrders] = React.useState<number>(0);
   const [totLowStock, setTotLowStock] = React.useState<number>(0);
   const [salesOverTime, setSalesOverTime] = React.useState<MonthlySalesChart[]>(
-    []
+    [],
   );
   const [categoryData, setCategoryData] = React.useState<CategoryChart[]>([]); // ✅ state for pie chart
 
@@ -179,12 +180,13 @@ const Dashboard: React.FC = () => {
           "#888888",
         ];
 
-        const formatted = categories.map((cat: CategoryProducts, index: number) => ({
-  name: cat.categoryName,
-  value: cat.productCount,
-  color: colors[index % colors.length],
-}));
-
+        const formatted = categories.map(
+          (cat: CategoryProducts, index: number) => ({
+            name: cat.categoryName,
+            value: cat.productCount,
+            color: colors[index % colors.length],
+          }),
+        );
 
         setCategoryData(formatted);
       } catch (error) {

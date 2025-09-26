@@ -19,22 +19,32 @@ const IconComponent: React.FC<IconComponentProps> = ({
 // Normalize roles for filtering and display
 const normalizeRole = (role: string) => {
   switch (role) {
-    case "admin": return "admin";
-    case "warehouseStaff": return "warehouse";
-    case "deliveryStaff": return "delivery";
-    case "customer": return "customer";
-    default: return role;
+    case "admin":
+      return "admin";
+    case "warehouseStaff":
+      return "warehouse";
+    case "deliveryStaff":
+      return "delivery";
+    case "customer":
+      return "customer";
+    default:
+      return role;
   }
 };
 
 // Display friendly role names
 const displayRole = (role: string) => {
   switch (role) {
-    case "admin": return "Admin";
-    case "warehouseStaff": return "Warehouse Staff";
-    case "deliveryStaff": return "Delivery Staff";
-    case "customer": return "Customer";
-    default: return role;
+    case "admin":
+      return "Admin";
+    case "warehouseStaff":
+      return "Warehouse Staff";
+    case "deliveryStaff":
+      return "Delivery Staff";
+    case "customer":
+      return "Customer";
+    default:
+      return role;
   }
 };
 
@@ -68,11 +78,16 @@ const UserManagement: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     switch (normalizeRole(role)) {
-      case "admin": return "bg-purple-100 text-purple-800";
-      case "warehouse": return "bg-blue-100 text-blue-800";
-      case "delivery": return "bg-green-100 text-green-800";
-      case "customer": return "bg-gray-100 text-gray-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "admin":
+        return "bg-purple-100 text-purple-800";
+      case "warehouse":
+        return "bg-blue-100 text-blue-800";
+      case "delivery":
+        return "bg-green-100 text-green-800";
+      case "customer":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -88,7 +103,9 @@ const UserManagement: React.FC = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600 mt-2">Manage system users and their roles</p>
+        <p className="text-gray-600 mt-2">
+          Manage system users and their roles
+        </p>
       </div>
 
       {/* Search & Filter */}
@@ -145,13 +162,15 @@ const UserManagement: React.FC = () => {
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">{user.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {user.name}
+                    </div>
                     <div className="text-sm text-gray-500">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(
-                        user.role
+                        user.role,
                       )}`}
                     >
                       {displayRole(user.role)}
@@ -165,13 +184,22 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button className="text-blue-600 hover:text-blue-900" title="Edit User">
+                      <button
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit User"
+                      >
                         <IconComponent iconName="Edit" size={16} />
                       </button>
-                      <button className="text-green-600 hover:text-green-900" title="Reset Password">
+                      <button
+                        className="text-green-600 hover:text-green-900"
+                        title="Reset Password"
+                      >
                         <IconComponent iconName="Key" size={16} />
                       </button>
-                      <button className="text-red-600 hover:text-red-900" title="Deactivate">
+                      <button
+                        className="text-red-600 hover:text-red-900"
+                        title="Deactivate"
+                      >
                         <IconComponent iconName="UserX" size={16} />
                       </button>
                     </div>
@@ -194,10 +222,10 @@ const UserManagement: React.FC = () => {
                     role === "admin"
                       ? "Shield"
                       : role === "warehouse"
-                      ? "Package"
-                      : role === "delivery"
-                      ? "Truck"
-                      : "Users"
+                        ? "Package"
+                        : role === "delivery"
+                          ? "Truck"
+                          : "Users"
                   }
                   size={24}
                 />

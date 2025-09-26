@@ -7,10 +7,19 @@ interface IconComponentProps {
   className?: string;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20, className }) => {
-  const Icon =
-    LucideIcons[iconName] as React.ComponentType<LucideIcons.LucideProps> | undefined;
-  return Icon ? <Icon size={size} className={className} /> : <LucideIcons.Circle size={size} />;
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+  className,
+}) => {
+  const Icon = LucideIcons[iconName] as
+    | React.ComponentType<LucideIcons.LucideProps>
+    | undefined;
+  return Icon ? (
+    <Icon size={size} className={className} />
+  ) : (
+    <LucideIcons.Circle size={size} />
+  );
 };
 
 const UserSignup: React.FC = () => {
@@ -48,16 +57,22 @@ const UserSignup: React.FC = () => {
             <IconComponent iconName="UserPlus" size={28} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center text-gray-900">Create Account</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-900">
+          Create Account
+        </h2>
         <p className="mt-1 text-center text-gray-500 text-sm">
-          Join <span className="font-semibold">BrightBuy</span> today and start shopping
+          Join <span className="font-semibold">BrightBuy</span> today and start
+          shopping
         </p>
 
         {/* Form */}
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           {/* Full Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
               Full Name
             </label>
             <div className="relative mt-1">
@@ -76,7 +91,10 @@ const UserSignup: React.FC = () => {
 
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
               Email Address
             </label>
             <div className="relative mt-1">
@@ -95,7 +113,10 @@ const UserSignup: React.FC = () => {
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700"
+            >
               Password
             </label>
             <div className="relative mt-1">
@@ -114,14 +135,20 @@ const UserSignup: React.FC = () => {
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                <IconComponent iconName={showPassword ? "EyeOff" : "Eye"} size={18} />
+                <IconComponent
+                  iconName={showPassword ? "EyeOff" : "Eye"}
+                  size={18}
+                />
               </button>
             </div>
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700"
+            >
               Confirm Password
             </label>
             <div className="relative mt-1">
@@ -159,7 +186,10 @@ const UserSignup: React.FC = () => {
         {/* Login link */}
         <p className="mt-5 text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <a href="/userlogin" className="text-primary hover:underline font-medium">
+          <a
+            href="/userlogin"
+            className="text-primary hover:underline font-medium"
+          >
             Sign in
           </a>
         </p>
