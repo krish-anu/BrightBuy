@@ -21,6 +21,7 @@ const normalizeRole = (role: string) => {
   const lowerRole = role.toLowerCase();
   switch (lowerRole) {
     case "admin": return "admin";
+    case "superadmin": return "superadmin";
     case "warehousestaff": return "warehouse";
     case "deliverystaff": return "delivery";
     case "customer": return "customer";
@@ -33,6 +34,7 @@ const displayRole = (role: string) => {
   const lowerRole = role.toLowerCase();
   switch (lowerRole) {
     case "admin": return "Admin";
+    case "superadmin": return "Super Admin";
     case "warehousestaff": return "Warehouse Staff";
     case "deliverystaff": return "Delivery Staff";
     case "customer": return "Customer";
@@ -75,6 +77,7 @@ const UserManagement: React.FC = () => {
     const normalizedRole = normalizeRole(role);
     switch (normalizedRole) {
       case "admin": return "bg-purple-100 text-purple-800";
+      case "superadmin": return "bg-red-100 text-red-800";
       case "warehouse": return "bg-blue-100 text-blue-800";
       case "delivery": return "bg-green-100 text-green-800";
       case "customer": return "bg-gray-100 text-gray-800";
@@ -119,6 +122,7 @@ const UserManagement: React.FC = () => {
             onChange={(e) => setFilterRole(e.target.value)}
           >
             <option value="">All Roles</option>
+            <option value="superadmin">Super Admin</option>
             <option value="admin">Admin</option>
             <option value="warehouse">Warehouse Staff</option>
             <option value="delivery">Delivery Staff</option>
@@ -190,8 +194,8 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* User Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-        {["admin", "warehouse", "delivery", "customer"].map((role) => {
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6">
+        {["superadmin", "admin", "warehouse", "delivery", "customer"].map((role) => {
           const count = users.filter((u) => normalizeRole(u.role) === role).length;
           console.log(`Role ${role} count:`, count, users.filter((u) => normalizeRole(u.role) === role));
           
@@ -201,7 +205,9 @@ const UserManagement: React.FC = () => {
                 <div className="p-2 bg-gray-100 rounded-md">
                   <IconComponent
                     iconName={
-                      role === "admin"
+                      role === "superadmin"
+                        ? "Crown"
+                        : role === "admin"
                         ? "Shield"
                         : role === "warehouse"
                         ? "Package"
