@@ -346,8 +346,40 @@ const getTotalOrders = async (req, res, next) => {
     next(err);
   }
 }
+const getStats = async (req, res, next) => {  
+  try {
+    const [totalOrders] = await query(orderQueries.getTotalOrders);
+    const [totalRevenue] = await query(orderQueries.getTotalRevenue);
+    const [categoryWiseOrders] = await query(orderQueries.getCategoryWiseOrders);
+    const orderStatusCounts = await query(orderQueries.getOrderStatusCounts);
 
+    // Process order status counts to ensure all statuses are included
+    const statusOverview = {
+      Pending: 0,
+      Confirmed: 0,
+      Shipped: 0,
+      Delivered: 0,
+      Cancelled: 0
+    };
 
+    // Fill in the actual counts from database
+    orderStatusCounts.forEach(row => {
+      if (statusOverview.hasOwnProperty(row.status)) {
+        statusOverview[row.status] = row.count;
+      }
+    });
+
+    const stats = {
+      totalOrders: totalOrders?.totalOrders ?? 0,
+      totalRevenue: totalRevenue?.totalRevenue ?? 0,
+      categoryWiseOrders: categoryWiseOrders ?? [],
+      orderStatusOverview: statusOverview
+    };
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+}
 
 module.exports = {
   getOrders,
@@ -359,5 +391,6 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
-  getTotalOrders
+  getTotalOrders,
+  getStats
 };

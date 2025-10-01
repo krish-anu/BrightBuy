@@ -89,6 +89,15 @@ const getOrderDetailsByOrderId = `
 `;
 
 const getTotalOrders = `SELECT COUNT(*) AS totalOrders FROM orders`;
+
+const getOrderStatusCounts = `
+  SELECT 
+    status,
+    COUNT(*) AS count
+  FROM orders 
+  GROUP BY status
+`;
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -106,5 +115,6 @@ module.exports = {
   restockItems,
   getPaymentByOrderId,
   getOrderDetailsByOrderId,
-  getTotalOrders
+  getTotalOrders,
+  getOrderStatusCounts
 };
