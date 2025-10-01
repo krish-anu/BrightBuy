@@ -14,9 +14,12 @@ const getOrders = async (req, res, next) => {
   try {
     const rows = await query(orderQueries.getAllOrders);
     
-    // Transform the data to include customer object
-    const ordersWithCustomers = rows.map(row => {
+    // Transform the data to include customer object and fetch order items
+    const ordersWithCustomersAndItems = await Promise.all(rows.map(async (row) => {
       const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      
+      // Fetch order items for each order
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [orderData.id]);
       
       return {
         ...orderData,
@@ -25,11 +28,12 @@ const getOrders = async (req, res, next) => {
           name: customerName,
           email: customerEmail,
           phone: customerPhone
-        } : null
+        } : null,
+        items: orderItems
       };
-    });
+    }));
     
-    res.status(200).json({ success: true, data: ordersWithCustomers });
+    res.status(200).json({ success: true, data: ordersWithCustomersAndItems });
   } catch (err) { next(err); }
 };
 
@@ -215,24 +219,16 @@ const cancelOrder = async (req, res, next) => {
 // Get category-wise orders
 const getCategoryWiseOrders = async (req, res, next) => {
   try {
+    console.log("Fetching category wise orders...");
     const rows = await query(orderQueries.getCategoryWiseOrders);
+    console.log("Category wise orders raw result:", rows);
 
-    const categoryOrders = {};
-    let totalOrders = 0;
-    for (const row of rows) {
-      const parent = row.parentId;
-      const child = row.categoryId;
-      const count = parseInt(row.orderCount);
-      if (parent !== null) {
-        if (!categoryOrders[parent]) categoryOrders[parent] = { category: 'Parent', totalOrders: 0, subcategories: {} };
-        categoryOrders[parent].totalOrders += count;
-        categoryOrders[parent].subcategories[child] = { categoryName: row.categoryName, order: count };
-      }
-      totalOrders += count;
-    }
-
-    res.status(200).json({ success: true, data: { categoryOrders, totalOrders } });
-  } catch (err) { next(err); }
+    // Return the raw data directly - the frontend expects an array of category objects
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { 
+    console.error("Error in getCategoryWiseOrders:", err);
+    next(err); 
+  }
 };
 
 // Get total revenue
