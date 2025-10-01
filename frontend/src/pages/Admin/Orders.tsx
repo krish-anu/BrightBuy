@@ -239,21 +239,27 @@ const Orders: React.FC = () => {
             <option value="cancelled">Cancelled</option>
           </select>
           
-          <input
-            type="date"
-            placeholder="From Date"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-          />
+          <div className="relative">
+            <input
+              type="date"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              title="From Date"
+            />
+            <div className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">From</div>
+          </div>
           
-          <input
-            type="date"
-            placeholder="To Date"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-          />
+          <div className="relative">
+            <input
+              type="date"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              title="To Date"
+            />
+            <div className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">To</div>
+          </div>
           
           <select
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
