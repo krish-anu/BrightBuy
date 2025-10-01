@@ -40,6 +40,7 @@ interface ProductVariantFlattened extends ProductVariant {
 const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterStockStatus, setFilterStockStatus] = useState(''); // Add stock status filter
   const [products, setProducts] = useState<ProductVariantFlattened[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,14 +180,34 @@ const Inventory: React.FC = () => {
 
 
 
-  // Filter products by search and category
-  const filteredProducts = products.filter(p =>
-    (p.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.variantName.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (filterCategory === '' || p.categories.includes(filterCategory))
-  );
-
-const loadCategories = async () => {
+  // Filter products by search, category, and stock status
+  const filteredProducts = products.filter(p => {
+    const matchesSearch =
+      p.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.variantName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      filterCategory === '' || p.categories.includes(filterCategory);
+    
+    // Stock status filtering
+    let matchesStockStatus = true;
+    if (filterStockStatus) {
+      switch (filterStockStatus) {
+        case 'low-stock':
+          matchesStockStatus = p.stockQnt <= 10 && p.stockQnt > 0;
+          break;
+        case 'out-of-stock':
+          matchesStockStatus = p.stockQnt === 0;
+          break;
+        case 'in-stock':
+          matchesStockStatus = p.stockQnt > 10;
+          break;
+        default:
+          matchesStockStatus = true;
+      }
+    }
+    
+    return matchesSearch && matchesCategory && matchesStockStatus;
+  });const loadCategories = async () => {
   try {
     console.log('Fetching categories...');
     const categories = await getAllCategories();
@@ -300,45 +321,104 @@ const loadInventoryStats = async () => {
         <>
           {/* Search & Filter */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search products or variant..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <IconComponent iconName="Search" size={16} />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search products or variant..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <IconComponent iconName="Search" size={16} />
+                </div>
+              </div>
+
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                value={filterCategory}
+                onChange={e => setFilterCategory(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {categories && categories.length > 0 ? (
+                  categories.map(cat => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No categories available</option>
+                )}
+              </select>
+
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                value={filterStockStatus}
+                onChange={e => setFilterStockStatus(e.target.value)}
+              >
+                <option value="">All Stock Status</option>
+                <option value="in-stock">In Stock (&gt;10)</option>
+                <option value="low-stock">Low Stock (1-10)</option>
+                <option value="out-of-stock">Out of Stock (0)</option>
+              </select>
+
+              <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                <IconComponent iconName="Plus" size={16} />
+                <span className="ml-2">Add Product</span>
+              </button>
             </div>
-          </div>
-
-          <select
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {categories && categories.length > 0 ? (
-              categories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))
-            ) : (
-              <option disabled>No categories available</option>
+            
+            {/* Active Filters Display */}
+            {(searchTerm || filterCategory || filterStockStatus) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="text-sm text-gray-600">Active filters:</span>
+                {searchTerm && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Search: "{searchTerm}"
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filterCategory && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Category: {filterCategory}
+                    <button
+                      onClick={() => setFilterCategory('')}
+                      className="ml-1 text-green-600 hover:text-green-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filterStockStatus && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    Stock: {filterStockStatus === 'low-stock' ? 'Low Stock' : filterStockStatus === 'out-of-stock' ? 'Out of Stock' : 'In Stock'}
+                    <button
+                      onClick={() => setFilterStockStatus('')}
+                      className="ml-1 text-yellow-600 hover:text-yellow-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterCategory('');
+                    setFilterStockStatus('');
+                  }}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+                >
+                  Clear all
+                </button>
+              </div>
             )}
-          </select>
-
-          <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            <IconComponent iconName="Plus" size={16} />
-            <span className="ml-2">Add Product</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Products Table */}
+          </div>      {/* Products Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
