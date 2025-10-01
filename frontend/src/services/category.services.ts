@@ -2,7 +2,8 @@ import axiosInstance from "@/axiosConfig";
 
 export const getAllCategories = async () => {
   try {
-    const response = await axiosInstance.get("api/category");
+    const response = await axiosInstance.get("/api/category");
+    console.log('Category service response:', response);
     return response.data;
   } catch (error) {
     console.error("Error fetching categories:", error);

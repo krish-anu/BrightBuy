@@ -147,6 +147,82 @@ const getProductCount = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Get all products with pagination
+const getProductsPaginated = async (req, res, next) => {
+  try {
+    console.log('Pagination request received:', req.query);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    console.log(`Fetching products - page: ${page}, limit: ${limit}, offset: ${offset}`);
+
+    // Get paginated products
+    console.log('Executing paginated products query...');
+    const products = await query(productQueries.getAllProductsPaginated, [limit, offset]);
+    console.log(`Products fetched: ${products.length}`);
+    
+    // Get total count
+    console.log('Executing total count query...');
+    const countResult = await query(productQueries.getTotalProductsCount);
+    console.log('Count result:', countResult);
+    const totalCount = countResult[0]?.totalCount || 0;
+    
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    console.log('Pagination metadata:', {
+      currentPage: page,
+      totalPages,
+      totalCount,
+      hasNextPage,
+      hasPrevPage,
+      limit
+    });
+
+    res.status(200).json({
+      success: true,
+      data: products,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage,
+        limit
+      }
+    });
+  } catch (err) {
+    console.error('Error in getProductsPaginated:', err);
+    next(err);
+  }
+};
+
+// Get inventory statistics (not affected by pagination)
+const getInventoryStats = async (req, res, next) => {
+  try {
+    console.log('Fetching inventory statistics...');
+    const [stats] = await query(productQueries.getInventoryStats);
+    console.log('Inventory stats result:', stats);
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        totalProducts: stats.totalProducts || 0,
+        totalVariants: stats.totalVariants || 0,
+        lowStockItems: stats.lowStockItems || 0,
+        outOfStockItems: stats.outOfStockItems || 0,
+        totalInventoryValue: parseFloat(stats.totalInventoryValue) || 0
+      }
+    });
+  } catch (err) {
+    console.error('Error in getInventoryStats:', err);
+    next(err);
+  }
+};
+
 // Get popular products
 const getPopularProduct = async (req, res, next) => {
   try {
@@ -158,6 +234,8 @@ const getPopularProduct = async (req, res, next) => {
 
 module.exports = {
   getProducts,
+  getProductsPaginated,
+  getInventoryStats,
   getProduct,
   addProduct,
   updateProduct,
