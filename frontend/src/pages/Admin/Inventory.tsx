@@ -48,7 +48,7 @@ const Inventory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Make mutable
   const [inventoryStats, setInventoryStats] = useState({
     totalProducts: 0,
     totalVariants: 0,
@@ -270,6 +270,12 @@ const loadInventoryStats = async () => {
     }
   };
 
+  // Handle items per page change
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
   // Stock status helper
   const getStockStatus = (stock: number) => {
     if (stock === 0) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
@@ -295,7 +301,7 @@ const loadInventoryStats = async () => {
     };
     
     fetchData();
-  }, [currentPage]); // Add currentPage as dependency
+  }, [currentPage, itemsPerPage]); // Add itemsPerPage as dependency
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -321,7 +327,7 @@ const loadInventoryStats = async () => {
         <>
           {/* Search & Filter */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="relative">
                 <input
                   type="text"
@@ -361,6 +367,18 @@ const loadInventoryStats = async () => {
                 <option value="in-stock">In Stock (&gt;10)</option>
                 <option value="low-stock">Low Stock (1-10)</option>
                 <option value="out-of-stock">Out of Stock (0)</option>
+              </select>
+
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                value={itemsPerPage}
+                onChange={e => handleItemsPerPageChange(Number(e.target.value))}
+              >
+                <option value={5}>5 per page</option>
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
               </select>
 
               <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
