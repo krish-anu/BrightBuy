@@ -1,7 +1,19 @@
 // Orders Queries
-const getAllOrders = `SELECT * FROM orders ORDER BY orderDate DESC`;
+const getAllOrders = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  LEFT JOIN users u ON o.userId = u.id
+  ORDER BY o.orderDate DESC
+`;
 
-const getOrderById = `SELECT * FROM orders WHERE id = ?`;
+const getOrderById = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  LEFT JOIN users u ON o.userId = u.id
+  WHERE o.id = ?
+`;
 
 const getOrderItemsByOrderId = `
   SELECT oi.*, pv.id AS variantId, pv.SKU, pv.variantName, pv.price, pv.stockQnt,

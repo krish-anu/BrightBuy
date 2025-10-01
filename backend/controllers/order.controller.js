@@ -13,7 +13,23 @@ const stripe = require('stripe')(STRIPE_SECRET_KEY);
 const getOrders = async (req, res, next) => {
   try {
     const rows = await query(orderQueries.getAllOrders);
-    res.status(200).json({ success: true, data: rows });
+    
+    // Transform the data to include customer object
+    const ordersWithCustomers = rows.map(row => {
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      
+      return {
+        ...orderData,
+        customer: customerId ? {
+          id: customerId,
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone
+        } : null
+      };
+    });
+    
+    res.status(200).json({ success: true, data: ordersWithCustomers });
   } catch (err) { next(err); }
 };
 
@@ -24,8 +40,23 @@ const getOrder = async (req, res, next) => {
     if (!orders.length) throw new ApiError('Order not found', 404);
     if (req.user.role === 'Customer' && orders[0].userId !== req.user.id)
       throw new ApiError('Forbidden access', 403)
+    
     const orderItems = await query(orderQueries.getOrderItemsByOrderId, [req.params.id]);
-    res.status(200).json({ success: true, data: { ...orders[0], items: orderItems } });
+    
+    // Transform the order data to include customer object
+    const { customerId, customerName, customerEmail, customerPhone, ...orderData } = orders[0];
+    const orderWithCustomer = {
+      ...orderData,
+      customer: customerId ? {
+        id: customerId,
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone
+      } : null,
+      items: orderItems
+    };
+    
+    res.status(200).json({ success: true, data: orderWithCustomer });
   } catch (err) { next(err); }
 };
 

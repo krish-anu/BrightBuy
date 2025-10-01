@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { orders } from '../../../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { getAllOrders } from '../../services/order.services';
+import type { Order } from '../../services/order.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
@@ -14,16 +15,111 @@ const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) =>
 };
 
 const Orders: React.FC = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Enhanced filtering and sorting
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortBy, setSortBy] = useState<'date' | 'total' | 'status'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Load orders from API
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const ordersData = await getAllOrders();
+      setOrders(ordersData);
+    } catch (err) {
+      console.error('Error loading orders:', err);
+      setError('Failed to load orders. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load orders on component mount
+  useEffect(() => {
+    loadOrders();
+  }, []);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === '' || order.status === filterStatus;
-    return matchesSearch && matchesStatus;
+      order.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customer?.name || 'Unknown Customer').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === '' || order.status.toLowerCase() === filterStatus.toLowerCase();
+    
+    // Date filtering
+    const orderDate = new Date(order.orderDate || order.createdAt);
+    const matchesDateFrom = !dateFrom || orderDate >= new Date(dateFrom);
+    const matchesDateTo = !dateTo || orderDate <= new Date(dateTo);
+    
+    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+  }).sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (sortBy) {
+      case 'date':
+        aValue = new Date(a.orderDate || a.createdAt).getTime();
+        bValue = new Date(b.orderDate || b.createdAt).getTime();
+        break;
+      case 'total':
+        aValue = a.totalPrice;
+        bValue = b.totalPrice;
+        break;
+      case 'status':
+        aValue = a.status;
+        bValue = b.status;
+        break;
+      default:
+        aValue = new Date(a.orderDate || a.createdAt).getTime();
+        bValue = new Date(b.orderDate || b.createdAt).getTime();
+    }
+    
+    if (sortOrder === 'asc') {
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    } else {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
   });
+
+  // Pagination calculations
+  const totalCount = filteredOrders.length;
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, dateFrom, dateTo, sortBy, sortOrder]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -49,11 +145,73 @@ const Orders: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
         <p className="text-gray-600 mt-2">Track and manage customer orders</p>
+        
+        {/* Order Statistics */}
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <IconComponent iconName="Package" size={20} />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Orders</p>
+                  <p className="text-2xl font-semibold text-gray-900">{orders.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <IconComponent iconName="CheckCircle" size={20} />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Delivered</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {orders.filter(o => o.status.toLowerCase() === 'delivered').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <IconComponent iconName="Clock" size={20} />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Pending</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {orders.filter(o => ['pending', 'confirmed', 'processing'].includes(o.status.toLowerCase())).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <IconComponent iconName="DollarSign" size={20} />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    ${orders.length > 0 
+                      ? orders.reduce((sum, order) => {
+                          const price = Number(order.totalPrice) || 0;
+                          return sum + price;
+                        }, 0).toFixed(2)
+                      : '0.00'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Search & Filter */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="relative">
             <input
               type="text"
@@ -66,6 +224,7 @@ const Orders: React.FC = () => {
               <IconComponent iconName="Search" size={16} />
             </div>
           </div>
+          
           <select
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             value={filterStatus}
@@ -73,56 +232,310 @@ const Orders: React.FC = () => {
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
             <option value="processing">Processing</option>
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            <IconComponent iconName="Download" size={16} />
-            <span className="ml-2">Export Orders</span>
-          </button>
+          
+          <input
+            type="date"
+            placeholder="From Date"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+          />
+          
+          <input
+            type="date"
+            placeholder="To Date"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+          />
+          
+          <select
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            value={`${sortBy}-${sortOrder}`}
+            onChange={e => {
+              const [newSortBy, newSortOrder] = e.target.value.split('-') as ['date' | 'total' | 'status', 'asc' | 'desc'];
+              setSortBy(newSortBy);
+              setSortOrder(newSortOrder);
+            }}
+          >
+            <option value="date-desc">Newest First</option>
+            <option value="date-asc">Oldest First</option>
+            <option value="total-desc">Highest Amount</option>
+            <option value="total-asc">Lowest Amount</option>
+            <option value="status-asc">Status A-Z</option>
+            <option value="status-desc">Status Z-A</option>
+          </select>
+          
+          <select
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            value={itemsPerPage}
+            onChange={e => handleItemsPerPageChange(Number(e.target.value))}
+          >
+            <option value={5}>5 per page</option>
+            <option value={10}>10 per page</option>
+            <option value={25}>25 per page</option>
+            <option value={50}>50 per page</option>
+            <option value={100}>100 per page</option>
+          </select>
         </div>
+        
+        {/* Active Filters Display */}
+        {(searchTerm || filterStatus || dateFrom || dateTo) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="text-sm text-gray-600 mr-2">Active filters:</span>
+            {searchTerm && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Search: {searchTerm}
+                <button
+                  type="button"
+                  className="ml-1 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-600 hover:bg-blue-200"
+                  onClick={() => setSearchTerm('')}
+                >
+                  <IconComponent iconName="X" size={12} />
+                </button>
+              </span>
+            )}
+            {filterStatus && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Status: {filterStatus}
+                <button
+                  type="button"
+                  className="ml-1 h-4 w-4 rounded-full inline-flex items-center justify-center text-green-600 hover:bg-green-200"
+                  onClick={() => setFilterStatus('')}
+                >
+                  <IconComponent iconName="X" size={12} />
+                </button>
+              </span>
+            )}
+            {dateFrom && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                From: {dateFrom}
+                <button
+                  type="button"
+                  className="ml-1 h-4 w-4 rounded-full inline-flex items-center justify-center text-purple-600 hover:bg-purple-200"
+                  onClick={() => setDateFrom('')}
+                >
+                  <IconComponent iconName="X" size={12} />
+                </button>
+              </span>
+            )}
+            {dateTo && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                To: {dateTo}
+                <button
+                  type="button"
+                  className="ml-1 h-4 w-4 rounded-full inline-flex items-center justify-center text-orange-600 hover:bg-orange-200"
+                  onClick={() => setDateTo('')}
+                >
+                  <IconComponent iconName="X" size={12} />
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+              onClick={() => {
+                setSearchTerm('');
+                setFilterStatus('');
+                setDateFrom('');
+                setDateTo('');
+              }}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th>Order ID</th>
-                <th>Customer</th>
-                <th>Items</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders.map(order => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td>{order.id}</td>
-                  <td>{order.customer.name}</td>
-                  <td>{order.items.length} item{order.items.length > 1 ? 's' : ''}</td>
-                  <td>${order.total.toFixed(2)}</td>
-                  <td>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
-                  </td>
-                  <td>{formatDate(order.orderDate)}</td>
-                  <td className="flex space-x-2">
-                    <button title="View Details"><IconComponent iconName="Eye" size={16} /></button>
-                    <button title="Update Status"><IconComponent iconName="Edit" size={16} /></button>
-                    <button title="Assign Delivery"><IconComponent iconName="Truck" size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
+              <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+              <span className="ml-2 text-gray-600">Loading orders...</span>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <IconComponent iconName="AlertCircle" size={48} />
+              <p className="text-red-600 mt-2">{error}</p>
+              <button 
+                onClick={loadOrders}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <IconComponent iconName="Package" size={48} />
+              <p className="text-gray-600 mt-2">No orders found</p>
+              {searchTerm || filterStatus ? (
+                <p className="text-sm text-gray-500 mt-1">Try adjusting your search or filter criteria</p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">Orders will appear here once customers place them</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedOrders.map(order => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{order.customer?.name || 'Unknown Customer'}</div>
+                      <div className="text-sm text-gray-500">{order.customer?.email || 'No email'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${(Number(order.totalPrice) || 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status.toLowerCase())}`}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(order.orderDate || order.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button 
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
+                          onClick={() => console.log('View order:', order.id)}
+                        >
+                          <IconComponent iconName="Eye" size={16} />
+                        </button>
+                        <button 
+                          className="text-green-600 hover:text-green-900"
+                          title="Update Status"
+                          onClick={() => console.log('Update status:', order.id)}
+                        >
+                          <IconComponent iconName="Edit" size={16} />
+                        </button>
+                        <button 
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Assign Delivery"
+                          onClick={() => console.log('Assign delivery:', order.id)}
+                        >
+                          <IconComponent iconName="Truck" size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                    <span className="font-medium">{Math.min(endIndex, totalCount)}</span> of{' '}
+                    <span className="font-medium">{totalCount}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Previous</span>
+                      <IconComponent iconName="ChevronLeft" size={16} />
+                    </button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber;
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => setCurrentPage(pageNumber)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            pageNumber === currentPage
+                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    })}
+                    
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Next</span>
+                      <IconComponent iconName="ChevronRight" size={16} />
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
