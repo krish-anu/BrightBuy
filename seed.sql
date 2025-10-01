@@ -441,13 +441,6 @@ INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imag
 (69, 'Acer Swift 3 OLED 256GB', 'ACER-LAP-069', 150, 799.99, NULL),
 (70, 'LG Gram 17 2025 512GB', 'LG-LAP-070', 90, 1399.99, NULL);
 
--- Additional Audio Devices (Products 71-80)
--- Removed duplicate Audio Devices products (already inserted above)
--- No code needed here; duplicates have been omitted.
-
--- The code for product_variants (IDs 71-80) is already present above and matches the products inserted for Audio Devices.
--- No need to re-insert; this block is a duplicate and should be deleted.
-
 -- Additional Cameras & Photography (Products 81-90)
 INSERT INTO products (name, description, brand) VALUES
 ('Canon PowerShot G7 X Mark IV', 'Compact camera for vloggers.', 'Canon'),
@@ -508,7 +501,6 @@ INSERT INTO product_categories (productId, categoryId) VALUES
 (61, 2), (62, 2), (63, 2), (64, 2), (65, 2), (66, 2), (67, 2), (68, 2), (69, 2), (70, 2),
 -- Audio Devices
 (21, 3), (22, 3), (23, 3), (24, 3), (25, 3), (26, 3), (27, 3), (28, 3), (29, 3), (30, 3),
-(71, 3), (72, 3), (73, 3), (74, 3), (75, 3), (76, 3), (77, 3), (78, 3), (79, 3), (80, 3),
 -- Cameras & Photography
 (31, 4), (32, 4), (33, 4), (34, 4), (35, 4), (36, 4), (37, 4), (38, 4), (39, 4), (40, 4),
 (81, 4), (82, 4), (83, 4), (84, 4), (85, 4), (86, 4), (87, 4), (88, 4), (89, 4), (90, 4),
