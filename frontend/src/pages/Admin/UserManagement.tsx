@@ -18,21 +18,23 @@ const IconComponent: React.FC<IconComponentProps> = ({
 
 // Normalize roles for filtering and display
 const normalizeRole = (role: string) => {
-  switch (role) {
+  const lowerRole = role.toLowerCase();
+  switch (lowerRole) {
     case "admin": return "admin";
-    case "warehouseStaff": return "warehouse";
-    case "deliveryStaff": return "delivery";
+    case "warehousestaff": return "warehouse";
+    case "deliverystaff": return "delivery";
     case "customer": return "customer";
-    default: return role;
+    default: return lowerRole;
   }
 };
 
 // Display friendly role names
 const displayRole = (role: string) => {
-  switch (role) {
+  const lowerRole = role.toLowerCase();
+  switch (lowerRole) {
     case "admin": return "Admin";
-    case "warehouseStaff": return "Warehouse Staff";
-    case "deliveryStaff": return "Delivery Staff";
+    case "warehousestaff": return "Warehouse Staff";
+    case "deliverystaff": return "Delivery Staff";
     case "customer": return "Customer";
     default: return role;
   }
@@ -46,8 +48,11 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       const res = await getAllUsers();
-      if (res?.data) setUsers(res.data);
-      console.log("Fetched users:", res?.data);
+      if (res?.data) {
+        setUsers(res.data);
+        console.log("Fetched users:", res?.data);
+        console.log("User roles:", res?.data.map((u: any) => ({ id: u.id, role: u.role, normalized: normalizeRole(u.role) })));
+      }
     } catch (error) {
       console.error("Error fetching users:", error);
     }
@@ -67,7 +72,8 @@ const UserManagement: React.FC = () => {
   });
 
   const getRoleColor = (role: string) => {
-    switch (normalizeRole(role)) {
+    const normalizedRole = normalizeRole(role);
+    switch (normalizedRole) {
       case "admin": return "bg-purple-100 text-purple-800";
       case "warehouse": return "bg-blue-100 text-blue-800";
       case "delivery": return "bg-green-100 text-green-800";
@@ -185,32 +191,37 @@ const UserManagement: React.FC = () => {
 
       {/* User Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-        {["admin", "warehouse", "delivery", "customer"].map((role) => (
-          <div key={role} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-gray-100 rounded-md">
-                <IconComponent
-                  iconName={
-                    role === "admin"
-                      ? "Shield"
-                      : role === "warehouse"
-                      ? "Package"
-                      : role === "delivery"
-                      ? "Truck"
-                      : "Users"
-                  }
-                  size={24}
-                />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {users.filter((u) => normalizeRole(u.role) === role).length}
+        {["admin", "warehouse", "delivery", "customer"].map((role) => {
+          const count = users.filter((u) => normalizeRole(u.role) === role).length;
+          console.log(`Role ${role} count:`, count, users.filter((u) => normalizeRole(u.role) === role));
+          
+          return (
+            <div key={role} className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-gray-100 rounded-md">
+                  <IconComponent
+                    iconName={
+                      role === "admin"
+                        ? "Shield"
+                        : role === "warehouse"
+                        ? "Package"
+                        : role === "delivery"
+                        ? "Truck"
+                        : "Users"
+                    }
+                    size={24}
+                  />
                 </div>
-                <div className="text-sm text-gray-500">{displayRole(role)}</div>
+                <div className="ml-4">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {count}
+                  </div>
+                  <div className="text-sm text-gray-500">{displayRole(role)}</div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
