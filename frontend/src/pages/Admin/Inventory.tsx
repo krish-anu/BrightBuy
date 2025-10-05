@@ -214,12 +214,13 @@ const Inventory: React.FC = () => {
     console.log('Categories API response:', categories);
     
     if (categories && categories.success && Array.isArray(categories.data)) {
-      const categoryNames = categories.data.map((cat: { id: number; name: string }) => cat.name || 'Unknown Category');
+      // Backend returns categoryId and categoryName, not id and name
+      const categoryNames = categories.data.map((cat: { categoryId: number; categoryName: string }) => cat.categoryName || 'Unknown Category');
       console.log('Category names:', categoryNames);
       setCategories(categoryNames);
     } else if (categories && Array.isArray(categories.data)) {
       // Handle case where success field might not exist but data is valid
-      const categoryNames = categories.data.map((cat: { id: number; name: string }) => cat.name || 'Unknown Category');
+      const categoryNames = categories.data.map((cat: { categoryId: number; categoryName: string }) => cat.categoryName || 'Unknown Category');
       console.log('Category names (no success field):', categoryNames);
       setCategories(categoryNames);
     } else {
