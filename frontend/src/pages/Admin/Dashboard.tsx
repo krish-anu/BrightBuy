@@ -75,41 +75,41 @@ const IconComponent: React.FC<IconComponentProps> = ({
   );
 };
 
-// --- Stats Card ---
-interface StatsCardProps {
-  title: string;
-  value: string | number;
-  icon: keyof typeof LucideIcons;
-  color: string;
-  change?: string;
+// --- Combined Stats Box ---
+interface CombinedStatsBoxProps {
+  totalRevenue: number;
+  totalOrders: number;
+  lowStockItems: number;
 }
 
-const StatsCard: React.FC<StatsCardProps> = ({
-  title,
-  value,
-  icon,
-  color,
-  change,
+const CombinedStatsBox: React.FC<CombinedStatsBoxProps> = ({
+  totalRevenue,
+  totalOrders,
+  lowStockItems,
 }) => (
-  <div
-    className="bg-white rounded-lg shadow-md p-6 border-l-4"
-    style={{ borderLeftColor: color }}
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        {change && (
-          <p className="text-sm text-green-600 mt-1">
-            +{change}% from last month
-          </p>
-        )}
+  <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+    <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Overview</h3>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="text-center p-4 bg-green-50 rounded-lg">
+        <div className="flex justify-center mb-2">
+          <IconComponent iconName="DollarSign" size={24} color="#10B981" />
+        </div>
+        <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+        <p className="text-xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
       </div>
-      <div
-        className="p-3 rounded-full"
-        style={{ backgroundColor: `${color}20` }}
-      >
-        <IconComponent iconName={icon} size={24} />
+      <div className="text-center p-4 bg-blue-50 rounded-lg">
+        <div className="flex justify-center mb-2">
+          <IconComponent iconName="ShoppingCart" size={24} color="#3B82F6" />
+        </div>
+        <p className="text-sm font-medium text-gray-600">Total Orders</p>
+        <p className="text-xl font-bold text-blue-600">{totalOrders}</p>
+      </div>
+      <div className="text-center p-4 bg-yellow-50 rounded-lg">
+        <div className="flex justify-center mb-2">
+          <IconComponent iconName="AlertTriangle" size={24} color="#F59E0B" />
+        </div>
+        <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
+        <p className="text-xl font-bold text-yellow-600">{lowStockItems}</p>
       </div>
     </div>
   </div>
@@ -258,11 +258,54 @@ const Dashboard: React.FC = () => {
         <p className="text-gray-600 mt-2">Welcome to BrightBuy Admin Dashboard</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatsCard title="Total Revenue" value={`$${totRevenue.toFixed(2)}`} icon="DollarSign" color="#10B981" />
-        <StatsCard title="Total Orders" value={totOrder} icon="ShoppingCart" color="#3B82F6" />
-        <StatsCard title="Low Stock Items" value={totLowStock} icon="AlertTriangle" color="#F59E0B" />
+      {/* Combined Stats Box */}
+      <div className="mb-8">
+        <CombinedStatsBox 
+          totalRevenue={totRevenue} 
+          totalOrders={totOrder} 
+          lowStockItems={totLowStock} 
+        />
+      </div>
+
+      {/* Additional Business Metrics */}
+      <div className="mb-8">
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Analytics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-indigo-50 rounded-lg">
+              <div className="flex justify-center mb-2">
+                <IconComponent iconName="TrendingUp" size={24} color="#6366F1" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
+              <p className="text-xl font-bold text-indigo-600">
+                ${totOrder > 0 ? (totRevenue / totOrder).toFixed(2) : '0.00'}
+              </p>
+            </div>
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="flex justify-center mb-2">
+                <IconComponent iconName="Package" size={24} color="#8B5CF6" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">Total Products</p>
+              <p className="text-xl font-bold text-purple-600">{categoryData.reduce((sum, cat) => sum + cat.value, 0)}</p>
+            </div>
+            <div className="text-center p-4 bg-pink-50 rounded-lg">
+              <div className="flex justify-center mb-2">
+                <IconComponent iconName="Users" size={24} color="#EC4899" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">Active Categories</p>
+              <p className="text-xl font-bold text-pink-600">{categoryData.length}</p>
+            </div>
+            <div className="text-center p-4 bg-orange-50 rounded-lg">
+              <div className="flex justify-center mb-2">
+                <IconComponent iconName="Calendar" size={24} color="#F97316" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">Orders This Month</p>
+              <p className="text-xl font-bold text-orange-600">
+                {salesOverTime.length > 0 ? salesOverTime[salesOverTime.length - 1]?.sales || 0 : 0}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Charts Row */}
