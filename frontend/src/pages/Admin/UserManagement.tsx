@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import * as LucideIcons from "lucide-react";
 import type { LucideProps } from "lucide-react";
-import { getAllUsers } from "../../services/user.services";
+import { getAllUsers, updateUser, deleteUser } from "../../services/user.services";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -15,6 +15,17 @@ const IconComponent: React.FC<IconComponentProps> = ({
   const Icon = LucideIcons[iconName] as React.ComponentType<LucideProps>;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+  address?: any;
+  cityId?: number;
+  createdAt: string;
+}
 
 // Normalize roles for filtering and display
 const normalizeRole = (role: string) => {
@@ -45,7 +56,26 @@ const displayRole = (role: string) => {
 const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  
+  // Modal states
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Edit form states
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    role: "",
+    phone: "",
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    postalCode: "",
+  });
 
   const fetchUsers = async () => {
     try {
@@ -57,6 +87,132 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching users:", error);
+    }
+  };
+
+  // Modal handlers
+  const handleViewUser = (user: User) => {
+    setSelectedUser(user);
+    setViewModalOpen(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    
+    // Parse address JSON into separate fields
+    let addressLine1 = "", addressLine2 = "", city = "", postalCode = "";
+    
+    if (user.address) {
+      try {
+        const addressObj = typeof user.address === 'string' ? JSON.parse(user.address) : user.address;
+        addressLine1 = addressObj.line1 || addressObj.street || "";
+        addressLine2 = addressObj.line2 || "";
+        city = addressObj.city || "";
+        postalCode = addressObj.postalCode || addressObj.postal_code || "";
+      } catch {
+        // If address is not valid JSON, treat as line1
+        addressLine1 = typeof user.address === 'string' ? user.address : "";
+      }
+    }
+    
+    setEditForm({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone || "",
+      addressLine1,
+      addressLine2,
+      city,
+      postalCode,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setDeleteModalOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!selectedUser) return;
+    
+    // Basic validation
+    if (!editForm.name.trim() || !editForm.email.trim()) {
+      alert("Name and email are required!");
+      return;
+    }
+    
+    setIsUpdating(true);
+    
+    try {
+      // Combine address fields into JSON object
+      let addressData = null;
+      if (editForm.addressLine1.trim() || editForm.city.trim()) {
+        addressData = {
+          line1: editForm.addressLine1.trim() || null,
+          line2: editForm.addressLine2.trim() || null,
+          city: editForm.city.trim() || null,
+          postalCode: editForm.postalCode.trim() || null
+        };
+        
+        // Remove null values to keep JSON clean
+        addressData = Object.fromEntries(
+          Object.entries(addressData).filter(([_, value]) => value !== null)
+        );
+        
+        // If no valid address data, set to null
+        if (Object.keys(addressData).length === 0) {
+          addressData = null;
+        }
+      }
+      
+      const updateData = {
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role,
+        phone: editForm.phone || undefined,
+        address: addressData
+      };
+      
+      console.log("Updating user:", selectedUser.id, updateData);
+      const response = await updateUser(selectedUser.id, updateData);
+      console.log("Update response:", response);
+      
+      // Update local state
+      setUsers(users.map(user => 
+        user.id === selectedUser.id 
+          ? { ...user, ...updateData }
+          : user
+      ));
+      
+      setEditModalOpen(false);
+      setSelectedUser(null);
+      
+      // Refresh users to get latest data
+      fetchUsers();
+      
+      alert("User updated successfully!");
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      alert("Failed to update user: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      await deleteUser(selectedUser.id);
+      
+      // Update local state
+      setUsers(users.filter(user => user.id !== selectedUser.id));
+      
+      setDeleteModalOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error("Error deleting user:", error);
     }
   };
 
@@ -195,19 +351,22 @@ const UserManagement: React.FC = () => {
                     <div className="flex justify-center space-x-3">
                       <button 
                         className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 p-1 rounded transition-colors duration-200" 
+                        title="View User Details"
+                        onClick={() => handleViewUser(user)}
+                      >
+                        <IconComponent iconName="Eye" size={16} />
+                      </button>
+                      <button 
+                        className="text-green-600 hover:text-green-900 hover:bg-green-50 p-1 rounded transition-colors duration-200" 
                         title="Edit User"
+                        onClick={() => handleEditUser(user)}
                       >
                         <IconComponent iconName="Edit" size={16} />
                       </button>
                       <button 
-                        className="text-green-600 hover:text-green-900 hover:bg-green-50 p-1 rounded transition-colors duration-200" 
-                        title="Reset Password"
-                      >
-                        <IconComponent iconName="Key" size={16} />
-                      </button>
-                      <button 
                         className="text-red-600 hover:text-red-900 hover:bg-red-50 p-1 rounded transition-colors duration-200" 
-                        title="Deactivate"
+                        title="Delete User"
+                        onClick={() => handleDeleteUser(user)}
                       >
                         <IconComponent iconName="UserX" size={16} />
                       </button>
@@ -256,6 +415,212 @@ const UserManagement: React.FC = () => {
           );
         })}
       </div>
+
+      {/* View User Modal */}
+      {viewModalOpen && selectedUser && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">User Details</h3>
+                <button
+                  onClick={() => setViewModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <IconComponent iconName="X" size={20} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedUser.name}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <p className="mt-1 text-sm text-gray-900">{displayRole(selectedUser.role)}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedUser.phone || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Address</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedUser.address ? JSON.stringify(selectedUser.address) : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">City ID</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedUser.cityId || "N/A"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editModalOpen && selectedUser && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Edit User</h3>
+                <button
+                  onClick={() => setEditModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <IconComponent iconName="X" size={20} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Customer">Customer</option>
+                    <option value="Admin">Admin</option>
+                    <option value="SuperAdmin">Super Admin</option>
+                    <option value="WarehouseStaff">Warehouse Staff</option>
+                    <option value="DeliveryStaff">Delivery Staff</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Address Line 1</label>
+                  <input
+                    type="text"
+                    value={editForm.addressLine1}
+                    onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Street address, building number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Address Line 2</label>
+                  <input
+                    type="text"
+                    value={editForm.addressLine2}
+                    onChange={(e) => setEditForm({ ...editForm, addressLine2: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Apartment, suite, unit (optional)"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">City</label>
+                    <input
+                      type="text"
+                      value={editForm.city}
+                      onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Postal Code</label>
+                    <input
+                      type="text"
+                      value={editForm.postalCode}
+                      onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Postal/ZIP code"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateUser}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && selectedUser && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Delete User</h3>
+                <button
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <IconComponent iconName="X" size={20} />
+                </button>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to delete the user <strong>{selectedUser.name}</strong>?
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  This action cannot be undone. The user's orders will be preserved.
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Delete User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
