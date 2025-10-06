@@ -41,12 +41,12 @@ type OrderStatusOverview = {
   Cancelled: number;
 };
 
-type StatsData = {
-  totalOrders: number;
-  totalRevenue: string;
-  categoryWiseOrders: any;
-  orderStatusOverview: OrderStatusOverview;
-};
+// type StatsData = {
+//   totalOrders: number;
+//   totalRevenue: string;
+//   categoryWiseOrders: any;
+//   orderStatusOverview: OrderStatusOverview;
+// };
 
 type MonthlySalesChart = {
   month: string;
