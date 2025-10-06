@@ -130,6 +130,8 @@ const Dashboard: React.FC = () => {
     Delivered: 0,
     Cancelled: 0,
   });
+  const [selectedYear, setSelectedYear] = React.useState<string>("all");
+  const [availableYears, setAvailableYears] = React.useState<string[]>([]);
 
   useEffect(() => {
     // Fetch total revenue
@@ -164,38 +166,6 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchLowStock();
-
-    // Fetch monthly sales
-    const fetchSales = async () => {
-      try {
-        const data = await getMonthlySales();
-        const monthNames = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        const formatted = data.map((item: any) => {
-          const [, month] = item.month.split("-");
-          return {
-            month: monthNames[parseInt(month) - 1],
-            sales: Number(item.totalSales),
-          };
-        });
-        setSalesOverTime(formatted);
-      } catch (err) {
-        console.error("Error fetching monthly sales:", err);
-      }
-    };
-    fetchSales();
 
     // Fetch product categories
     const fetchCategories = async () => {
@@ -242,6 +212,94 @@ const Dashboard: React.FC = () => {
     };
     fetchOrderStats();
   }, []);
+
+  // Separate useEffect for sales data that depends on selectedYear
+  React.useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const data = await getMonthlySales();
+        console.log("Raw monthly sales data:", data); // Debug log
+        
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        
+        if (data.length === 0) {
+          setSalesOverTime([]);
+          return;
+        }
+        
+        // Extract available years from the data
+        const years = [...new Set(data.map((item: any) => item.month.split("-")[0]))].sort();
+        setAvailableYears(years);
+        
+        // Filter data by selected year
+        const filteredData = selectedYear === "all" 
+          ? data 
+          : data.filter((item: any) => item.month.startsWith(selectedYear));
+        
+        if (selectedYear === "all") {
+          // Group sales by month name (ignoring year) and combine totals
+          const monthlyTotals = new Map();
+          
+          filteredData.forEach((item: any) => {
+            const [, month] = item.month.split("-");
+            const monthName = monthNames[parseInt(month) - 1];
+            const sales = Number(item.totalSales);
+            
+            if (monthlyTotals.has(monthName)) {
+              // Add to existing month total
+              monthlyTotals.set(monthName, monthlyTotals.get(monthName) + sales);
+            } else {
+              // Create new month entry
+              monthlyTotals.set(monthName, sales);
+            }
+          });
+          
+          // Convert to array format and maintain month order
+          const formattedData = monthNames
+            .filter(monthName => monthlyTotals.has(monthName))
+            .map(monthName => ({
+              month: monthName,
+              sales: monthlyTotals.get(monthName),
+            }));
+          
+          setSalesOverTime(formattedData);
+        } else {
+          // Show specific year data with month-year format
+          const formattedData = filteredData.map((item: any) => {
+            const [year, month] = item.month.split("-");
+            const monthName = monthNames[parseInt(month) - 1];
+            return {
+              month: `${monthName} ${year.slice(-2)}`,
+              sales: Number(item.totalSales),
+              fullDate: item.month,
+            };
+          }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+          
+          setSalesOverTime(formattedData);
+        }
+        
+        console.log("Processed monthly data:", selectedYear === "all" ? "Combined years" : `Year ${selectedYear}`); // Debug log
+        
+      } catch (err) {
+        console.error("Error fetching monthly sales:", err);
+      }
+    };
+    
+    fetchSales();
+  }, [selectedYear]);
 
   const orderStatusConfig = [
     { key: "Pending", label: "Pending", bg: "bg-orange-50", text: "text-orange-600", subText: "text-orange-700" },
@@ -311,7 +369,19 @@ const Dashboard: React.FC = () => {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Over Time</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Sales Over Time</h3>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={salesOverTime}>
               <CartesianGrid strokeDasharray="3 3" />
