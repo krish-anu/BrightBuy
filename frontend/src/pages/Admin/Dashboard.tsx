@@ -214,7 +214,10 @@ const Dashboard: React.FC = () => {
           "#ff6666",
           "#888888",
         ];
-        const formatted = categories.map((cat: CategoryProducts, idx: number) => ({
+        // Filter out categories with zero products before formatting
+        const categoriesWithProducts = categories.filter((cat: CategoryProducts) => cat.productCount > 0);
+        
+        const formatted = categoriesWithProducts.map((cat: CategoryProducts, idx: number) => ({
           name: cat.categoryName,
           value: cat.productCount,
           color: colors[idx % colors.length],
