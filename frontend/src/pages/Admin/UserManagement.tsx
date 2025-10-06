@@ -102,7 +102,7 @@ const UserManagement: React.FC = () => {
 
       {/* Search & Filter */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <input
               type="text"
@@ -128,11 +128,6 @@ const UserManagement: React.FC = () => {
             <option value="delivery">Delivery Staff</option>
             <option value="customer">Customer</option>
           </select>
-
-          <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            <IconComponent iconName="UserPlus" size={16} />
-            <span className="ml-2">Add User</span>
-          </button>
         </div>
       </div>
 
