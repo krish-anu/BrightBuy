@@ -543,3 +543,221 @@ UPDATE product_categories SET categoryId = 4 WHERE productId IN (81, 82, 83, 84,
 -- Now properly categorize products for missing categories
 -- Add some actual wearable devices, power/charging devices, security devices, and toys
 -- We'll need to change some product names/descriptions or add new categorizations based on what makes sense
+
+-- Insert Cities data
+INSERT INTO cities (name, isMainCategory) VALUES
+('New York', TRUE),
+('Los Angeles', TRUE),
+('Chicago', TRUE),
+('Houston', TRUE),
+('Philadelphia', TRUE),
+('Phoenix', TRUE),
+('San Antonio', TRUE),
+('San Diego', TRUE),
+('Dallas', TRUE),
+('San Jose', TRUE);
+
+-- Insert Users data (including customers and one admin)
+INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
+('admin@brightbuy.com', 'admin123', 'Admin User', 'Admin', '555-0000', 1, TRUE),
+('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
+('jane.doe@email.com', 'password123', 'Jane Doe', 'Customer', '555-0002', 2, TRUE),
+('mike.johnson@email.com', 'password123', 'Mike Johnson', 'Customer', '555-0003', 3, TRUE),
+('sarah.wilson@email.com', 'password123', 'Sarah Wilson', 'Customer', '555-0004', 4, TRUE),
+('david.brown@email.com', 'password123', 'David Brown', 'Customer', '555-0005', 5, TRUE),
+('lisa.davis@email.com', 'password123', 'Lisa Davis', 'Customer', '555-0006', 6, TRUE),
+('robert.miller@email.com', 'password123', 'Robert Miller', 'Customer', '555-0007', 7, TRUE),
+('jennifer.garcia@email.com', 'password123', 'Jennifer Garcia', 'Customer', '555-0008', 8, TRUE),
+('michael.martinez@email.com', 'password123', 'Michael Martinez', 'Customer', '555-0009', 9, TRUE),
+('emily.anderson@email.com', 'password123', 'Emily Anderson', 'Customer', '555-0010', 10, TRUE),
+('chris.taylor@email.com', 'password123', 'Chris Taylor', 'Customer', '555-0011', 1, TRUE),
+('amanda.thomas@email.com', 'password123', 'Amanda Thomas', 'Customer', '555-0012', 2, TRUE),
+('kevin.rodriguez@email.com', 'password123', 'Kevin Rodriguez', 'Customer', '555-0013', 3, TRUE),
+('jessica.lee@email.com', 'password123', 'Jessica Lee', 'Customer', '555-0014', 4, TRUE),
+('ryan.clark@email.com', 'password123', 'Ryan Clark', 'Customer', '555-0015', 5, TRUE);
+
+-- Insert 35 Orders with different amounts across different months (Jan 2024 - Oct 2025)
+INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod, estimatedDeliveryDate) VALUES
+-- January 2024 orders
+(2, '2024-01-15 10:30:00', 1249.99, 'Standard Delivery', 19.99, 'Delivered', 'Card', '2024-01-20 00:00:00'),
+(3, '2024-01-18 14:45:00', 849.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(4, '2024-01-22 09:15:00', 2999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card', '2024-01-27 00:00:00'),
+
+-- February 2024 orders
+(5, '2024-02-05 16:20:00', 599.99, 'Standard Delivery', 15.99, 'Delivered', 'CashOnDelivery', '2024-02-10 00:00:00'),
+(6, '2024-02-12 11:30:00', 1899.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(7, '2024-02-20 13:45:00', 449.99, 'Standard Delivery', 12.99, 'Delivered', 'Card', '2024-02-25 00:00:00'),
+
+-- March 2024 orders
+(8, '2024-03-08 10:15:00', 3499.99, 'Standard Delivery', 39.99, 'Delivered', 'Card', '2024-03-15 00:00:00'),
+(9, '2024-03-14 15:30:00', 799.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(10, '2024-03-25 12:20:00', 1699.99, 'Standard Delivery', 24.99, 'Delivered', 'CashOnDelivery', '2024-03-30 00:00:00'),
+
+-- April 2024 orders
+(11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card', '2024-04-08 00:00:00'),
+(12, '2024-04-16 14:10:00', 2499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(13, '2024-04-28 11:55:00', 649.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-05-03 00:00:00'),
+
+-- May 2024 orders
+(14, '2024-05-07 16:40:00', 1299.99, 'Standard Delivery', 21.99, 'Delivered', 'CashOnDelivery', '2024-05-12 00:00:00'),
+(15, '2024-05-19 13:25:00', 549.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(16, '2024-05-30 10:50:00', 1999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card', '2024-06-04 00:00:00'),
+
+-- June 2024 orders
+(2, '2024-06-11 15:15:00', 899.99, 'Standard Delivery', 18.99, 'Delivered', 'Card', '2024-06-16 00:00:00'),
+(3, '2024-06-22 12:30:00', 399.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
+(4, '2024-06-29 09:20:00', 4299.99, 'Standard Delivery', 49.99, 'Delivered', 'Card', '2024-07-06 00:00:00'),
+
+-- July 2024 orders
+(5, '2024-07-08 14:50:00', 749.99, 'Standard Delivery', 17.99, 'Delivered', 'Card', '2024-07-13 00:00:00'),
+(6, '2024-07-18 11:25:00', 1399.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(7, '2024-07-27 16:35:00', 199.99, 'Standard Delivery', 7.99, 'Delivered', 'CashOnDelivery', '2024-08-01 00:00:00'),
+
+-- August 2024 orders
+(8, '2024-08-05 13:40:00', 2699.99, 'Standard Delivery', 34.99, 'Delivered', 'Card', '2024-08-12 00:00:00'),
+(9, '2024-08-15 10:55:00', 499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(10, '2024-08-26 15:10:00', 1799.99, 'Standard Delivery', 26.99, 'Delivered', 'Card', '2024-09-02 00:00:00'),
+
+-- September 2024 orders
+(11, '2024-09-09 12:15:00', 99.99, 'Standard Delivery', 5.99, 'Delivered', 'CashOnDelivery', '2024-09-14 00:00:00'),
+(12, '2024-09-20 14:30:00', 5999.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(13, '2024-09-28 11:45:00', 129.99, 'Standard Delivery', 6.99, 'Delivered', 'Card', '2024-10-03 00:00:00'),
+
+-- October 2024 orders
+(14, '2024-10-12 16:20:00', 999.99, 'Standard Delivery', 19.99, 'Delivered', 'Card', '2024-10-17 00:00:00'),
+(15, '2024-10-23 13:35:00', 1499.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
+(16, '2024-10-30 10:40:00', 699.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-11-04 00:00:00'),
+
+-- November 2024 orders
+(2, '2024-11-14 15:25:00', 3899.99, 'Standard Delivery', 44.99, 'Delivered', 'Card', '2024-11-21 00:00:00'),
+(3, '2024-11-25 12:50:00', 249.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+
+-- December 2024 orders
+(4, '2024-12-05 14:15:00', 1199.99, 'Standard Delivery', 22.99, 'Delivered', 'CashOnDelivery', '2024-12-12 00:00:00'),
+(5, '2024-12-18 11:30:00', 149.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
+(6, '2024-12-28 16:45:00', 2299.99, 'Standard Delivery', 32.99, 'Delivered', 'Card', '2025-01-04 00:00:00'),
+
+-- Recent 2025 orders (some pending/shipped)
+(7, '2025-09-15 10:20:00', 1599.99, 'Standard Delivery', 24.99, 'Shipped', 'Card', '2025-09-22 00:00:00'),
+(8, '2025-10-01 14:35:00', 799.99, 'Store Pickup', 0.00, 'Confirmed', 'CashOnDelivery', NULL),
+(9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card', '2025-10-12 00:00:00');
+
+-- Insert Order Items for the orders
+INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
+-- Order 1 items (iPhone 17 Pro Max)
+(1, 2, 1, 1249.99, 1249.99),
+
+-- Order 2 items (Samsung Galaxy S25 Ultra)
+(2, 1, 1, 849.99, 849.99),
+
+-- Order 3 items (Canon EOS R6 Mark III)
+(3, 87, 1, 2999.99, 2999.99),
+
+-- Order 4 items (GoPro MAX 2)
+(4, 83, 1, 599.99, 599.99),
+
+-- Order 5 items (Samsung QN95D 55")
+(5, 96, 1, 1899.99, 1899.99),
+
+-- Order 6 items (Google Pixel 10a Lite)
+(6, 13, 1, 449.99, 449.99),
+
+-- Order 7 items (Samsung Family Hub Fridge)
+(7, 91, 1, 3499.99, 3499.99),
+
+-- Order 8 items (MacBook Air M3 15-inch)
+(8, 61, 1, 799.99, 799.99),
+
+-- Order 9 items (Pixel Fold 2 256GB)
+(9, 53, 1, 1699.99, 1699.99),
+
+-- Order 10 items (Xiaomi Redmi Note 15)
+(10, 15, 1, 299.99, 299.99),
+
+-- Order 11 items (LG OLED G4 65")
+(11, 94, 1, 2499.99, 2499.99),
+
+-- Order 12 items (Poco F7 Pro 256GB)
+(12, 54, 1, 649.99, 649.99),
+
+-- Order 13 items (Sony A7R VI Body)
+(13, 86, 1, 1299.99, 1299.99),
+
+-- Order 14 items (OnePlus Nord 6 Pro 256GB)
+(14, 58, 1, 549.99, 549.99),
+
+-- Order 15 items (Lenovo Legion Pro 7i Gen 9 1TB)
+(15, 62, 1, 1999.99, 1999.99),
+
+-- Order 16 items (Dell Inspiron 14 Plus 256GB)
+(16, 65, 1, 899.99, 899.99),
+
+-- Order 17 items (Galaxy A75 5G 128GB)
+(17, 56, 1, 399.99, 399.99),
+
+-- Order 18 items (Nikon Z9 II Body)
+(18, 88, 1, 4299.99, 4299.99),
+
+-- Order 19 items (Dyson V15 Detect)
+(19, 97, 1, 749.99, 749.99),
+
+-- Order 20 items (LG Gram 17 2025 512GB)
+(20, 70, 1, 1399.99, 1399.99),
+
+-- Order 21 items (Instax Mini 99)
+(21, 84, 1, 199.99, 199.99),
+
+-- Order 22 items (Lenovo Legion Pro 7i Gen 9)
+(22, 62, 1, 2699.99, 2699.99),
+
+-- Order 23 items (DJI Pocket 3)
+(23, 85, 1, 499.99, 499.99),
+
+-- Order 24 items (HP Omen 16 2025 512GB)
+(24, 63, 1, 1799.99, 1799.99),
+
+-- Order 25 items (Beurer Pulse Oximeter)
+(25, 78, 1, 99.99, 99.99),
+
+-- Order 26 items (Leica Q3)
+(26, 89, 1, 5999.99, 5999.99),
+
+-- Order 27 items (Instant Vortex Air Fryer)
+(27, 95, 1, 129.99, 129.99),
+
+-- Order 28 items (ASUS ZenBook 14X OLED)
+(28, 68, 1, 999.99, 999.99),
+
+-- Order 29 items (Apple iPad Pro 13-inch M4 Max)
+(29, 23, 1, 1499.99, 1499.99),
+
+-- Order 30 items (Breville Barista Express)
+(30, 100, 1, 699.99, 699.99),
+
+-- Order 31 items (Sony A7R VI Body)
+(31, 86, 1, 3899.99, 3899.99),
+
+-- Order 32 items (Philips Series 9000)
+(32, 71, 1, 249.99, 249.99),
+
+-- Order 33 items (LG ThinQ Dryer)
+(33, 92, 1, 1199.99, 1199.99),
+
+-- Order 34 items (Acer Swift 3 OLED 256GB)
+(34, 69, 1, 149.99, 149.99),
+
+-- Order 35 items (Samsung Galaxy Tab S10, iPhone 17 Mini Pro)
+(35, 21, 1, 1299.99, 1299.99),
+(35, 12, 1, 999.99, 999.99);
+
+-- Add recent order items for 2025 orders
+INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
+-- Order 33 items (Surface Laptop Studio 6)
+(33, 66, 1, 1599.99, 1599.99),
+
+-- Order 34 items (MacBook Air M3 15-inch)
+(34, 61, 1, 799.99, 799.99),
+
+-- Order 35 items (ROG Zephyrus G16 2025 1TB + ThinkPad X1 Carbon Gen 13)
+(35, 64, 1, 1999.99, 1999.99),
+(35, 67, 1, 199.99, 199.99);
