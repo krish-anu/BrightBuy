@@ -37,6 +37,8 @@ const Orders: React.FC = () => {
       setLoading(true);
       setError(null);
       const ordersData = await getAllOrders();
+      console.log('Loaded orders data:', ordersData);
+      console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
     } catch (err) {
       console.error('Error loading orders:', err);
@@ -122,11 +124,13 @@ const Orders: React.FC = () => {
   }, [searchTerm, filterStatus, dateFrom, dateTo, sortBy, sortOrder]);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'pending':
         return 'bg-orange-100 text-orange-800';
-      case 'processing':
+      case 'confirmed':
         return 'bg-blue-100 text-blue-800';
+      case 'processing':
+        return 'bg-indigo-100 text-indigo-800';
       case 'shipped':
         return 'bg-yellow-100 text-yellow-800';
       case 'delivered':
@@ -425,8 +429,11 @@ const Orders: React.FC = () => {
                       ${(Number(order.totalPrice) || 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status.toLowerCase())}`}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor((order.status || 'pending').toLowerCase())}`}>
+                        {order.status 
+                          ? order.status.charAt(0).toUpperCase() + order.status.slice(1)
+                          : 'Pending'
+                        }
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
