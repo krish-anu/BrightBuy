@@ -21,7 +21,7 @@ export interface Variant {
   id: string;
   sku: string;
   price: number;
-  stockQtn: number;
+  stockQnt: number; // Changed from stockQtn to stockQnt
   attributes: Attribute[];
 }
 export interface product {
@@ -167,7 +167,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
             <span className="text-md text-muted-foreground">
               Available Stock:{" "}
               <span className="font-bold text-chart-3">
-                {displayVariant?.stock}
+                {displayVariant?.stockQnt} {/* Fixed property name */}
               </span>
             </span>
           ) : null}
@@ -206,19 +206,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
   );
 }
 
-function getUniqueAttributes(
-  variants: {
-    id: string;
-    sku: string;
-    price: number;
-    stockQnt: number;
-    attributes: {
-      attributeID: string;
-      attributeName: string;
-      attributeValue: string;
-    }[];
-  }[],
-) {
+function getUniqueAttributes(variants: Variant[]) {
   const attributeNames = new Set<string>();
   variants.forEach((variant) => {
     variant.attributes.forEach((attr) => {
@@ -237,8 +225,8 @@ function getAttributeValues(
     attributeValues[name] = new Set<string>();
     variants.forEach((variant) => {
       variant.attributes.forEach((attr) => {
-        if (attr.name === name) {
-          attributeValues[name].add(attr.value);
+        if (attr.attributeName === name) {
+          attributeValues[name].add(attr.attributeValue);
         }
       });
     });
@@ -259,7 +247,7 @@ function findByOptions(
 
   for (const variant of variants) {
     const match = variant.attributes.every(
-      (attr) => selectedOptions[attr.name] == attr.value,
+      (attr) => selectedOptions[attr.attributeName] === attr.attributeValue,  
     );
 
     if (match) {
@@ -273,7 +261,7 @@ function getInitialOptions(variants: Variant[]): Record<string, string> {
   const initialOptions: Record<string, string> = {};
   if (variants.length > 0) {
     variants[0].attributes.forEach((attr) => {
-      initialOptions[attr.name] = attr.value;
+      initialOptions[attr.attributeName] = attr.attributeValue;  
     });
   }
   return initialOptions;
@@ -281,7 +269,7 @@ function getInitialOptions(variants: Variant[]): Record<string, string> {
 
 function checkStock(variant: Variant | undefined): string {
   if (!variant) return "not-available";
-  else if (variant.stockQtn > 0) {
+  else if (variant.stockQnt > 0) {  
     return "in-stock";
   } else {
     return "out-of-stock";

@@ -74,7 +74,7 @@ export const products: Product[] = [
       {
         id: "v4",
         price: 1599.99,
-        stockQty: 5,
+        stockQnt: 5,
         sku: "123459",
         attributes: [
           {
