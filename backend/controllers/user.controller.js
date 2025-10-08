@@ -52,6 +52,42 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// Admin update user (different from updateUserInfo which updates current user)
+const updateUserById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, email, role, phone, address } = req.body;
+
+    console.log('Update request body:', req.body);
+
+    const rows = await query(userQueries.getById, [id]);
+    if (rows.length === 0) throw new ApiError('User not found', 404);
+
+    const user = rows[0];
+
+    // Properly handle undefined values by converting them to existing values or null
+    const updateParams = [
+      name !== undefined ? name : user.name,
+      email !== undefined ? email : user.email,
+      role !== undefined ? role : user.role,
+      user.role_accepted, // Keep existing role_accepted
+      address !== undefined ? (address || null) : user.address,
+      phone !== undefined ? (phone || null) : user.phone,
+      user.cityId, // Keep existing cityId
+      id
+    ];
+
+    console.log('Update parameters:', updateParams);
+
+    await query(userQueries.updateAdmin, updateParams);
+
+    const updatedRows = await query(userQueries.getById, [id]);
+    res.status(200).json({ success: true, data: updatedRows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Optional: Delete user
 const deleteUser = async (req, res, next) => {
   try {
@@ -69,5 +105,6 @@ module.exports = {
   getUserDeliveryInfo,
   updateUserInfo,
   getAllUsers,
+  updateUserById,
   deleteUser
 };

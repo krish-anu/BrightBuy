@@ -1,7 +1,19 @@
 // Orders Queries
-const getAllOrders = `SELECT * FROM orders ORDER BY orderDate DESC`;
+const getAllOrders = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  LEFT JOIN users u ON o.userId = u.id
+  ORDER BY o.orderDate DESC
+`;
 
-const getOrderById = `SELECT * FROM orders WHERE id = ?`;
+const getOrderById = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  LEFT JOIN users u ON o.userId = u.id
+  WHERE o.id = ?
+`;
 
 const getOrderItemsByOrderId = `
   SELECT oi.*, pv.id AS variantId, pv.SKU, pv.variantName, pv.price, pv.stockQnt,
@@ -31,13 +43,19 @@ const getUserOrderById = `SELECT * FROM orders WHERE id = ? AND userId = ?`;
 const cancelOrderById = `UPDATE orders SET status = 'Cancelled' WHERE id = ?`;
 
 const getCategoryWiseOrders = `
-  SELECT c.id AS categoryId, c.name AS categoryName, c.parentId, COUNT(oi.id) AS orderCount
-  FROM order_items oi
-  JOIN product_variants pv ON oi.variantId = pv.id
-  JOIN products p ON pv.ProductId = p.id
-  JOIN product_categories pc ON p.id = pc.productId
-  JOIN categories c ON pc.categoryId = c.id
-  GROUP BY c.id,c.name,c.parentId
+  SELECT 
+    c.id AS categoryId, 
+    c.name AS categoryName, 
+    c.parentId, 
+    COALESCE(COUNT(oi.id), 0) AS orderCount
+  FROM categories c
+  LEFT JOIN product_categories pc ON c.id = pc.categoryId
+  LEFT JOIN products p ON pc.productId = p.id
+  LEFT JOIN product_variants pv ON p.id = pv.productId
+  LEFT JOIN order_items oi ON pv.id = oi.variantId
+  WHERE c.isMainCategory = TRUE
+  GROUP BY c.id, c.name, c.parentId
+  ORDER BY orderCount DESC, c.name ASC
 `;
 
 const getOrderStatusById = `
@@ -89,6 +107,15 @@ const getOrderDetailsByOrderId = `
 `;
 
 const getTotalOrders = `SELECT COUNT(*) AS totalOrders FROM orders`;
+
+const getOrderStatusCounts = `
+  SELECT 
+    status,
+    COUNT(*) AS count
+  FROM orders 
+  GROUP BY status
+`;
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -106,5 +133,6 @@ module.exports = {
   restockItems,
   getPaymentByOrderId,
   getOrderDetailsByOrderId,
-  getTotalOrders
+  getTotalOrders,
+  getOrderStatusCounts
 };

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/auth.middleware");
 const authorizeRoles = require("../middlewares/role.middleware");
-const { getAllUsers } = require("../controllers/user.controller");
+const { getAllUsers, updateUserById, deleteUser } = require("../controllers/user.controller");
 
 // ===================== SUPER ADMIN ROUTES =====================
 // // Only super-admin can permit admins
@@ -88,5 +88,9 @@ const { getAllUsers } = require("../controllers/user.controller");
 // );
 
 router.get("/", getAllUsers);
+
+// Admin routes for user management
+router.put("/:id", updateUserById);
+router.delete("/:id", deleteUser);
 
 module.exports = router;

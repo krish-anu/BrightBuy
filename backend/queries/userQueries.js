@@ -22,6 +22,11 @@ const userQueries = {
     SET name = ?, email = ?, password = ?, role = ?, role_accepted = ?, address = ?, phone = ?, cityId = ?
     WHERE id = ?
   `,
+  updateAdmin: `
+    UPDATE users
+    SET name = ?, email = ?, role = ?, role_accepted = ?, address = ?, phone = ?, cityId = ?
+    WHERE id = ?
+  `,
   delete: `
     DELETE FROM users
     WHERE id = ?

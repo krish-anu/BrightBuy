@@ -1,5 +1,113 @@
-// Get all products with optional limit
-const getAllProducts = `SELECT id, name, description, brand FROM products ORDER BY name ASC `;
+// Get all products with variants, categories, price, stock, and status
+const getAllProducts = `
+SELECT 
+    p.id,
+    p.name,
+    p.description,
+    p.brand,
+    COALESCE(
+        JSON_ARRAYAGG(
+            CASE 
+                WHEN pv.id IS NOT NULL THEN
+                    JSON_OBJECT(
+                        'id', pv.id,
+                        'variantName', pv.variantName,
+                        'SKU', pv.SKU,
+                        'price', pv.price,
+                        'stockQnt', pv.stockQnt,
+                        'status', CASE 
+                            WHEN pv.stockQnt > 10 THEN 'In Stock'
+                            WHEN pv.stockQnt > 0 THEN 'Low Stock'
+                            ELSE 'Out of Stock'
+                        END
+                    )
+                ELSE NULL
+            END
+        ),
+        JSON_ARRAY()
+    ) AS ProductVariants,
+    COALESCE(
+        (SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'id', c2.id,
+                'name', c2.name
+            )
+        )
+        FROM product_categories pc2
+        LEFT JOIN categories c2 ON pc2.categoryId = c2.id
+        WHERE pc2.productId = p.id
+        ),
+        JSON_ARRAY()
+    ) AS Categories
+FROM products p
+LEFT JOIN product_variants pv ON p.id = pv.productId
+GROUP BY p.id, p.name, p.description, p.brand
+ORDER BY p.name ASC
+`;
+
+// Get all products with pagination
+const getAllProductsPaginated = `
+SELECT 
+    p.id,
+    p.name,
+    p.description,
+    p.brand,
+    JSON_ARRAYAGG(
+        CASE 
+            WHEN pv.id IS NOT NULL THEN
+                JSON_OBJECT(
+                    'id', pv.id,
+                    'variantName', pv.variantName,
+                    'SKU', pv.SKU,
+                    'price', pv.price,
+                    'stockQnt', pv.stockQnt,
+                    'status', CASE 
+                        WHEN pv.stockQnt > 10 THEN 'In Stock'
+                        WHEN pv.stockQnt > 0 THEN 'Low Stock'
+                        ELSE 'Out of Stock'
+                    END
+                )
+            ELSE NULL
+        END
+    ) AS ProductVariants,
+    (SELECT CASE 
+        WHEN COUNT(c2.id) > 0 THEN
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'id', c2.id,
+                    'name', c2.name
+                )
+            )
+        ELSE JSON_ARRAY()
+    END
+    FROM product_categories pc2
+    LEFT JOIN categories c2 ON pc2.categoryId = c2.id
+    WHERE pc2.productId = p.id
+    ) AS Categories
+FROM products p
+LEFT JOIN product_variants pv ON p.id = pv.productId
+GROUP BY p.id, p.name, p.description, p.brand
+ORDER BY p.name ASC
+LIMIT ? OFFSET ?
+`;
+
+// Get total count of products for pagination
+const getTotalProductsCount = `
+SELECT COUNT(*) as totalCount 
+FROM products
+`;
+
+// Get complete inventory statistics (not affected by pagination)
+const getInventoryStats = `
+SELECT 
+    COUNT(DISTINCT p.id) as totalProducts,
+    COUNT(pv.id) as totalVariants,
+    COALESCE(SUM(CASE WHEN pv.stockQnt <= 10 AND pv.stockQnt > 0 THEN 1 ELSE 0 END), 0) as lowStockItems,
+    COALESCE(SUM(CASE WHEN pv.stockQnt = 0 THEN 1 ELSE 0 END), 0) as outOfStockItems,
+    COALESCE(SUM(pv.price * pv.stockQnt), 0) as totalInventoryValue
+FROM products p
+LEFT JOIN product_variants pv ON p.id = pv.productId
+`;
 
 // Get product by ID
 const getProductById = `SELECT id, name, description, brand FROM products WHERE id = ?`;
@@ -73,6 +181,9 @@ INSERT INTO product_categories (productId, categoryId) VALUES (?, ?)
 
 module.exports = {
   getAllProducts,
+  getAllProductsPaginated,
+  getTotalProductsCount,
+  getInventoryStats,
   getProductById,
   insertProduct,
   updateProduct,

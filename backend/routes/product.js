@@ -1,4 +1,4 @@
-const { getProducts, getProduct, addProduct, updateProduct, deleteProduct, getProductVariantCount, getVariantsOfProduct, getProductCount, getPopularProduct } = require('../controllers/product.controller');
+const { getProducts, getProductsPaginated, getInventoryStats, getProduct, addProduct, updateProduct, deleteProduct, getProductVariantCount, getVariantsOfProduct, getProductCount, getPopularProduct } = require('../controllers/product.controller');
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require('../middlewares/role.middleware');
 const ROLES = require('../roles');
@@ -7,6 +7,8 @@ const router = require('express').Router();
 
 
 router.get('/popular',getPopularProduct)
+router.get('/paginated', getProductsPaginated);
+router.get('/stats', getInventoryStats);
 router.get('/count', getProductCount);
 router.get('/variant/count', getProductVariantCount);
 router.get('/:productId/variants', getVariantsOfProduct);

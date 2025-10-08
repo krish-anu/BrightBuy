@@ -13,7 +13,27 @@ const stripe = require('stripe')(STRIPE_SECRET_KEY);
 const getOrders = async (req, res, next) => {
   try {
     const rows = await query(orderQueries.getAllOrders);
-    res.status(200).json({ success: true, data: rows });
+    
+    // Transform the data to include customer object and fetch order items
+    const ordersWithCustomersAndItems = await Promise.all(rows.map(async (row) => {
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      
+      // Fetch order items for each order
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [orderData.id]);
+      
+      return {
+        ...orderData,
+        customer: customerId ? {
+          id: customerId,
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone
+        } : null,
+        items: orderItems
+      };
+    }));
+    
+    res.status(200).json({ success: true, data: ordersWithCustomersAndItems });
   } catch (err) { next(err); }
 };
 
@@ -24,8 +44,23 @@ const getOrder = async (req, res, next) => {
     if (!orders.length) throw new ApiError('Order not found', 404);
     if (req.user.role === 'Customer' && orders[0].userId !== req.user.id)
       throw new ApiError('Forbidden access', 403)
+    
     const orderItems = await query(orderQueries.getOrderItemsByOrderId, [req.params.id]);
-    res.status(200).json({ success: true, data: { ...orders[0], items: orderItems } });
+    
+    // Transform the order data to include customer object
+    const { customerId, customerName, customerEmail, customerPhone, ...orderData } = orders[0];
+    const orderWithCustomer = {
+      ...orderData,
+      customer: customerId ? {
+        id: customerId,
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone
+      } : null,
+      items: orderItems
+    };
+    
+    res.status(200).json({ success: true, data: orderWithCustomer });
   } catch (err) { next(err); }
 };
 
@@ -184,24 +219,16 @@ const cancelOrder = async (req, res, next) => {
 // Get category-wise orders
 const getCategoryWiseOrders = async (req, res, next) => {
   try {
+    console.log("Fetching category wise orders...");
     const rows = await query(orderQueries.getCategoryWiseOrders);
+    console.log("Category wise orders raw result:", rows);
 
-    const categoryOrders = {};
-    let totalOrders = 0;
-    for (const row of rows) {
-      const parent = row.parentId;
-      const child = row.categoryId;
-      const count = parseInt(row.orderCount);
-      if (parent !== null) {
-        if (!categoryOrders[parent]) categoryOrders[parent] = { category: 'Parent', totalOrders: 0, subcategories: {} };
-        categoryOrders[parent].totalOrders += count;
-        categoryOrders[parent].subcategories[child] = { categoryName: row.categoryName, order: count };
-      }
-      totalOrders += count;
-    }
-
-    res.status(200).json({ success: true, data: { categoryOrders, totalOrders } });
-  } catch (err) { next(err); }
+    // Return the raw data directly - the frontend expects an array of category objects
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { 
+    console.error("Error in getCategoryWiseOrders:", err);
+    next(err); 
+  }
 };
 
 // Get total revenue
@@ -346,8 +373,40 @@ const getTotalOrders = async (req, res, next) => {
     next(err);
   }
 }
+const getStats = async (req, res, next) => {  
+  try {
+    const [totalOrders] = await query(orderQueries.getTotalOrders);
+    const [totalRevenue] = await query(orderQueries.getTotalRevenue);
+    const [categoryWiseOrders] = await query(orderQueries.getCategoryWiseOrders);
+    const orderStatusCounts = await query(orderQueries.getOrderStatusCounts);
 
+    // Process order status counts to ensure all statuses are included
+    const statusOverview = {
+      Pending: 0,
+      Confirmed: 0,
+      Shipped: 0,
+      Delivered: 0,
+      Cancelled: 0
+    };
 
+    // Fill in the actual counts from database
+    orderStatusCounts.forEach(row => {
+      if (statusOverview.hasOwnProperty(row.status)) {
+        statusOverview[row.status] = row.count;
+      }
+    });
+
+    const stats = {
+      totalOrders: totalOrders?.totalOrders ?? 0,
+      totalRevenue: totalRevenue?.totalRevenue ?? 0,
+      categoryWiseOrders: categoryWiseOrders ?? [],
+      orderStatusOverview: statusOverview
+    };
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+}
 
 module.exports = {
   getOrders,
@@ -359,5 +418,6 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
-  getTotalOrders
+  getTotalOrders,
+  getStats
 };
