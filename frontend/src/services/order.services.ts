@@ -114,11 +114,13 @@ export const getOrderById = async (orderId: number): Promise<Order> => {
 // Update order status
 export const updateOrderStatus = async (orderId: number, status: string): Promise<Order> => {
   try {
-    const response = await axiosInstance.patch<{success: boolean; data: Order}>(
-      `/api/order/update/${orderId}`,
-      { status }
-    );
-    return response.data.data;
+    const response = await axiosInstance.patch(`/api/order/update/${orderId}`, { status });
+    // Backend may return { success: true, data: Order } or { success: true, message: '...' }
+    const returned = response.data?.data ?? null;
+    if (returned) return returned as Order;
+    // If backend returned only a message, fetch the order explicitly
+    const order = await getOrderById(orderId);
+    return order;
   } catch (error) {
     console.error("Error updating order status:", error);
     throw error;

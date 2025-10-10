@@ -53,6 +53,29 @@ const Orders: React.FC = () => {
     loadOrders();
   }, []);
 
+  // Modal state for view/edit
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [editStatus, setEditStatus] = useState<string>('');
+
+  const getAllowedNextStatuses = (current: string | undefined) => {
+    const curr = current ? current.charAt(0).toUpperCase() + current.slice(1).toLowerCase() : 'Pending';
+    switch (curr) {
+      case 'Pending':
+        return ['Confirmed', 'Cancelled'];
+      case 'Confirmed':
+        return ['Processing', 'Shipped', 'Cancelled'];
+      case 'Processing':
+        return ['Shipped', 'Cancelled'];
+      case 'Shipped':
+        return ['Delivered'];
+      default:
+        return [];
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
       order.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -415,7 +438,7 @@ const Orders: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedOrders.map(order => (
+                  {paginatedOrders.filter(Boolean).map(order => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -444,14 +467,20 @@ const Orders: React.FC = () => {
                         <button 
                           className="text-blue-600 hover:text-blue-900"
                           title="View Details"
-                          onClick={() => console.log('View order:', order.id)}
+                          onClick={() => { setSelectedOrder(order); setViewModalOpen(true); }}
                         >
                           <IconComponent iconName="Eye" size={16} />
                         </button>
                         <button 
                           className="text-green-600 hover:text-green-900"
                           title="Update Status"
-                          onClick={() => console.log('Update status:', order.id)}
+                          onClick={() => { 
+                            const titleCase = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+                            setSelectedOrder(order); 
+                            const allowed = getAllowedNextStatuses(order.status);
+                            setEditStatus(allowed.length ? allowed[0] : titleCase(order.status)); 
+                            setEditModalOpen(true); 
+                          }}
                         >
                           <IconComponent iconName="Edit" size={16} />
                         </button>
@@ -550,6 +579,100 @@ const Orders: React.FC = () => {
           </>
         )}
       </div>
+      {/* View Order Modal */}
+      {viewModalOpen && selectedOrder && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Order #{selectedOrder.id}</h3>
+              <button onClick={() => { setViewModalOpen(false); setSelectedOrder(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Customer</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.customer?.name || 'Unknown'}</p>
+                <p className="text-xs text-gray-500">{selectedOrder.customer?.email || 'No email'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Items</label>
+                <ul className="mt-1 text-sm text-gray-900 list-disc list-inside">
+                  {selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items.map(it => (<li key={it.id}>{it.variantName} x {it.quantity}</li>)) : <li>No items</li>}
+                </ul>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Total</label>
+                <p className="mt-1 text-sm text-gray-900">${(Number(selectedOrder.totalPrice) || 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.status}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal - change status flow */}
+      {editModalOpen && selectedOrder && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Update Order Status</h3>
+              <button onClick={() => { setEditModalOpen(false); setSelectedOrder(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Current Status</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.status}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Change Status</label>
+                <div className="mt-2">
+                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full px-3 py-2 border rounded">
+                    {getAllowedNextStatuses(selectedOrder?.status).length === 0 ? (
+                      <option value={selectedOrder?.status || 'Pending'}>{selectedOrder?.status || 'Pending'}</option>
+                    ) : (
+                      getAllowedNextStatuses(selectedOrder?.status).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div className="mt-3 flex space-x-2">
+                    <button disabled={isUpdatingStatus} onClick={async () => {
+                      try {
+                        setIsUpdatingStatus(true);
+                        const { updateOrderStatus } = await import('@/services/order.services');
+                        const updated = await updateOrderStatus(selectedOrder.id, editStatus);
+
+                        if (updated && updated.id) {
+                          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                        } else {
+                          // If backend did not return updated order, reload list to ensure UI consistency
+                          await loadOrders();
+                        }
+
+                        setEditModalOpen(false);
+                        setSelectedOrder(null);
+                      } catch (err: any) {
+                        console.error('Failed to update order status', err);
+                        const serverMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update status';
+                        alert(`Failed to update status: ${serverMsg}`);
+                        // Reload orders to ensure UI isn't stale
+                        await loadOrders();
+                        setEditModalOpen(false);
+                        setSelectedOrder(null);
+                      } finally {
+                        setIsUpdatingStatus(false);
+                      }
+                    }} className={`px-3 py-1 ${isUpdatingStatus ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{isUpdatingStatus ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditModalOpen(false); setSelectedOrder(null); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

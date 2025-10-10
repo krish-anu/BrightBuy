@@ -155,6 +155,43 @@ CREATE TABLE IF NOT EXISTS order_items (
     ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+-- 11. Deliveries table
+CREATE TABLE IF NOT EXISTS deliveries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  orderId INT NOT NULL,
+  staffId INT DEFAULT NULL,
+  -- Allow both lowercase and capitalized variants because backend sometimes writes capitalized values
+  status ENUM('Pending','Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+  deliveryDate DATETIME DEFAULT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_deliveries_order FOREIGN KEY (orderId) REFERENCES orders(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT fk_deliveries_staff FOREIGN KEY (staffId) REFERENCES users(id)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- 12. Payments table (created before payment inserts)
+CREATE TABLE IF NOT EXISTS payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userId INT NOT NULL,
+  orderId INT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
+  status ENUM('Pending','Paid','Cancelled','Failed') NOT NULL DEFAULT 'Pending',
+  paymentIntentId VARCHAR(255) DEFAULT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_payments_user FOREIGN KEY (userId) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT fk_payments_order FOREIGN KEY (orderId) REFERENCES orders(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 -- Insert Main Categories
 INSERT INTO categories (name, isMainCategory, parentId) VALUES
 ('Mobiles & Tablets', TRUE, NULL),
@@ -326,6 +363,26 @@ INSERT IGNORE INTO order_items (id, orderId, variantId, quantity, unitPrice, tot
 (7, 7, 4, 1, 899.99, 899.99),    -- OnePlus 13 Pro
 -- Order 8: Audio Devices
 (8, 8, 32, 1, 349.99, 349.99);   -- Beats Studio Pro 2
+
+-- Seed deliveries for Standard Delivery orders
+-- (orderId, staffId left NULL for now; deliveryDate set for delivered orders)
+INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
+(1, NULL, 'delivered', '2024-01-20 10:00:00'),
+(3, NULL, 'in_transit', NULL),
+(4, NULL, 'assigned', NULL),
+(6, NULL, 'delivered', '2024-02-10 12:00:00'),
+(8, NULL, 'in_transit', NULL);
+
+-- Seed payments for sample orders (simple statuses)
+INSERT IGNORE INTO payments (userId, orderId, amount, paymentMethod, status) VALUES
+(2, 1, 1299.99, 'Card', 'Paid'),
+(3, 2, 299.99, 'Card', 'Paid'),
+(4, 3, 399.99, 'CashOnDelivery', 'Pending'),
+(5, 4, 199.99, 'Card', 'Pending'),
+(6, 5, 249.99, 'Card', 'Pending'),
+(2, 6, 599.99, 'Card', 'Paid'),
+(3, 7, 899.99, 'Card', 'Paid'),
+(4, 8, 349.99, 'CashOnDelivery', 'Pending');
 
 -- Insert Subcategories (continuing from main categories which are already inserted)
 -- Mobiles & Tablets Subcategories

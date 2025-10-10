@@ -289,7 +289,11 @@ const updateOrderStatus = async (req, res, next) => {
 
     if (!orderRows.length) throw new ApiError('Order not found', 404);
     const order = orderRows[0];
-    const { status } = req.body;
+  const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+  let { status } = req.body;
+  if (!status) throw new ApiError('Status is required', 400);
+  // Normalize status to Title Case (e.g., 'shipped' -> 'Shipped') to avoid casing issues
+  status = String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase();
 
     // Validate transition
     const isValid = await isValidUpdate(status, order.status);
@@ -334,8 +338,12 @@ const updateOrderStatus = async (req, res, next) => {
       }
       
     }
-    if (status === 'Delivered' && order.paymentMethod === 'Card') {
-      if (order.deliveryId && order.deliveryStaffId !== req.user.id) {
+    // --- Case: Delivered ---
+    else if (status === 'Delivered') {
+      // Only allow delivery staff to mark delivered when there's a delivery record
+      // Admins and SuperAdmins can also update delivery status
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
         throw new ApiError('Forbidden access', 403);
       }
       await connection.query(
@@ -349,14 +357,35 @@ const updateOrderStatus = async (req, res, next) => {
         );
       }
     }
+    // --- Case: Simple status updates (Confirmed, Processing, Pending) ---
+    else if (['Confirmed', 'Processing', 'Pending'].includes(status)) {
+      await connection.query(
+        `UPDATE orders SET status = ? WHERE id = ?`,
+        [status, order.id]
+      );
+    }
     else {
+      // For any other status not explicitly handled above (e.g., Cancelled),
+      // prevent non-assigned delivery staff from updating delivery-specific orders.
+      // Admins and SuperAdmins may bypass this restriction.
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
+        throw new ApiError('Forbidden access', 403);
+      }
       throw new ApiError("Invalid update", 400);
     }
 
 
-    // Commit transaction
-    await connection.commit();
-    res.status(200).json({ success: true, message: 'Order status updated' });
+  // Commit transaction
+  await connection.commit();
+
+  // Fetch and return updated order details so frontend can update state
+  const [updatedOrders] = await connection.query(`SELECT * FROM orders WHERE id = ?`, [order.id]);
+  const updatedOrder = updatedOrders[0];
+  const [orderItems] = await connection.query(orderQueries.getOrderItemsByOrderId, [order.id]);
+  updatedOrder.items = orderItems;
+
+  res.status(200).json({ success: true, data: updatedOrder });
   } catch (error) {
     await connection.rollback();
     next(error);
