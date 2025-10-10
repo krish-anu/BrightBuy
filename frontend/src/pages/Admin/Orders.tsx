@@ -763,7 +763,14 @@ const Orders: React.FC = () => {
                         const resp = await assignStaffToDelivery(Number(idToUse), selected.id);
                         // If the service returns an error-like response, surface it
                         if (resp && resp.success === false) {
-                          const msg = resp.error || resp.message || 'Failed to assign delivery staff';
+                          let msg = 'Failed to assign delivery staff';
+                          if (resp.error) {
+                            if (typeof resp.error === 'string') {
+                              msg = resp.error;
+                            } else if (typeof resp.error === 'object' && 'message' in resp.error) {
+                              msg = (resp.error as { message?: string }).message || msg;
+                            }
+                          }
                           alert(msg);
                         } else {
                           // refresh lists
