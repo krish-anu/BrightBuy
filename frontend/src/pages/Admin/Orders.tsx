@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getAllOrders } from '../../services/order.services';
+import { getAllOrders, getAssignedOrders } from '../../services/order.services';
+import { getCurrentUserFromToken } from '../../services/auth.services';
 import type { Order } from '../../services/order.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
@@ -36,13 +37,22 @@ const Orders: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const ordersData = await getAllOrders();
+      // If the current user is WarehouseStaff, fetch assigned orders instead of full list
+      const current = getCurrentUserFromToken();
+      const role = current?.role || '';
+      const ordersData = role.toLowerCase() === 'warehousestaff' ? await getAssignedOrders() : await getAllOrders();
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
     } catch (err) {
       console.error('Error loading orders:', err);
-      setError('Failed to load orders. Please try again.');
+      // Distinguish forbidden from other errors
+      const e: any = err;
+      if (e?.message === 'Forbidden' || e?.response?.status === 403) {
+        setError('You do not have permission to view orders. Contact an admin.');
+      } else {
+        setError('Failed to load orders. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -66,9 +76,7 @@ const Orders: React.FC = () => {
       case 'Pending':
         return ['Confirmed', 'Cancelled'];
       case 'Confirmed':
-        return ['Processing', 'Shipped', 'Cancelled'];
-      case 'Processing':
-        return ['Shipped', 'Cancelled'];
+          return ['Shipped', 'Cancelled'];
       case 'Shipped':
         return ['Delivered'];
       default:
@@ -152,8 +160,6 @@ const Orders: React.FC = () => {
         return 'bg-orange-100 text-orange-800';
       case 'confirmed':
         return 'bg-blue-100 text-blue-800';
-      case 'processing':
-        return 'bg-indigo-100 text-indigo-800';
       case 'shipped':
         return 'bg-yellow-100 text-yellow-800';
       case 'delivered':
@@ -208,7 +214,7 @@ const Orders: React.FC = () => {
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">Pending</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {orders.filter(o => ['pending', 'confirmed', 'processing'].includes(o.status.toLowerCase())).length}
+                    {orders.filter(o => ['pending', 'confirmed'].includes(o.status.toLowerCase())).length}
                   </p>
                 </div>
               </div>
@@ -260,7 +266,7 @@ const Orders: React.FC = () => {
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
-            <option value="processing">Processing</option>
+            {/* Processing removed */}
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>

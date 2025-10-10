@@ -64,6 +64,17 @@ const getOrderStatusById = `
   WHERE id = ?
 `;
 
+// Orders assigned to a delivery staff (via deliveries.staffId)
+const getOrdersAssignedToStaff = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  JOIN deliveries d ON d.orderId = o.id
+  LEFT JOIN users u ON o.userId = u.id
+  WHERE d.staffId = ?
+  ORDER BY o.orderDate DESC
+`;
+
 const getTotalRevenue = `SELECT SUM(totalPrice) AS totalRevenue FROM orders`;
 
 // --- Stripe webhook related queries ---
@@ -128,6 +139,7 @@ module.exports = {
   getCategoryWiseOrders,
   getTotalRevenue,
   getOrderStatusById,
+  getOrdersAssignedToStaff,
   updateOrderStatus,
   updatePaymentStatus,
   restockItems,

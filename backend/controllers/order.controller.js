@@ -273,6 +273,36 @@ const getOrderStatus = async (req, res, next) => {
   }
 };
 
+// Get orders assigned to the authenticated delivery/warehouse staff
+const getAssignedOrders = async (req, res, next) => {
+  try {
+    const role = (req.user.role || '').toString().toLowerCase();
+    let rows = [];
+
+    // If WarehouseStaff should see the same orders as Admin, fetch all orders for them
+    if (role === 'warehousestaff' || role === 'warehouse') {
+      rows = await query(orderQueries.getAllOrders);
+    } else {
+      const staffId = req.user.id;
+      rows = await query(orderQueries.getOrdersAssignedToStaff, [staffId]);
+    }
+
+    // Transform the data to include order items for each order
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+    res.status(200).json({ success: true, data: ordersWithItems });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateOrderStatus = async (req, res, next) => {
   const connection = await pool.getConnection();
   await connection.beginTransaction();
@@ -357,8 +387,8 @@ const updateOrderStatus = async (req, res, next) => {
         );
       }
     }
-    // --- Case: Simple status updates (Confirmed, Processing, Pending) ---
-    else if (['Confirmed', 'Processing', 'Pending'].includes(status)) {
+    // --- Case: Simple status updates (Confirmed, Pending) ---
+    else if (['Confirmed', 'Pending'].includes(status)) {
       await connection.query(
         `UPDATE orders SET status = ? WHERE id = ?`,
         [status, order.id]
@@ -447,6 +477,7 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
+  getAssignedOrders,
   getTotalOrders,
   getStats
 };

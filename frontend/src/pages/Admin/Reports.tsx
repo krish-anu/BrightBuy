@@ -324,12 +324,7 @@ const Reports: React.FC = () => {
                 {reportsData && reportsData.orderStatusOverview ? reportsData.orderStatusOverview.Pending || 0 : 0}
               </span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Processing Orders</span>
-              <span className="text-lg font-bold text-blue-600">
-                {reportsData && reportsData.orderStatusOverview ? reportsData.orderStatusOverview.Processing || 0 : 0}
-              </span>
-            </div>
+            {/* Processing status removed from reports */}
             <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
               <span className="text-sm font-medium text-gray-700">Shipped Orders</span>
               <span className="text-lg font-bold text-purple-600">

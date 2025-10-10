@@ -4,7 +4,7 @@ const authorizeRoles = (...allowedRoles) => {
     const normalizedAllowed = allowedRoles.map(r => r.toLowerCase());
 
     if (!normalizedAllowed.includes(userRole)) {
-      console.log("User role:", req.user.role, "Allowed roles:", allowedRoles);
+      console.log(`Role middleware reject: requester=${req.user.id} role=${req.user.role} method=${req.method} path=${req.originalUrl} Allowed roles:`, allowedRoles);
       return res.status(403).json({ message: "Forbidden: Access denied" });
     }
 

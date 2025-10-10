@@ -339,7 +339,7 @@ INSERT IGNORE INTO orders (id, userId, deliveryMode, deliveryAddress, totalPrice
 (1, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 1299.99, 15.00, 'Card', 'Delivered'),
 (2, 3, 'Store Pickup', NULL, 299.99, 0.00, 'Card', 'Confirmed'),
 (3, 4, 'Standard Delivery', '{"street": "456 Oak Ave", "city": "City", "state": "State", "zipCode": "67890"}', 399.99, 10.00, 'CashOnDelivery', 'Shipped'),
-(4, 5, 'Standard Delivery', '{"street": "789 Pine St", "city": "City", "state": "State", "zipCode": "11111"}', 199.99, 20.00, 'Card', 'Processing'),
+(4, 5, 'Standard Delivery', '{"street": "789 Pine St", "city": "City", "state": "State", "zipCode": "11111"}', 199.99, 20.00, 'Card', 'Confirmed'),
 (5, 6, 'Store Pickup', NULL, 249.99, 0.00, 'Card', 'Pending'),
 (6, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 599.99, 15.00, 'Card', 'Delivered'),
 (7, 3, 'Store Pickup', NULL, 899.99, 0.00, 'Card', 'Delivered'),

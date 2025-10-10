@@ -28,7 +28,7 @@ export interface Order {
   };
   items: OrderItem[];
   total: number;
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  status: "pending" | "shipped" | "delivered" | "cancelled";
   orderDate: string;
   shippingAddress: string;
   assignedDelivery?: string;
@@ -72,7 +72,7 @@ export interface Reports {
   };
   orderStats: {
     pending: number;
-    processing: number;
+    // processing removed
     shipped: number;
     delivered: number;
     cancelled: number;
@@ -103,7 +103,7 @@ export const products: Product[] = [
 
 export const orders: Order[] = [
   { id: "ORD-001", customer: { name: "John Smith", email: "john.smith@email.com", phone: "+1-555-0123" }, items: [{ productId: 1, name: "Wireless Bluetooth Headphones", quantity: 2, price: 99.99 }, { productId: 3, name: "Organic Cotton T-Shirt", quantity: 1, price: 29.99 }], total: 229.97, status: "pending", orderDate: "2024-01-16T10:30:00Z", shippingAddress: "123 Main St, Anytown, AT 12345", assignedDelivery: "DEL-001" },
-  { id: "ORD-002", customer: { name: "Sarah Johnson", email: "sarah.j@email.com", phone: "+1-555-0124" }, items: [{ productId: 2, name: "Smart Fitness Watch", quantity: 1, price: 249.99 }], total: 249.99, status: "processing", orderDate: "2024-01-16T14:15:00Z", shippingAddress: "456 Oak Ave, Somewhere, ST 67890", assignedDelivery: "DEL-002" },
+  { id: "ORD-002", customer: { name: "Sarah Johnson", email: "sarah.j@email.com", phone: "+1-555-0124" }, items: [{ productId: 2, name: "Smart Fitness Watch", quantity: 1, price: 249.99 }], total: 249.99, status: "pending", orderDate: "2024-01-16T14:15:00Z", shippingAddress: "456 Oak Ave, Somewhere, ST 67890", assignedDelivery: "DEL-002" },
   { id: "ORD-003", customer: { name: "Mike Wilson", email: "mike.w@email.com", phone: "+1-555-0125" }, items: [{ productId: 4, name: "Stainless Steel Water Bottle", quantity: 3, price: 24.99 }, { productId: 5, name: "Gaming Mechanical Keyboard", quantity: 1, price: 129.99 }], total: 204.96, status: "shipped", orderDate: "2024-01-15T09:45:00Z", shippingAddress: "789 Pine Rd, Elsewhere, ET 13579", assignedDelivery: "DEL-001" },
   { id: "ORD-004", customer: { name: "Emily Davis", email: "emily.d@email.com", phone: "+1-555-0126" }, items: [{ productId: 1, name: "Wireless Bluetooth Headphones", quantity: 1, price: 99.99 }, { productId: 3, name: "Organic Cotton T-Shirt", quantity: 2, price: 29.99 }], total: 159.97, status: "delivered", orderDate: "2024-01-14T16:20:00Z", shippingAddress: "321 Elm St, Another, AT 24680", assignedDelivery: "DEL-003" }
 ];
@@ -125,7 +125,7 @@ export const deliveries: Delivery[] = [
 export const reports: Reports = {
   salesSummary: { totalRevenue: 844.89, totalOrders: 4, averageOrderValue: 211.22, topSellingProduct: "Wireless Bluetooth Headphones" },
   inventoryStats: { totalProducts: 5, lowStockItems: 2, outOfStockItems: 0, totalValue: 25847.65 },
-  orderStats: { pending: 1, processing: 1, shipped: 1, delivered: 1, cancelled: 0 },
+  orderStats: { pending: 2, shipped: 1, delivered: 1, cancelled: 0 },
   deliveryStats: { assigned: 1, inTransit: 1, delivered: 1, failed: 0 }
 };
 
