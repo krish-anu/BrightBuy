@@ -15,6 +15,7 @@ SELECT
                         'SKU', pv.SKU,
                         'price', pv.price,
                         'stockQnt', pv.stockQnt,
+                        'imageURL', pv.imageURL,
                         'status', CASE 
                             WHEN pv.stockQnt > 10 THEN 'In Stock'
                             WHEN pv.stockQnt > 0 THEN 'Low Stock'
@@ -52,37 +53,40 @@ SELECT
     p.name,
     p.description,
     p.brand,
-    JSON_ARRAYAGG(
-        CASE 
-            WHEN pv.id IS NOT NULL THEN
-                JSON_OBJECT(
-                    'id', pv.id,
-                    'variantName', pv.variantName,
-                    'SKU', pv.SKU,
-                    'price', pv.price,
-                    'stockQnt', pv.stockQnt,
-                    'status', CASE 
-                        WHEN pv.stockQnt > 10 THEN 'In Stock'
-                        WHEN pv.stockQnt > 0 THEN 'Low Stock'
-                        ELSE 'Out of Stock'
-                    END
-                )
-            ELSE NULL
-        END
+    COALESCE(
+        JSON_ARRAYAGG(
+            CASE 
+                WHEN pv.id IS NOT NULL THEN
+                    JSON_OBJECT(
+                        'id', pv.id,
+                        'variantName', pv.variantName,
+                        'SKU', pv.SKU,
+                        'price', pv.price,
+                        'stockQnt', pv.stockQnt,
+                        'imageURL', pv.imageURL,
+                        'status', CASE 
+                            WHEN pv.stockQnt > 10 THEN 'In Stock'
+                            WHEN pv.stockQnt > 0 THEN 'Low Stock'
+                            ELSE 'Out of Stock'
+                        END
+                    )
+                ELSE NULL
+            END
+        ),
+        JSON_ARRAY()
     ) AS ProductVariants,
-    (SELECT CASE 
-        WHEN COUNT(c2.id) > 0 THEN
-            JSON_ARRAYAGG(
-                JSON_OBJECT(
-                    'id', c2.id,
-                    'name', c2.name
-                )
+    COALESCE(
+        (SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'id', c2.id,
+                'name', c2.name
             )
-        ELSE JSON_ARRAY()
-    END
-    FROM product_categories pc2
-    LEFT JOIN categories c2 ON pc2.categoryId = c2.id
-    WHERE pc2.productId = p.id
+        )
+        FROM product_categories pc2
+        LEFT JOIN categories c2 ON pc2.categoryId = c2.id
+        WHERE pc2.productId = p.id
+        ),
+        JSON_ARRAY()
     ) AS Categories
 FROM products p
 LEFT JOIN product_variants pv ON p.id = pv.productId
@@ -163,6 +167,9 @@ const getAttributeById = `SELECT * FROM variant_attributes WHERE id = ?`;
 // Insert variant option
 const insertVariantOption = `INSERT INTO product_variant_options (variantId, attributeId, value) VALUES (?, ?, ?)`;
 
+// Update variant image URL
+const updateVariantImage = `UPDATE product_variants SET imageURL = ? WHERE id = ?`;
+
 // Get popular products
 const getPopularProducts = `
 SELECT p.id, p.name, p.brand, p.description, SUM(oi.quantity) AS soldQuantity
@@ -192,6 +199,7 @@ module.exports = {
   getProductByName,
   insertVariant,
   insertAttributeIfNotExists,
+    updateVariantImage,
   getAttributeById,
   insertVariantOption,
   getPopularProducts,

@@ -24,6 +24,7 @@ interface ProductVariant {
   variantName: string;
   price: number;
   stockQnt: number;
+  imageURL?: string;
 }
 
 // API product type
@@ -100,11 +101,26 @@ const Inventory: React.FC = () => {
       }
       return variants.map((variant) => ({
         ...variant,
+        imageURL: (variant as any).imageURL || null,
         productName: product.name || 'Unknown Product',
         brand: product.brand || 'Unknown Brand',
         categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
       }));
     });
+  };
+
+  // View modal state
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariantFlattened | null>(null);
+
+  const openViewModal = (variant: ProductVariantFlattened) => {
+    setSelectedVariant(variant);
+    setViewModalOpen(true);
+  };
+
+  const closeViewModal = () => {
+    setSelectedVariant(null);
+    setViewModalOpen(false);
   };
 
   // Live search: update searchTerm immediately when typing
@@ -351,11 +367,6 @@ const Inventory: React.FC = () => {
                     <button onClick={() => setAddModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">Cancel</button>
                     <button onClick={async () => {
                       try {
-                        let imageUrl = null;
-                        if (newProductForm.imageFile) {
-                          const uploadRes = await uploadImage(newProductForm.imageFile);
-                          imageUrl = uploadRes.url;
-                        }
                         const categoryIds: number[] = Array.isArray(newProductForm.categoryIds) ? newProductForm.categoryIds : [];
                         const productPayload = {
                           name: newProductForm.name,
@@ -365,9 +376,21 @@ const Inventory: React.FC = () => {
                           stockQnt: Number(newProductForm.stockQnt),
                           categoryIds,
                           attributes: [],
-                          imageURL: imageUrl,
                         };
-                        await addProduct(productPayload);
+
+                        // Create product + variant first
+                        const createRes = await addProduct(productPayload);
+                        const variantId = createRes?.variantId || (createRes?.data && createRes.data.variantId) || null;
+
+                        // If image file provided and we have variantId, upload with entity=variant
+                        if (newProductForm.imageFile && variantId) {
+                          const uploadRes = await (await import('@/services/product.services')).uploadImageForEntity(newProductForm.imageFile, 'variant', variantId);
+                          const imageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes?.data?.message || uploadRes?.url;
+                          if (imageUrl) {
+                            await (await import('@/services/product.services')).setVariantImage(variantId, imageUrl);
+                          }
+                        }
+
                         setAddModalOpen(false);
                         loadProducts(1);
                       } catch (err) {
@@ -432,7 +455,12 @@ const Inventory: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-900">${p.price}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.stockQnt}</td>
                           <td className="px-6 py-4"><span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>{stockStatus.label}</span></td>
-                          <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2"><button className="text-blue-600 hover:text-blue-900"><IconComponent iconName="Edit" size={16} /></button><button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button><button className="text-red-600 hover:text-red-900"><IconComponent iconName="Trash2" size={16} /></button></div></td>
+                          <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2">
+                            <button onClick={() => openViewModal(p)} className="text-gray-700 hover:text-gray-900" title="View"><IconComponent iconName="Eye" size={16} /></button>
+                            <button className="text-blue-600 hover:text-blue-900"><IconComponent iconName="Edit" size={16} /></button>
+                            <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button>
+                            <button className="text-red-600 hover:text-red-900"><IconComponent iconName="Trash2" size={16} /></button>
+                          </div></td>
                         </tr>
                       );
                     })
@@ -464,6 +492,37 @@ const Inventory: React.FC = () => {
           </div>
         </>
       )}
+        {/* View Variant Modal */}
+        {viewModalOpen && selectedVariant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-1/2 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">{selectedVariant.productName} — {selectedVariant.variantName}</h3>
+                <button onClick={closeViewModal} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  {selectedVariant.imageURL ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-64 object-contain rounded-md" />
+                  ) : (
+                    <div className="w-full h-64 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Brand: <strong className="text-gray-900">{selectedVariant.brand}</strong></p>
+                  <p className="text-sm text-gray-600 mb-2">Category: <strong className="text-gray-900">{selectedVariant.categories}</strong></p>
+                  <p className="text-sm text-gray-600 mb-2">Price: <strong className="text-gray-900">${selectedVariant.price}</strong></p>
+                  <p className="text-sm text-gray-600 mb-2">Stock: <strong className="text-gray-900">{selectedVariant.stockQnt}</strong></p>
+                  <p className="text-sm text-gray-600 mb-2">SKU: <strong className="text-gray-900">{(selectedVariant as any).SKU || '—'}</strong></p>
+                </div>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button onClick={closeViewModal} className="px-4 py-2 bg-gray-100 rounded-md">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

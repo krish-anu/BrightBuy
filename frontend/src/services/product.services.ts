@@ -91,6 +91,32 @@ export const uploadImage = async (file: File) => {
   }
 }
 
+export const uploadImageForEntity = async (file: File, entity: string, entityId: string | number) => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('entity', entity);
+    formData.append('entityId', String(entityId));
+    const response = await axiosInstance.post('/api/image/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading image for entity:', error);
+    throw error;
+  }
+}
+
+export const setVariantImage = async (variantId: number | string, imageURL: string) => {
+  try {
+    const response = await axiosInstance.patch(`/api/variant/${variantId}/image`, { imageURL });
+    return response.data;
+  } catch (error) {
+    console.error('Error setting variant image:', error);
+    throw error;
+  }
+}
+
 export const addProduct = async (productData: any) => {
   try {
     const response = await axiosInstance.post('/api/product', productData);

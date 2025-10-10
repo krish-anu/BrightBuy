@@ -102,10 +102,11 @@ const addProduct = async (req, res, next) => {
       ]);
     }
 
-    await connection.commit();
-    const [newProduct] = await connection.query(productQueries.getProductById, [productId]);
+  await connection.commit();
+  const [newProduct] = await connection.query(productQueries.getProductById, [productId]);
 
-    res.status(201).json({ success: true, data: newProduct[0] });
+  // Return created product and the newly created variant id so frontend can upload image with correct entityId
+  res.status(201).json({ success: true, data: newProduct[0], variantId });
   } catch (err) {
     if (connection) await connection.rollback();
     next(err);
@@ -271,3 +272,4 @@ module.exports = {
   getProductCount,
   getPopularProduct
 };
+

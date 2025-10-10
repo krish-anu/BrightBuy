@@ -6,12 +6,23 @@ exports.uploadImage = async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
 
+    // read entity info from the request (frontend should send these fields)
+    const { entity = 'unknown', entityId = '0' } = req.body || {};
+
+    // build filename: {entity}/{entityId}/{timestamp}_{random}.{ext}
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 8);
+    const originalName = file.originalname || 'file';
+    const extMatch = originalName.match(/\.([0-9a-zA-Z]+)(?:\?.*)?$/);
+    const ext = extMatch ? extMatch[1] : (file.mimetype.split('/')[1] || 'bin');
+    const key = `${entity}/${entityId}/${timestamp}_${randomString}.${ext}`;
+
     const params = {
       Bucket: process.env.S3_BUCKET_NAME,
-      Key: `${Date.now()}-${file.originalname}`,
+      Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
-    //   ACL: 'public-read', // optional
+      // ACL: 'public-read',
     };
 
     await s3.send(new PutObjectCommand(params));
