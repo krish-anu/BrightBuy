@@ -30,46 +30,71 @@ const getProduct = async (req, res, next) => {
 const addProduct = async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
-    const { name, description, brand, attributes, stockQnt, price,categoryIds } = req.body;
+    const { name, description, brand, attributes, stockQnt, price, categoryIds, imageURL } = req.body;
 
-    if (!name || !description || !attributes || !price )
-      throw new ApiError('Name, description, price and attributes are required', 400);
+    // defensive defaults and validation
+    const attrs = Array.isArray(attributes) ? attributes : [];
+    if (!name || !description || !price) throw new ApiError('Name, description and price are required', 400);
 
     await connection.beginTransaction();
 
     const [existing] = await connection.query(productQueries.getProductByName, [name]);
-    if (existing.length) throw new ApiError('Product exists', 409);
-
-    const [productResult] = await connection.query(
-      productQueries.insertProduct,
-      [name, description, brand || null]
-    );
-    const productId = productResult.insertId;
+    let productId;
+    if (existing.length) {
+      // If a product with the same name exists, use its id and create a new variant for it
+      productId = existing[0].id;
+    } else {
+      const [productResult] = await connection.query(
+        productQueries.insertProduct,
+        [name, description, brand || null]
+      );
+      productId = productResult.insertId;
+    }
 
     if (Array.isArray(categoryIds)) {
       for (const categoryId of categoryIds) {
+        // insertProductCategory is idempotent (INSERT IGNORE) so duplicates won't error
         await connection.query(productQueries.insertProductCategory, [productId, categoryId]);
       }
     }
 
-    const variantName = `${ name } ${ attributes.map(a => a.value).join(' ') }`;
-    const SKU = generateSKU(name, variantName);
-
-    const [variantResult] = await connection.query(productQueries.insertVariant, [
-      productId,
-      variantName,
-      SKU,
-      stockQnt || 1,
-      price,
-    ]);
+  const variantName = `${ name } ${ attrs.map(a => a && a.value ? a.value : '').join(' ') }`;
+    // Generate SKU and ensure uniqueness (retry a few times if collision occurs)
+    let SKU;
+    let variantResult;
+    const maxSkuTries = 5;
+    for (let attempt = 0; attempt < maxSkuTries; attempt++) {
+      SKU = generateSKU(name, variantName);
+      try {
+        [variantResult] = await connection.query(productQueries.insertVariant, [
+          productId,
+          variantName,
+          SKU,
+          stockQnt || 1,
+          price,
+          imageURL || null,
+        ]);
+        break; // success
+      } catch (err) {
+        // If duplicate SKU (ER_DUP_ENTRY) then retry; otherwise rethrow
+        if (err && err.code === 'ER_DUP_ENTRY') {
+          console.warn(`SKU collision, retrying (${attempt + 1}/${maxSkuTries})`);
+          if (attempt === maxSkuTries - 1) throw new ApiError('Failed to generate unique SKU, try again', 500);
+          // else continue loop to generate a new SKU
+        } else {
+          throw err;
+        }
+      }
+    }
     const variantId = variantResult.insertId;
-    for (const attr of attributes) {
-      if (!attr.id || !attr.value) continue;
+    for (const attr of attrs) {
+      if (!attr || !attr.id || !attr.value) continue;
 
-      const [attribute] = await connection.query(productQueries.getAttributeById, [attr.id]);
-      if (!attribute.length) throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
+      const attributeRows = await connection.query(productQueries.getAttributeById, [attr.id]);
+      const attribute = Array.isArray(attributeRows) && attributeRows[0] ? attributeRows[0] : null;
+      if (!attribute || attribute.length === 0) throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
 
-      const attributeId = attribute[0].id;
+      const attributeId = attribute[0].id || attribute[0].id;
       await connection.query(productQueries.insertVariantOption, [
         variantId,
         attributeId,
@@ -157,9 +182,10 @@ const getProductsPaginated = async (req, res, next) => {
 
     console.log(`Fetching products - page: ${page}, limit: ${limit}, offset: ${offset}`);
 
-    // Get paginated products
-    console.log('Executing paginated products query...');
-    const products = await query(productQueries.getAllProductsPaginated, [limit, offset]);
+  // Get paginated products
+  console.log('Executing paginated products query...');
+  const paginatedSql = `${productQueries.getAllProductsPaginated} LIMIT ${limit} OFFSET ${offset}`;
+  const products = await query(paginatedSql);
     console.log(`Products fetched: ${products.length}`);
     
     // Get total count

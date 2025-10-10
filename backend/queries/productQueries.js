@@ -88,7 +88,6 @@ FROM products p
 LEFT JOIN product_variants pv ON p.id = pv.productId
 GROUP BY p.id, p.name, p.description, p.brand
 ORDER BY p.name ASC
-LIMIT ? OFFSET ?
 `;
 
 // Get total count of products for pagination
@@ -149,12 +148,11 @@ SELECT p.id AS productId, p.name, COUNT(pv.id) AS count
 FROM products p
 LEFT JOIN product_variants pv ON pv.productId = p.id
 GROUP BY p.id ORDER BY p.name ASC`;
-
 // Check if product exists by name
 const getProductByName = `SELECT * FROM products WHERE name = ?`;
 
-// Insert variant
-const insertVariant = `INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price) VALUES (?, ?, ?, ?, ?)`;
+// Insert variant (include imageURL to allow storing uploaded image link)
+const insertVariant = `INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES (?, ?, ?, ?, ?, ?)`;
 
 // Insert attribute if not exists
 const insertAttributeIfNotExists = `INSERT IGNORE INTO variant_attributes (name) VALUES (?)`;
@@ -176,7 +174,7 @@ ORDER BY soldQuantity DESC
 `;
 
 const insertProductCategory = `
-INSERT INTO product_categories (productId, categoryId) VALUES (?, ?)
+INSERT IGNORE INTO product_categories (productId, categoryId) VALUES (?, ?)
 `;
 
 module.exports = {

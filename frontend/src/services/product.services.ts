@@ -76,3 +76,27 @@ export const getInventoryStats = async (): Promise<{ success: boolean; data: Inv
     throw error;
   }
 }
+
+export const uploadImage = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await axiosInstance.post('/api/image/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+}
+
+export const addProduct = async (productData: any) => {
+  try {
+    const response = await axiosInstance.post('/api/product', productData);
+    return response.data;
+  } catch (error) {
+    console.error('Error adding product:', error);
+    throw error;
+  }
+}
