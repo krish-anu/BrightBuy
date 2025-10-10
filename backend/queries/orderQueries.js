@@ -1,9 +1,11 @@
 // Orders Queries
 const getAllOrders = `
   SELECT o.*, 
-         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone,
+         d.id AS deliveryId, d.status AS deliveryStatus, d.staffId AS deliveryStaffId
   FROM orders o
   LEFT JOIN users u ON o.userId = u.id
+  LEFT JOIN deliveries d ON d.orderId = o.id
   ORDER BY o.orderDate DESC
 `;
 

@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS orders (
   deliveryAddress JSON NULL,
   deliveryCharge DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (deliveryCharge >= 0),
   estimatedDeliveryDate DATETIME NULL DEFAULT NULL,
-  status ENUM('Pending','Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+  status ENUM('Pending','Confirmed','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
   paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
   cancelReason ENUM('PaymentFailed','Expired','UserCancelled') NULL,
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -160,8 +160,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   orderId INT NOT NULL,
   staffId INT DEFAULT NULL,
-  -- Allow both lowercase and capitalized variants because backend sometimes writes capitalized values
-  status ENUM('Pending','Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+  -- Include 'Assigned' in the enum so seed and backend can explicitly set it
+  status ENUM('Pending','Assigned','Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
   deliveryDate DATETIME DEFAULT NULL,
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -368,10 +368,10 @@ INSERT IGNORE INTO order_items (id, orderId, variantId, quantity, unitPrice, tot
 -- (orderId, staffId left NULL for now; deliveryDate set for delivered orders)
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
 (1, NULL, 'delivered', '2024-01-20 10:00:00'),
-(3, NULL, 'in_transit', NULL),
-(4, NULL, 'assigned', NULL),
+(3, NULL, 'Assigned', NULL),
+(4, NULL, 'Assigned', NULL),
 (6, NULL, 'delivered', '2024-02-10 12:00:00'),
-(8, NULL, 'in_transit', NULL);
+(8, NULL, 'Assigned', NULL);
 
 -- Seed payments for sample orders (simple statuses)
 INSERT IGNORE INTO payments (userId, orderId, amount, paymentMethod, status) VALUES
@@ -616,7 +616,10 @@ INSERT INTO cities (name, isMainCategory) VALUES
 
 -- Insert Users data (including customers and one admin)
 INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
-('admin@brightbuy.com', 'admin123', 'Admin User', 'Admin', '555-0000', 1, TRUE),
+('admin@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User', 'Admin', '555-0000', 1, TRUE),
+('anudelivery@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff', 'DeliveryStaff', '555-0101', 1, TRUE),
+('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', 1, TRUE),
+('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', 1, TRUE),
 ('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
 ('jane.doe@email.com', 'password123', 'Jane Doe', 'Customer', '555-0002', 2, TRUE),
 ('mike.johnson@email.com', 'password123', 'Mike Johnson', 'Customer', '555-0003', 3, TRUE),

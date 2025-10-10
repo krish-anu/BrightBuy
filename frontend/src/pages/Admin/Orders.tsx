@@ -45,20 +45,29 @@ const Orders: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      // If the current user is WarehouseStaff, fetch assigned orders instead of full list
+      // Decide which endpoint to call based on token role to avoid 403 Forbidden
       const current = getCurrentUserFromToken();
-      const role = current?.role || '';
-  const ordersData = role.toLowerCase() === 'warehousestaff' ? await getAssignedOrders() : await getAllOrders();
+      const role = (current?.role || '').toString().toLowerCase();
+      let ordersData: Order[] = [];
+      if (role === 'admin' || role === 'superadmin') {
+        ordersData = await getAllOrders();
+      } else if (role === 'warehousestaff' || role === 'deliverystaff' || role.includes('delivery')) {
+        // warehouse and delivery staff should only get their assigned orders
+        ordersData = await getAssignedOrders();
+      } else {
+        // Other roles are not allowed to list all orders; surface a helpful message and return empty
+        setError('You do not have permission to list all orders.');
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
       // If admin and activeTab is shipped, load shipped orders too
       if (role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin') {
         // lazy load shipped orders
-        try {
-          const res = await import('../../services/order.services').then(m => m.getAllOrders && m.getAllOrders());
-          // but we'll call the shipped endpoint explicitly below when tab is active
-        } catch (e) { /* ignore */ }
+        // lazy load placeholder - no-op
       }
     } catch (err) {
       console.error('Error loading orders:', err);
@@ -154,7 +163,9 @@ const Orders: React.FC = () => {
     }
   });
 
-  const displayedOrders = activeTab === 'shipped' ? shippedOrders : (activeTab === 'assigned' ? orders.filter(o => o.deliveryId) : orders);
+  const displayedOrders = activeTab === 'shipped'
+    ? shippedOrders
+    : (activeTab === 'assigned' ? filteredOrders.filter(o => o.deliveryId) : filteredOrders);
 
   // Pagination calculations (use displayedOrders which respects tab)
   const totalCount = displayedOrders.length;
@@ -187,6 +198,8 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'assigned':
+        return 'bg-blue-100 text-blue-800';
       case 'pending':
         return 'bg-orange-100 text-orange-800';
       case 'confirmed':
@@ -203,6 +216,17 @@ const Orders: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
+
+  // Safely stringify possible object fields (addresses, names) returned as JSON
+  const stringifyField = (v: any) => {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    try {
+      return JSON.stringify(v);
+    } catch (_) {
+      return String(v);
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -304,6 +328,7 @@ const Orders: React.FC = () => {
             onChange={e => setFilterStatus(e.target.value)}
           >
             <option value="">All Statuses</option>
+            <option value="assigned">Assigned</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             {/* Processing removed */}
@@ -488,8 +513,11 @@ const Orders: React.FC = () => {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.customer?.name || 'Unknown Customer'}</div>
-                      <div className="text-sm text-gray-500">{order.customer?.email || 'No email'}</div>
+                      <div className="text-sm text-gray-900">{(typeof order.customer?.name === 'object') ? stringifyField(order.customer?.name) : (order.customer?.name || 'Unknown Customer')}</div>
+                      <div className="text-sm text-gray-500">{(typeof order.customer?.email === 'object') ? stringifyField(order.customer?.email) : (order.customer?.email || 'No email')}</div>
+                      {order.deliveryAddress && (
+                        <div className="text-xs text-gray-400 mt-1">{typeof order.deliveryAddress === 'object' ? stringifyField(order.deliveryAddress) : order.deliveryAddress}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
@@ -531,10 +559,16 @@ const Orders: React.FC = () => {
                           <IconComponent iconName="Edit" size={16} />
                         </button>
                         { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
-                        <button 
+                        <button
                           className="text-purple-600 hover:text-purple-900"
                           title="Assign Delivery"
                           onClick={async () => {
+                            // Guard client-side: ensure current token belongs to Admin or SuperAdmin
+                            const current = getCurrentUserFromToken();
+                            if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
+                              alert('You are not authorized to assign deliveries. Please login as Admin.');
+                              return;
+                            }
                             // Open assign modal for this order
                             try {
                               setDeliveryToAssign({ orderId: order.id, deliveryId: order.deliveryId });
@@ -542,8 +576,12 @@ const Orders: React.FC = () => {
                               // fetch delivery staff
                               const staff = await getDeliveryStaff();
                               setAvailableDeliveryStaff(staff || []);
-                            } catch (err) {
-                              alert('Failed to fetch delivery staff');
+                            } catch (err: any) {
+                              console.error('Failed to fetch delivery staff', err);
+                              const status = err?.response?.status || err?.status;
+                              if (status === 401) alert('Unauthorized — please login');
+                              else if (status === 403) alert('Forbidden — you do not have permission to perform assignments');
+                              else alert('Failed to fetch delivery staff');
                             }
                           }}
                         >
