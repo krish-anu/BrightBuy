@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllOrders, getAssignedOrders } from '../../services/order.services';
+import { getDeliveryStaff } from '../../services/user.services';
+import { assignStaffToDelivery } from '../../services/delivery.services';
 import { getCurrentUserFromToken } from '../../services/auth.services';
 import type { Order } from '../../services/order.services';
 import * as LucideIcons from 'lucide-react';
@@ -21,6 +23,12 @@ const Orders: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'shipped' | 'assigned'>('all');
+  const [shippedOrders, setShippedOrders] = useState<Order[]>([]);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [availableDeliveryStaff, setAvailableDeliveryStaff] = useState<any[]>([]);
+  const [assigningDelivery, setAssigningDelivery] = useState(false);
+  const [deliveryToAssign, setDeliveryToAssign] = useState<{ deliveryId?: number; orderId?: number } | null>(null);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,10 +48,18 @@ const Orders: React.FC = () => {
       // If the current user is WarehouseStaff, fetch assigned orders instead of full list
       const current = getCurrentUserFromToken();
       const role = current?.role || '';
-      const ordersData = role.toLowerCase() === 'warehousestaff' ? await getAssignedOrders() : await getAllOrders();
+  const ordersData = role.toLowerCase() === 'warehousestaff' ? await getAssignedOrders() : await getAllOrders();
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
+      // If admin and activeTab is shipped, load shipped orders too
+      if (role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin') {
+        // lazy load shipped orders
+        try {
+          const res = await import('../../services/order.services').then(m => m.getAllOrders && m.getAllOrders());
+          // but we'll call the shipped endpoint explicitly below when tab is active
+        } catch (e) { /* ignore */ }
+      }
     } catch (err) {
       console.error('Error loading orders:', err);
       // Distinguish forbidden from other errors
@@ -62,6 +78,20 @@ const Orders: React.FC = () => {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  // Load shipped orders (admin only)
+  const loadShippedOrders = async () => {
+    try {
+      setLoading(true);
+      const axiosInstance = (await import('../../axiosConfig')).default;
+      const response = await axiosInstance.get('/api/order/shipped');
+      setShippedOrders(response.data?.data || []);
+    } catch (err) {
+      console.error('Error loading shipped orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Modal state for view/edit
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -124,12 +154,13 @@ const Orders: React.FC = () => {
     }
   });
 
-  // Pagination calculations
-  const totalCount = filteredOrders.length;
+  const displayedOrders = activeTab === 'shipped' ? shippedOrders : (activeTab === 'assigned' ? orders.filter(o => o.deliveryId) : orders);
+
+  // Pagination calculations (use displayedOrders which respects tab)
+  const totalCount = displayedOrders.length;
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
   // Pagination handlers
   const handlePreviousPage = () => {
@@ -240,6 +271,15 @@ const Orders: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-4">
+        <div className="flex space-x-2">
+          <button onClick={() => setActiveTab('all')} className={`px-3 py-1 rounded ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white'}`}>All Orders</button>
+          <button onClick={() => { setActiveTab('shipped'); loadShippedOrders(); }} className={`px-3 py-1 rounded ${activeTab === 'shipped' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Shipped</button>
+          <button onClick={() => setActiveTab('assigned')} className={`px-3 py-1 rounded ${activeTab === 'assigned' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Assigned</button>
+        </div>
       </div>
 
       {/* Search & Filter */}
@@ -392,7 +432,7 @@ const Orders: React.FC = () => {
         )}
       </div>
 
-      {/* Orders Table */}
+        {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center p-8">
@@ -444,7 +484,7 @@ const Orders: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedOrders.filter(Boolean).map(order => (
+                  {displayedOrders.slice(startIndex, endIndex).filter(Boolean).map(order => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -490,13 +530,26 @@ const Orders: React.FC = () => {
                         >
                           <IconComponent iconName="Edit" size={16} />
                         </button>
+                        { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
                         <button 
                           className="text-purple-600 hover:text-purple-900"
                           title="Assign Delivery"
-                          onClick={() => console.log('Assign delivery:', order.id)}
+                          onClick={async () => {
+                            // Open assign modal for this order
+                            try {
+                              setDeliveryToAssign({ orderId: order.id, deliveryId: order.deliveryId });
+                              setAssignModalOpen(true);
+                              // fetch delivery staff
+                              const staff = await getDeliveryStaff();
+                              setAvailableDeliveryStaff(staff || []);
+                            } catch (err) {
+                              alert('Failed to fetch delivery staff');
+                            }
+                          }}
                         >
                           <IconComponent iconName="Truck" size={16} />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -673,6 +726,61 @@ const Orders: React.FC = () => {
                       }
                     }} className={`px-3 py-1 ${isUpdatingStatus ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{isUpdatingStatus ? 'Saving...' : 'Save'}</button>
                   <button onClick={() => { setEditModalOpen(false); setSelectedOrder(null); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Delivery Modal (Admin only) */}
+      {assignModalOpen && deliveryToAssign && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Assign Delivery Staff</h3>
+              <button onClick={() => { setAssignModalOpen(false); setDeliveryToAssign(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Select Delivery Staff</label>
+                <div className="mt-2">
+                  <select className="w-full px-3 py-2 border rounded" onChange={(e) => setAvailableDeliveryStaff(prev => prev.map(s => ({...s, _selected: s.id === Number(e.target.value)})))}>
+                    <option value="">-- Select --</option>
+                    {availableDeliveryStaff.map(st => (
+                      <option key={st.id} value={st.id}>{st.name} ({st.email})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-3 flex space-x-2">
+                    <button onClick={async () => {
+                      const selected = availableDeliveryStaff.find(s => s._selected);
+                      if (!selected) { alert('Please select a staff'); return; }
+                      try {
+                        setAssigningDelivery(true);
+                        // Use deliveryId if present, otherwise pass the orderId — backend will create a delivery record when missing
+                        const idToUse = deliveryToAssign.deliveryId || deliveryToAssign.orderId;
+                        const resp = await assignStaffToDelivery(Number(idToUse), selected.id);
+                        // If the service returns an error-like response, surface it
+                        if (resp && resp.success === false) {
+                          const msg = resp.error || resp.message || 'Failed to assign delivery staff';
+                          alert(msg);
+                        } else {
+                          // refresh lists
+                          await loadOrders();
+                          await loadShippedOrders();
+                          setAssignModalOpen(false);
+                          setDeliveryToAssign(null);
+                        }
+                      } catch (err: any) {
+                        console.error('Assign failed', err);
+                        const serverMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to assign delivery staff';
+                        alert(serverMsg);
+                      } finally {
+                        setAssigningDelivery(false);
+                      }
+                    }} className={`px-3 py-1 ${assigningDelivery ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{assigningDelivery ? 'Assigning...' : 'Assign'}</button>
+                  <button onClick={() => { setAssignModalOpen(false); setDeliveryToAssign(null); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
                 </div>
               </div>
             </div>

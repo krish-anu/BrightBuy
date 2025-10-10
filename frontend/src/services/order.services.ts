@@ -40,6 +40,9 @@ export interface Order {
   // Additional fields from joins
   customer?: Customer;
   items?: OrderItem[];
+  // delivery info
+  deliveryId?: number;
+  deliveryStatus?: string;
 }
 
 export interface OrdersResponse {

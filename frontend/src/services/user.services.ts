@@ -30,3 +30,13 @@ export const deleteUser = async (userId: number) => {
         throw error;
     }
 };   
+
+export const getDeliveryStaff = async () => {
+    try {
+        const response = await axiosInstance.get('/api/users/delivery-staff');
+        return response.data.data;
+    } catch (error) {
+        console.error('Error fetching delivery staff:', error);
+        throw error;
+    }
+};

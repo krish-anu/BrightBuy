@@ -13,6 +13,11 @@ const userQueries = {
     FROM users
     WHERE email = ?
   `,
+  getDeliveryStaff: `
+    SELECT id, name, email, phone
+    FROM users
+    WHERE role = 'DeliveryStaff'
+  `,
   insert: `
     INSERT INTO users (name, email, password, role, role_accepted, address, phone, cityId)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)

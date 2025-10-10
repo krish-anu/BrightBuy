@@ -303,6 +303,27 @@ const getAssignedOrders = async (req, res, next) => {
   }
 };
 
+// Admin/SuperAdmin: Get orders with status 'Shipped' so admin can assign delivery staff
+const getShippedOrders = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getShippedOrders);
+
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+
+    res.status(200).json({ success: true, data: ordersWithItems });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateOrderStatus = async (req, res, next) => {
   const connection = await pool.getConnection();
   await connection.beginTransaction();
@@ -478,6 +499,7 @@ module.exports = {
   getOrderStatus,
   updateOrderStatus,
   getAssignedOrders,
+  getShippedOrders,
   getTotalOrders,
   getStats
 };

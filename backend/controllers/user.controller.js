@@ -52,6 +52,16 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// Get only delivery staff users (for admin assignment UI)
+const getDeliveryStaff = async (req, res, next) => {
+  try {
+    const rows = await query(userQueries.getDeliveryStaff);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Admin update user (different from updateUserInfo which updates current user)
 const updateUserById = async (req, res, next) => {
   try {
@@ -105,6 +115,7 @@ module.exports = {
   getUserDeliveryInfo,
   updateUserInfo,
   getAllUsers,
+  getDeliveryStaff,
   updateUserById,
   deleteUser
 };
