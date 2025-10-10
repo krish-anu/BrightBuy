@@ -98,7 +98,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
                     <Separator />
 
                     <div className="flex flex-col  font-black text-lg md:text-2xl text-secondary">
-                        <span className="">LKR {displayVariant?.price}</span>
+                        <span className="">LKR {displayVariant?.price ?? 0}</span>
                     </div>
                     <Separator />
                     <div className="flex flex-col gap-2 px-4 text-md md:text-lg text-foreground">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
-import { getAllProducts, getProductsPaginated, getInventoryStats, uploadImage, addProduct } from '@/services/product.services';
+import { getAllProducts, getProductsPaginated, getInventoryStats, addProduct } from '@/services/product.services';
 import { getAllCategories } from '@/services/category.services';
 import SingleSelect from '@/components/ui/SingleSelect';
 
@@ -22,9 +22,9 @@ interface IconComponentProps {
 interface ProductVariant {
   id: number;
   variantName: string;
-  price: number;
-  stockQnt: number;
-  imageURL?: string;
+  price: number | null;
+  stockQnt: number | null;
+  imageURL?: string | null;
 }
 
 // API product type
@@ -42,6 +42,7 @@ interface ProductVariantFlattened extends ProductVariant {
   productName: string;
   brand: string;
   categories: string;
+  isDefaultVariant?: boolean;
 }
 
 const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
@@ -85,39 +86,115 @@ const Inventory: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const flattenProducts = (list: Product[]): ProductVariantFlattened[] => {
-    return list.flatMap((product) => {
+    const out: ProductVariantFlattened[] = [];
+    for (const product of list) {
       const variants = product.ProductVariants || [];
       const categories = product.Categories || [];
-      if (variants.length === 0) {
-        return [
-          {
-            id: product.id,
-            variantName: 'Default',
-            price: (product as any).price || 0,
-            stockQnt: (product as any).stockQnt || 0,
-            productName: product.name || 'Unknown Product',
-            brand: product.brand || 'Unknown Brand',
-            categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
-          },
-        ];
+      if (!product || variants.length === 0) {
+        out.push({
+          id: product.id,
+          variantName: 'Default',
+          price: product ? ((product as any).price ?? null) : null,
+          stockQnt: product ? ((product as any).stockQnt ?? null) : null,
+          imageURL: product ? ((product as any).imageURL ?? null) : null,
+          isDefaultVariant: true,
+          productName: product.name || 'Unknown Product',
+          brand: product.brand || 'Unknown Brand',
+          categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+        });
+        continue;
       }
-      return variants.map((variant) => ({
-        ...variant,
-        imageURL: (variant as any).imageURL || null,
-        productName: product.name || 'Unknown Product',
-        brand: product.brand || 'Unknown Brand',
-        categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
-      }));
-    });
+      for (const variant of variants) {
+        // skip null/undefined variants (some API responses may include null entries)
+        if (!variant) continue;
+        out.push({
+          ...variant,
+          imageURL: (variant as any).imageURL ?? null,
+          isDefaultVariant: false,
+          price: (variant as any).price ?? (product ? (product as any).price ?? null : null),
+          stockQnt: (variant as any).stockQnt ?? (product ? (product as any).stockQnt ?? null : null),
+          productName: product.name || 'Unknown Product',
+          brand: product.brand || 'Unknown Brand',
+          categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+        });
+      }
+    }
+    return out;
   };
 
   // View modal state
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantFlattened | null>(null);
+  // Edit/Delete modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>({ variantName: '', price: 0, stockQnt: 0 });
 
   const openViewModal = (variant: ProductVariantFlattened) => {
+    (async () => {
+      try {
+        // If this is a default/no-variant row, there's no variant endpoint to call; use available data
+        if (variant.isDefaultVariant) {
+          setSelectedVariant({ ...variant, imageURL: variant.imageURL ?? null });
+          setViewModalOpen(true);
+          return;
+        }
+
+        const { getVariant } = await import('@/services/variant.services');
+        const res = await getVariant(variant.id);
+        const data = res?.data || res || null;
+        if (!data) {
+          // Variant missing on server (deleted elsewhere) — remove from current list
+          setProducts(prev => prev.filter(p => p.id !== variant.id));
+          setTotalCount(c => Math.max(0, c - 1));
+          await loadInventoryStats();
+          // Inform user
+          alert('Variant not found — it appears to have been deleted and was removed from the list');
+          return;
+        }
+        setSelectedVariant({ ...variant, imageURL: data?.imageURL ?? variant.imageURL ?? null });
+        setViewModalOpen(true);
+      } catch (err) {
+        console.error('Failed to load variant for view', err);
+        setSelectedVariant({ ...variant, imageURL: variant.imageURL ?? null });
+        setViewModalOpen(true);
+      }
+    })();
+  };
+
+  const handleEditVariant = (variant: ProductVariantFlattened) => {
+    (async () => {
+      try {
+        if (variant.isDefaultVariant) {
+          alert('This is a default product entry with no editable variant. Create a variant to edit details.');
+          return;
+        }
+        const { getVariant } = await import('@/services/variant.services');
+        const res = await getVariant(variant.id);
+        const data = res?.data || res || null;
+        // If variant not found (deleted), show a message and refresh list
+        if (!data) {
+          // Variant missing on server (deleted elsewhere) — remove from current list
+          setProducts(prev => prev.filter(p => p.id !== variant.id));
+          setTotalCount(c => Math.max(0, c - 1));
+          await loadInventoryStats();
+          alert('Variant not found — it appears to have been deleted and was removed from the list');
+          return;
+        }
+        // data shape from backend: { id, SKU, variantName, price, stockQnt, productId, imageURL, attributes }
+        setSelectedVariant({ ...variant, imageURL: data?.imageURL ?? variant.imageURL ?? null });
+  setEditForm({ variantName: data?.variantName ?? variant.variantName, price: data?.price ?? variant.price ?? 0, currentStock: data?.stockQnt ?? variant.stockQnt ?? 0, addStock: 0 });
+        setEditModalOpen(true);
+      } catch (err) {
+        console.error('Failed to load variant details', err);
+        alert('Failed to load variant details');
+      }
+    })();
+  };
+
+  const handleDeleteVariant = (variant: ProductVariantFlattened) => {
     setSelectedVariant(variant);
-    setViewModalOpen(true);
+    setDeleteModalOpen(true);
   };
 
   const closeViewModal = () => {
@@ -130,19 +207,44 @@ const Inventory: React.FC = () => {
   const loadProducts = async (page: number = 1) => {
     setProductsLoading(true);
     try {
-      // if searching, fetch all and search across full dataset
-      if (searchTerm && searchTerm.trim() !== '') {
+      // If searching OR a stock-status filter is active, fetch the full dataset and filter client-side
+      if ((searchTerm && searchTerm.trim() !== '') || (filterStockStatus && filterStockStatus !== '')) {
         const res = await getAllProducts();
         if (res && res.success && res.data) {
-          const flattened = flattenProducts(res.data as Product[]);
-          const q = searchTerm.toLowerCase();
-          const matched = flattened.filter((p) => (p.productName && p.productName.toLowerCase().includes(q)) || (p.variantName && p.variantName.toLowerCase().includes(q)));
+          let flattened = flattenProducts(res.data as Product[]);
+
+          // Apply search term filter if present
+          if (searchTerm && searchTerm.trim() !== '') {
+            const q = searchTerm.toLowerCase();
+            flattened = flattened.filter((p) => (p.productName && p.productName.toLowerCase().includes(q)) || (p.variantName && p.variantName.toLowerCase().includes(q)));
+          }
+
+          // Apply stock status filter if present (global)
+          if (filterStockStatus && filterStockStatus !== '') {
+            switch (filterStockStatus) {
+              case 'low-stock':
+                flattened = flattened.filter(p => (p.stockQnt ?? -1) <= 10 && (p.stockQnt ?? -1) > 0);
+                break;
+              case 'out-of-stock':
+                flattened = flattened.filter(p => (p.stockQnt ?? -1) === 0);
+                break;
+              case 'in-stock':
+                flattened = flattened.filter(p => (p.stockQnt ?? -1) > 10);
+                break;
+              default:
+                break;
+            }
+          }
+
+          // Also apply category filter client-side if selected
+          const afterCategory = filterCategory && filterCategory !== '' ? flattened.filter(p => p.categories.includes(filterCategory)) : flattened;
+
           const startIndex = (page - 1) * itemsPerPage;
-          const paginated = matched.slice(startIndex, startIndex + itemsPerPage);
+          const paginated = afterCategory.slice(startIndex, startIndex + itemsPerPage);
           setProducts(paginated);
           setCurrentPage(page);
-          setTotalPages(Math.ceil(matched.length / itemsPerPage));
-          setTotalCount(matched.length);
+          setTotalPages(Math.ceil(afterCategory.length / itemsPerPage));
+          setTotalCount(afterCategory.length);
           setError(null);
           return;
         }
@@ -188,23 +290,8 @@ const Inventory: React.FC = () => {
   const filteredProducts = products.filter((p) => {
     const matchesSearch = true; // search already applied during loadProducts when searching
     const matchesCategory = filterCategory === '' || p.categories.includes(filterCategory);
-    let matchesStockStatus = true;
-    if (filterStockStatus) {
-      switch (filterStockStatus) {
-        case 'low-stock':
-          matchesStockStatus = p.stockQnt <= 10 && p.stockQnt > 0;
-          break;
-        case 'out-of-stock':
-          matchesStockStatus = p.stockQnt === 0;
-          break;
-        case 'in-stock':
-          matchesStockStatus = p.stockQnt > 10;
-          break;
-        default:
-          matchesStockStatus = true;
-      }
-    }
-    return matchesSearch && matchesCategory && matchesStockStatus;
+    // stock status and search are applied globally in loadProducts when active
+    return matchesSearch && matchesCategory;
   });
 
   const loadCategories = async () => {
@@ -243,7 +330,8 @@ const Inventory: React.FC = () => {
   const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
   const handleItemsPerPageChange = (newItemsPerPage: number) => { setItemsPerPage(newItemsPerPage); setCurrentPage(1); };
 
-  const getStockStatus = (stock: number) => {
+  const getStockStatus = (stock: number | null | undefined) => {
+    if (stock === null || stock === undefined) return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
     if (stock === 0) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
     if (stock <= 10) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
@@ -265,7 +353,7 @@ const Inventory: React.FC = () => {
       } finally { setLoading(false); }
     };
     fetchData();
-  }, [currentPage, itemsPerPage, searchTerm]);
+  }, [currentPage, itemsPerPage, searchTerm, filterStockStatus, filterCategory]);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -422,7 +510,9 @@ const Inventory: React.FC = () => {
                         }
 
                         setAddModalOpen(false);
-                        loadProducts(1);
+                        await loadProducts(1);
+                        // Refresh global inventory stats so tiles show counts from all products
+                        await loadInventoryStats();
                       } catch (err) {
                         console.error('Error adding product:', err);
                         alert('Failed to add product');
@@ -482,14 +572,14 @@ const Inventory: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-900">{p.variantName}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.brand}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.categories}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">${p.price}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{p.stockQnt}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{p.price != null ? `$${p.price}` : null}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{p.stockQnt != null ? p.stockQnt : null}</td>
                           <td className="px-6 py-4"><span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>{stockStatus.label}</span></td>
                           <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2">
                             <button onClick={() => openViewModal(p)} className="text-gray-700 hover:text-gray-900" title="View"><IconComponent iconName="Eye" size={16} /></button>
-                            <button className="text-blue-600 hover:text-blue-900"><IconComponent iconName="Edit" size={16} /></button>
+                            <button onClick={() => handleEditVariant(p)} disabled={p.isDefaultVariant} className={`text-blue-600 hover:text-blue-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Edit"><IconComponent iconName="Edit" size={16} /></button>
                             <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button>
-                            <button className="text-red-600 hover:text-red-900"><IconComponent iconName="Trash2" size={16} /></button>
+                            <button onClick={() => handleDeleteVariant(p)} disabled={p.isDefaultVariant} className={`text-red-600 hover:text-red-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Delete"><IconComponent iconName="Trash2" size={16} /></button>
                           </div></td>
                         </tr>
                       );
@@ -516,39 +606,180 @@ const Inventory: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center"><div className="p-2 bg-blue-100 rounded-md"><IconComponent iconName="Package" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.totalVariants}</div><div className="text-sm text-gray-500">Total Product Variants</div></div></div></div>
-            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center"><div className="p-2 bg-yellow-100 rounded-md"><IconComponent iconName="AlertTriangle" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.lowStockItems}</div><div className="text-sm text-gray-500">Low Stock Items</div></div></div></div>
-            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">${inventoryStats.totalInventoryValue.toLocaleString()}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div></div>
+            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-blue-100 rounded-md"><IconComponent iconName="Package" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.totalVariants}</div><div className="text-sm text-gray-500">Total Product Variants</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
+            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-yellow-100 rounded-md"><IconComponent iconName="AlertTriangle" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.lowStockItems}</div><div className="text-sm text-gray-500">Low Stock Items</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
+            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">${inventoryStats.totalInventoryValue.toLocaleString()}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
           </div>
         </>
       )}
-        {/* View Variant Modal */}
+        {/* View Variant Modal (UserManagement style) */}
         {viewModalOpen && selectedVariant && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-1/2 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">{selectedVariant.productName} — {selectedVariant.variantName}</h3>
-                <button onClick={closeViewModal} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  {selectedVariant.imageURL ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-64 object-contain rounded-md" />
-                  ) : (
-                    <div className="w-full h-64 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+          <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Product Details</h3>
+                  <button onClick={closeViewModal} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Product</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedVariant?.productName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Variant</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedVariant?.variantName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Brand</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedVariant?.brand || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Category</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedVariant?.categories || 'N/A'}</p>
+                  </div>
+                  {selectedVariant?.price != null && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Price</label>
+                      <p className="mt-1 text-sm text-gray-900">${selectedVariant.price}</p>
+                    </div>
                   )}
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Brand: <strong className="text-gray-900">{selectedVariant.brand}</strong></p>
-                  <p className="text-sm text-gray-600 mb-2">Category: <strong className="text-gray-900">{selectedVariant.categories}</strong></p>
-                  <p className="text-sm text-gray-600 mb-2">Price: <strong className="text-gray-900">${selectedVariant.price}</strong></p>
-                  <p className="text-sm text-gray-600 mb-2">Stock: <strong className="text-gray-900">{selectedVariant.stockQnt}</strong></p>
-                  <p className="text-sm text-gray-600 mb-2">SKU: <strong className="text-gray-900">{(selectedVariant as any).SKU || '—'}</strong></p>
+                  {selectedVariant?.stockQnt != null && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Stock</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedVariant.stockQnt}</p>
+                    </div>
+                  )}
+                  {(selectedVariant as any)?.SKU && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">SKU</label>
+                      <p className="mt-1 text-sm text-gray-900">{(selectedVariant as any).SKU}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Image</label>
+                    <div className="mt-1">
+                      {selectedVariant?.imageURL ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={selectedVariant.imageURL} alt={`${selectedVariant?.productName || 'Product'}`} className="w-full h-40 object-contain rounded-md" />
+                      ) : (
+                        <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end mt-4">
-                <button onClick={closeViewModal} className="px-4 py-2 bg-gray-100 rounded-md">Close</button>
+            </div>
+          </div>
+        )}
+        {/* Edit Variant Modal */}
+        {editModalOpen && selectedVariant && (
+          <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Edit Variant</h3>
+                  <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Variant Name</label>
+                    <input type="text" value={editForm.variantName} onChange={(e) => setEditForm({ ...editForm, variantName: e.target.value })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Price</label>
+                    <input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Current Stock</label>
+                    <input type="number" value={editForm.currentStock ?? 0} readOnly className="mt-1 block w-full px-3 py-2 border rounded bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Add Stock</label>
+                    <input type="number" value={editForm.addStock} onChange={(e) => setEditForm({ ...editForm, addStock: Number(e.target.value) })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Image</label>
+                    <div className="mt-1">
+                      {selectedVariant?.imageURL ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
+                      ) : (
+                        <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end mt-4 space-x-2">
+                  <button onClick={() => setEditModalOpen(false)} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                  <button onClick={async () => {
+                    try {
+                      const { updateVariant } = await import('@/services/variant.services');
+                      const variantId = selectedVariant.id;
+                      const newStock = (Number(editForm.currentStock) || 0) + (Number(editForm.addStock) || 0);
+                      await updateVariant(variantId, { variantName: editForm.variantName, price: editForm.price ?? 0, stockQnt: newStock });
+                      setEditModalOpen(false);
+                      // refresh products
+                      await loadProducts(currentPage);
+                      await loadInventoryStats();
+                    } catch (err) {
+                      console.error('Failed to update variant', err);
+                      alert('Failed to update variant');
+                    }
+                  }} className="px-3 py-1 bg-blue-600 text-white rounded">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Variant Modal */}
+        {deleteModalOpen && selectedVariant && (
+          <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Delete Variant</h3>
+                  <button onClick={() => setDeleteModalOpen(false)} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+                </div>
+                <p>Are you sure you want to delete <strong>{selectedVariant.variantName}</strong> of product <strong>{selectedVariant.productName}</strong>?</p>
+                <div className="flex justify-end mt-4 space-x-2">
+                  <button onClick={() => setDeleteModalOpen(false)} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                  <button onClick={async () => {
+                    try {
+                      const { deleteVariant } = await import('@/services/variant.services');
+                      const deletedId = selectedVariant.id;
+                      await deleteVariant(deletedId);
+                      // Optimistically remove the row from current list
+                      // Remove from UI immediately (coerce to number to avoid string/number mismatches)
+                      setProducts(prev => prev.filter(p => Number(p.id) !== Number(deletedId)));
+                      setTotalCount(c => Math.max(0, c - 1));
+                      setDeleteModalOpen(false);
+                      setSelectedVariant(null);
+                      // Refresh inventory stats
+                      await loadInventoryStats();
+                      // Try to reload current page to fill rows (non-blocking)
+                      try { 
+                        await loadProducts(currentPage);
+                        // After reload, ensure row is not present (defensive): remove if still there
+                        setProducts(prev => prev.filter(p => Number(p.id) !== Number(deletedId)));
+                      } catch (e) { console.error('Failed to reload products after delete', e); }
+                    } catch (err) {
+                      console.error('Failed to delete variant', err);
+                      // Rollback UI removal if it was removed optimistically
+                      if (selectedVariant) {
+                        setProducts(prev => {
+                          // If the row already exists, keep it; otherwise restore selectedVariant at the top
+                          const exists = prev.some(p => p.id === selectedVariant.id);
+                          if (exists) return prev;
+                          return [selectedVariant, ...prev];
+                        });
+                        setTotalCount(c => c + 1);
+                      }
+                      alert('Failed to delete variant. It has been restored in the list.');
+                    }
+                  }} className="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+                </div>
               </div>
             </div>
           </div>

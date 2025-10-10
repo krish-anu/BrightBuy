@@ -53,14 +53,6 @@ export interface OrdersResponse {
   };
 }
 
-type OrderStats = {
-  pending: number;
-  confirmed: number;
-  shipped: number;
-  delivered: number;
-  cancelled: number;
-};
-
 type StatsResponse = {
   totalOrders: number;
   totalRevenue: string;
