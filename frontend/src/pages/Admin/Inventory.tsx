@@ -55,6 +55,7 @@ const Inventory: React.FC = () => {
   const [products, setProducts] = useState<ProductVariantFlattened[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -106,7 +107,10 @@ const Inventory: React.FC = () => {
     });
   };
 
+  // Live search: update searchTerm immediately when typing
+
   const loadProducts = async (page: number = 1) => {
+    setProductsLoading(true);
     try {
       // if searching, fetch all and search across full dataset
       if (searchTerm && searchTerm.trim() !== '') {
@@ -157,6 +161,8 @@ const Inventory: React.FC = () => {
       console.error('Error loading products:', err);
       setError(err instanceof Error ? err.message : 'Failed to load products');
       setProducts([]);
+    } finally {
+      setProductsLoading(false);
     }
   };
 
@@ -227,10 +233,15 @@ const Inventory: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      // Keep initial loading separate from subsequent product fetches
+      if (!searchTerm && currentPage === 1 && itemsPerPage === 10) {
+        setLoading(true);
+      }
       setError(null);
       try {
-        await Promise.all([loadProducts(currentPage), loadCategories(), loadInventoryStats()]);
+        // When searching, always load page 1
+        const pageToLoad = searchTerm ? 1 : currentPage;
+        await Promise.all([loadProducts(pageToLoad), loadCategories(), loadInventoryStats()]);
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally { setLoading(false); }
@@ -258,8 +269,9 @@ const Inventory: React.FC = () => {
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="relative">
-                <input type="text" placeholder="Search products or variant..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Search products or variant..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); loadProducts(1); }} />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><IconComponent iconName="Search" size={16} /></div>
+                {productsLoading && <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-500">Searching...</div>}
               </div>
 
               <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
@@ -374,7 +386,7 @@ const Inventory: React.FC = () => {
                 <span className="text-sm text-gray-600">Active filters:</span>
                 {searchTerm && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Search: "{searchTerm}"
-                    <button onClick={() => setSearchTerm('')} className="ml-1 text-blue-600 hover:text-blue-800">×</button>
+                    <button onClick={() => { setSearchTerm(''); }} className="ml-1 text-blue-600 hover:text-blue-800">×</button>
                   </span>
                 )}
                 {filterCategory && (
