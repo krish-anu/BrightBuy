@@ -81,6 +81,8 @@ const Inventory: React.FC = () => {
     attributes: [] as any[],
     imageFile: null as File | null,
   });
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const flattenProducts = (list: Product[]): ProductVariantFlattened[] => {
     return list.flatMap((product) => {
@@ -351,7 +353,35 @@ const Inventory: React.FC = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Category</label>
                         <div className="mt-1">
-                          <SingleSelect options={categories} value={newProductForm.categoryIds && newProductForm.categoryIds.length ? newProductForm.categoryIds[0] : null} onChange={(selectedId) => setNewProductForm({ ...newProductForm, categoryIds: selectedId ? [selectedId] : [] })} placeholder="Select main category" />
+                          <div className="flex space-x-2 items-center">
+                            <div className="flex-1">
+                              <SingleSelect options={categories} value={newProductForm.categoryIds && newProductForm.categoryIds.length ? newProductForm.categoryIds[0] : null} onChange={(selectedId) => setNewProductForm({ ...newProductForm, categoryIds: selectedId ? [selectedId] : [] })} placeholder="Select main category" />
+                            </div>
+                            <div>
+                              <button type="button" onClick={() => setShowAddCategory(true)} className="px-2 py-1 text-xs bg-gray-100 rounded">Add</button>
+                            </div>
+                          </div>
+                          {typeof showAddCategory !== 'undefined' && showAddCategory && (
+                            <div className="mt-2 flex items-center space-x-2">
+                              <input type="text" placeholder="New category name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="px-2 py-1 border rounded w-full" />
+                              <button onClick={async () => {
+                                try {
+                                  if (!newCategoryName || newCategoryName.trim() === '') return;
+                                  const resp = await (await import('@/services/category.services')).createCategory(newCategoryName.trim(), null);
+                                  if (resp && resp.success) {
+                                    // refresh categories
+                                    await loadCategories();
+                                    setNewCategoryName('');
+                                    setShowAddCategory(false);
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to create category', err);
+                                  alert('Failed to create category');
+                                }
+                              }} className="px-3 py-1 bg-blue-600 text-white rounded">Save</button>
+                              <button onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
