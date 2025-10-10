@@ -1,3 +1,9 @@
+jest.mock('stripe', () => {
+  return jest.fn().mockImplementation(() => ({
+    paymentIntents: { create: jest.fn().mockResolvedValue({ id: 'pi_test' }) },
+  }));
+});
+
 const request = require('supertest');
 // Use the express app (not the server that starts the listener) to avoid port/DB startup in tests
 const app = require('../app');
