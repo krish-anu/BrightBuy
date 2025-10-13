@@ -307,11 +307,7 @@ const Orders: React.FC = () => {
 
       {/* Tabs */}
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex space-x-2">
-          <button onClick={() => setActiveTab('all')} className={`px-3 py-1 rounded ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white'}`}>All Orders</button>
-          <button onClick={() => { setActiveTab('shipped'); loadShippedOrders(); }} className={`px-3 py-1 rounded ${activeTab === 'shipped' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Shipped</button>
-          <button onClick={() => setActiveTab('assigned')} className={`px-3 py-1 rounded ${activeTab === 'assigned' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Assigned</button>
-        </div>
+        
 
         {/* Delivery mode selector */}
         <div>
