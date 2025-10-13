@@ -81,6 +81,7 @@ const Inventory: React.FC = () => {
     categoryIds: [] as number[],
     attributes: [] as any[],
     imageFile: null as File | null,
+    _brands: [] as { id: number; name: string }[],
   });
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -355,6 +356,17 @@ const Inventory: React.FC = () => {
     fetchData();
   }, [currentPage, itemsPerPage, searchTerm, filterStockStatus, filterCategory]);
 
+  // Load brands once when the component mounts so the Add Product modal has data even if user opens it later
+  useEffect(() => {
+    (async () => {
+      try {
+        await loadBrands();
+      } catch (err) {
+        console.error('Failed to preload brands on mount', err);
+      }
+    })();
+  }, []);
+
   // Load brands for Add Product modal
   const loadBrands = async () => {
     try {
@@ -440,11 +452,18 @@ const Inventory: React.FC = () => {
                           <select className="flex-1 px-3 py-2 border rounded" value={newProductForm.brand} onChange={e => setNewProductForm({ ...newProductForm, brand: e.target.value })}>
                             <option value="">Select brand</option>
                             {/** brands loaded into state */}
-                            {Array.isArray((newProductForm as any)._brands) && (newProductForm as any)._brands.map((b: any) => (
-                              <option key={b.id} value={b.name}>{b.name}</option>
-                            ))}
+                            {Array.isArray((newProductForm as any)._brands) && (newProductForm as any)._brands.length > 0 ? (
+                              (newProductForm as any)._brands.map((b: any) => (
+                                <option key={b.id} value={b.name}>{b.name}</option>
+                              ))
+                            ) : (
+                              <option disabled>No brands available</option>
+                            )}
                           </select>
-                          <button type="button" onClick={() => setNewProductForm({ ...newProductForm, _showAddBrand: true })} className="px-2 py-1 text-xs bg-gray-100 rounded">Add</button>
+                          <div className="flex items-center space-x-2">
+                            <button type="button" onClick={() => setNewProductForm({ ...newProductForm, _showAddBrand: true })} className="px-2 py-1 text-xs bg-gray-100 rounded">Add</button>
+                            <button type="button" onClick={async () => { try { await loadBrands(); alert('Brands refreshed'); } catch (err) { console.error('Failed to refresh brands', err); alert('Failed to refresh brands'); } }} className="px-2 py-1 text-xs bg-gray-50 border rounded">Reload</button>
+                          </div>
                         </div>
 
                         {newProductForm._showAddBrand && (

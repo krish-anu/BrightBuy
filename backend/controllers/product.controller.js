@@ -24,8 +24,27 @@ const getBrands = async (req, res, next) => {
       ) ENGINE=InnoDB;
     `);
 
-    const rows = await query(`SELECT id, name FROM brands ORDER BY name ASC`);
-    res.status(200).json({ success: true, data: rows });
+    // fetch brands table entries
+    const brandRows = await query(`SELECT id, name FROM brands ORDER BY name ASC`);
+
+    // also fetch distinct brand values from products table (some older products may have brand text but not exist in brands table)
+    const productBrandRows = await query(`SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand != ''`);
+
+    // merge and dedupe by name (case-insensitive), prefer brands table id when available
+    const map = new Map();
+    for (const r of brandRows) {
+      if (!r || !r.name) continue;
+      map.set(r.name.toString().toLowerCase(), { id: r.id, name: r.name });
+    }
+    for (const pr of productBrandRows) {
+      const name = pr && pr.brand ? pr.brand.toString() : null;
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!map.has(key)) map.set(key, { id: null, name });
+    }
+
+    const merged = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    res.status(200).json({ success: true, data: merged });
   } catch (err) {
     next(err);
   }
