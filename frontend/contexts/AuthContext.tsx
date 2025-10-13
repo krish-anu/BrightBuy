@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
 import { loginUser } from "../src/services/auth.services";
-import { useNavigate } from "react-router-dom";
 
 // Types
 interface User {
@@ -42,7 +41,6 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
   // Check for existing user session on app load
   useEffect(() => {
@@ -85,18 +83,7 @@ const login = async (email: string, password: string) => {
 
       // console.log("User logged in:", userWithoutPassword);
 
-      // Redirect based on role
-      if (userWithoutPassword.role === "SuperAdmin") {
-        navigate("/superadmin");
-      } else if (userWithoutPassword.role === "Admin") {
-        navigate("/admin");
-      } else if (userWithoutPassword.role === "WarehouseStaff") {
-        navigate("/admin/inventory");
-      } else if (userWithoutPassword.role === "DeliveryStaff") {
-        navigate("/admin/deliveries");
-      } else {
-        navigate("/shop");
-      }
+      // NOTE: navigation is handled by the calling page (login forms)
 
       return { success: true, user: userWithoutPassword };
     } else {

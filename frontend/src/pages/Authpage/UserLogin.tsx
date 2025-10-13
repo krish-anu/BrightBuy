@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
-import { useNavigate ,useLocation} from 'react-router-dom';
+import { useNavigate ,useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 
 interface IconComponentProps {
@@ -36,11 +36,35 @@ const UserLogin: React.FC = () => {
 
     try {
       const result = await login(email, password);
-      // console.log("REs",result);
-      
+      // console.debug('Login result:', result);
 
       if (result?.success === true) {
-        navigate(from,{replace: true}); // Redirect after success
+        const returnedRole = result.user?.role || null;
+        const wantsAdmin = from && from.startsWith('/admin');
+
+        if (returnedRole === 'SuperAdmin') {
+          navigate('/superadmin', { replace: true });
+          return;
+        }
+        if (returnedRole === 'Admin') {
+          navigate('/admin', { replace: true });
+          return;
+        }
+        if (returnedRole === 'WarehouseStaff') {
+          navigate('/admin/inventory', { replace: true });
+          return;
+        }
+        if (returnedRole === 'DeliveryStaff') {
+          navigate('/admin/deliveries', { replace: true });
+          return;
+        }
+
+        // fallback
+        if (wantsAdmin) {
+          navigate('/', { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
       } else {
         setError(result?.error || 'Login failed');
       }
@@ -144,9 +168,15 @@ const UserLogin: React.FC = () => {
 
         <p className="mt-5 text-center text-sm text-gray-600">
           Don’t have an account?{" "}
-          <a href="/signup" className="text-primary hover:underline font-medium">
-            Create one
-          </a>
+          {(() => {
+            // If user was redirected here from an admin route, pass admin=true to signup so role dropdown is shown
+            const signupUrl = from && from.startsWith('/admin') ? '/signup?admin=true' : '/signup';
+            return (
+              <Link to={signupUrl} className="text-primary hover:underline font-medium">
+                Create one
+              </Link>
+            );
+          })()}
         </p>
       </div>
     </div>
