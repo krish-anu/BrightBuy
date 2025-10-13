@@ -355,6 +355,17 @@ const Inventory: React.FC = () => {
     fetchData();
   }, [currentPage, itemsPerPage, searchTerm, filterStockStatus, filterCategory]);
 
+  // Load brands for Add Product modal
+  const loadBrands = async () => {
+    try {
+      const { getBrands } = await import('@/services/product.services');
+      const brands = await getBrands();
+  setNewProductForm((prev: any) => ({ ...prev, _brands: brands }));
+    } catch (err) {
+      console.error('Failed to load brands', err);
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
@@ -400,7 +411,7 @@ const Inventory: React.FC = () => {
                 <option value={100}>100 per page</option>
               </select>
 
-              <button onClick={() => setAddModalOpen(true)} className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"><IconComponent iconName="Plus" size={16} /><span className="ml-2">Add Product</span></button>
+              <button onClick={async () => { await loadBrands(); setAddModalOpen(true); }} className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"><IconComponent iconName="Plus" size={16} /><span className="ml-2">Add Product</span></button>
             </div>
 
             {addModalOpen && (
@@ -425,7 +436,37 @@ const Inventory: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Brand</label>
-                        <input type="text" value={newProductForm.brand} onChange={(e) => setNewProductForm({ ...newProductForm, brand: e.target.value })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                        <div className="mt-1 flex space-x-2 items-center">
+                          <select className="flex-1 px-3 py-2 border rounded" value={newProductForm.brand} onChange={e => setNewProductForm({ ...newProductForm, brand: e.target.value })}>
+                            <option value="">Select brand</option>
+                            {/** brands loaded into state */}
+                            {Array.isArray((newProductForm as any)._brands) && (newProductForm as any)._brands.map((b: any) => (
+                              <option key={b.id} value={b.name}>{b.name}</option>
+                            ))}
+                          </select>
+                          <button type="button" onClick={() => setNewProductForm({ ...newProductForm, _showAddBrand: true })} className="px-2 py-1 text-xs bg-gray-100 rounded">Add</button>
+                        </div>
+
+                        {newProductForm._showAddBrand && (
+                          <div className="mt-2 flex items-center space-x-2">
+                            <input type="text" placeholder="New brand name" value={newProductForm._newBrandName || ''} onChange={(e) => setNewProductForm({ ...newProductForm, _newBrandName: e.target.value })} className="px-2 py-1 border rounded w-full" />
+                            <button onClick={async () => {
+                              try {
+                                const name = (newProductForm._newBrandName || '').toString().trim();
+                                if (!name) return;
+                                const { createBrand } = await import('@/services/product.services');
+                                const created = await createBrand(name);
+                                // refresh brands list in the modal state
+                                const brands = await (await import('@/services/product.services')).getBrands();
+                                setNewProductForm({ ...newProductForm, brand: created?.name || name, _brands: brands, _showAddBrand: false, _newBrandName: '' });
+                              } catch (err) {
+                                console.error('Failed to create brand', err);
+                                alert('Failed to create brand');
+                              }
+                            }} className="px-3 py-1 bg-blue-600 text-white rounded">Save</button>
+                            <button onClick={() => setNewProductForm({ ...newProductForm, _showAddBrand: false, _newBrandName: '' })} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Price</label>

@@ -126,3 +126,24 @@ export const addProduct = async (productData: any) => {
     throw error;
   }
 }
+
+// Brands
+export const getBrands = async (): Promise<{ id: number; name: string }[]> => {
+  try {
+    const resp = await axiosInstance.get('/api/product/brands');
+    return resp.data.data || [];
+  } catch (err) {
+    console.error('Error fetching brands:', err);
+    return [];
+  }
+};
+
+export const createBrand = async (name: string) => {
+  try {
+    const resp = await axiosInstance.post('/api/product/brands', { name });
+    return resp.data.data;
+  } catch (err) {
+    console.error('Error creating brand:', err);
+    throw err;
+  }
+};

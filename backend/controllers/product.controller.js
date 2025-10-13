@@ -12,6 +12,50 @@ const getProducts = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Get all brands (from a dedicated brands table). If table doesn't exist, create it.
+const getBrands = async (req, res, next) => {
+  try {
+    // ensure brands table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS brands (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    const rows = await query(`SELECT id, name FROM brands ORDER BY name ASC`);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Create a brand (idempotent)
+const createBrand = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.toString().trim()) throw new ApiError('Brand name is required', 400);
+    const brandName = name.toString().trim();
+
+    // ensure brands table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS brands (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // Insert if not exists
+    await query(`INSERT IGNORE INTO brands (name) VALUES (?)`, [brandName]);
+    const [rows] = await query(`SELECT id, name FROM brands WHERE name = ?`, [brandName]);
+    res.status(201).json({ success: true, data: rows[0] || { name: brandName } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get single product with variants
 const getProduct = async (req, res, next) => {
   try {
@@ -270,6 +314,10 @@ module.exports = {
   getProductVariantCount,
   getVariantsOfProduct,
   getProductCount,
-  getPopularProduct
+  getPopularProduct,
+  getBrands,
+  createBrand
 };
+ 
+
 

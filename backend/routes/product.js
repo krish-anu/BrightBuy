@@ -8,6 +8,8 @@ const router = require('express').Router();
 
 router.get('/popular',getPopularProduct)
 router.get('/paginated', getProductsPaginated);
+router.get('/brands', require('../controllers/product.controller').getBrands);
+router.post('/brands', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/product.controller').createBrand);
 router.get('/stats', getInventoryStats);
 router.get('/count', getProductCount);
 router.get('/variant/count', getProductVariantCount);
