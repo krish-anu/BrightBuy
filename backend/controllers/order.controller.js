@@ -431,10 +431,24 @@ const updateOrderStatus = async (req, res, next) => {
   await connection.commit();
 
   // Fetch and return updated order details so frontend can update state
-  const [updatedOrders] = await connection.query(`SELECT * FROM orders WHERE id = ?`, [order.id]);
-  const updatedOrder = updatedOrders[0];
+  // Select order with joined user fields to construct customer object (same shape as getOrder/getOrders)
+  const [updatedRows] = await connection.query(
+    `SELECT o.*, u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+     FROM orders o
+     LEFT JOIN users u ON o.userId = u.id
+     WHERE o.id = ?`,
+    [order.id]
+  );
+  const updatedOrderRow = updatedRows[0];
   const [orderItems] = await connection.query(orderQueries.getOrderItemsByOrderId, [order.id]);
-  updatedOrder.items = orderItems;
+
+  // Build response object matching getOrder/getOrders shape
+  const { customerId, customerName, customerEmail, customerPhone, ...orderData } = updatedOrderRow;
+  const updatedOrder = {
+    ...orderData,
+    customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+    items: orderItems
+  };
 
   res.status(200).json({ success: true, data: updatedOrder });
   } catch (error) {
