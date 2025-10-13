@@ -5,11 +5,11 @@ import { Dot } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ShoppingBagIcon, ShoppingCart } from "lucide-react";
-import type Product from "@/types/Product";
+import type SingleProduct from "@/types/Product";
 import { useState, useEffect } from "react";
 
 interface ProductPageProps {
-  product: Product;
+  product: SingleProduct;
 }
 
 export interface Attribute {
@@ -21,14 +21,14 @@ export interface Variant {
   id: string;
   sku: string;
   price: number;
-  stockQnt: number; // Changed from stockQtn to stockQnt
+  stockQnt: number;
+  image?: string;  
   attributes: Attribute[];
 }
 export interface product {
   id: string;
-  title: string;
+  name: string;
   description: string;
-  image: string;
   variants: Variant[];
 }
 
@@ -64,7 +64,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
         <div className="flex-1 md:max-w-1/3">
           <AspectRatio ratio={1 / 1}>
             <img
-              src={product.image}
+              src={displayVariant?.image ? displayVariant?.image : "/src/assets/product-placeholder.png"}
               className="object-cover w-full h-full rounded-md border-1"
             />
           </AspectRatio>
@@ -75,7 +75,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
         </div>
         <div className="inline-flex flex-col gap-4 w-auto min-w-1/3 md:max-w-2/3">
           <div className="flex flex-col font-bold text-lg md:text-xl text-foreground wrap-break-word">
-            <span> {product.title}</span>
+            <span> {product.name}</span>
           </div>
           <Separator />
 

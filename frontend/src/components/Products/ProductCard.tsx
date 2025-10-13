@@ -15,15 +15,15 @@ export default function ProductCard({ product }: ProductCardProps) {
       <CardContent className="px-0">
         <AspectRatio ratio={9 / 11} className="">
           <img
-            src={product.image}
-            alt={product.title}
+            src={product.ProductVariants[0]?.image || "/src/assets/product-placeholder.png"}
+            alt={product.name}
             className="object-cover h-full w-full rounded-sm"
           />
         </AspectRatio>
-        <CardTitle className="pt-4 text-lg">{product.title}</CardTitle>
+        <CardTitle className="pt-4 text-lg">{product.name}</CardTitle>
         {/* <CardDescription className="text-md">{product.description}</CardDescription> */}
         <span className="text-md md:text-lg font-bold text-secondary">
-          LKR {product.variants[0]?.price ?? 0}
+          LKR {product.ProductVariants[0]?.price ?? 0}
         </span>
       </CardContent>
       <CardFooter className="flex justify- px-0">

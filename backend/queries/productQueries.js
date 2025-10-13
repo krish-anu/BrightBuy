@@ -15,6 +15,7 @@ SELECT
                         'SKU', pv.SKU,
                         'price', pv.price,
                         'stockQnt', pv.stockQnt,
+                        'image', pv.imageURL || '',
                         'status', CASE 
                             WHEN pv.stockQnt > 10 THEN 'In Stock'
                             WHEN pv.stockQnt > 0 THEN 'Low Stock'
@@ -131,6 +132,8 @@ SELECT
     pv.variantName,
     pv.price,
     pv.stockQnt,
+    pv.SKU,
+    pv.imageURL,
     JSON_ARRAYAGG(JSON_OBJECT(
         'attributeId', va.id,
         'attributeName', va.name,
