@@ -1,5 +1,5 @@
 const ApiError = require('../utils/ApiError');
-const {query} = require('../config/db');
+const {query, pool} = require('../config/db');
 const deliveryQueries = require('../queries/deliveryQueries');
 
 const getDeliveries = async (req, res, next) => {
@@ -80,52 +80,58 @@ const updateDeliveryStatusController = async (req, res, next) => {
 }
 
 const assignDeliveryStaff = async (req, res, next) => {
+  let connection;
   try {
     const { id } = req.params;
     const { staffId } = req.body;
-    let deliveryRows = await query(deliveryQueries.getDeliveryById, [id]);
-    console.log('Existing delivery rows for id', id, deliveryRows);
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    let [deliveryRows] = await connection.query(deliveryQueries.getDeliveryById, [id]);
     // If no delivery found, assume caller passed an orderId and create a delivery row for that order
     if (!deliveryRows.length) {
-      console.log(`No delivery found with id=${id}, attempting to create delivery for order id ${id}`);
-      // Create a delivery row for the order and then refetch
-      const insertResult = await query(
+      const insertResult = await connection.query(
         `INSERT INTO deliveries (orderId, status, createdAt) VALUES (?, 'Pending', ?)`,
         [id, new Date()]
       );
-      const newDeliveryId = insertResult.insertId;
-      deliveryRows = await query(deliveryQueries.getDeliveryById, [newDeliveryId]);
+      const newDeliveryId = insertResult[0].insertId;
+      [deliveryRows] = await connection.query(deliveryQueries.getDeliveryById, [newDeliveryId]);
     }
-    const userRows = await query(
-      `SELECT * FROM users WHERE id = ?`,
-      [staffId]
-    );
+
+    // validate staff exists and is DeliveryStaff
+    const [userRows] = await connection.query(`SELECT * FROM users WHERE id = ?`, [staffId]);
     if (!userRows.length || userRows[0].role !== 'DeliveryStaff') {
       throw new ApiError('Invalid staff id', 400);
     }
-    if (deliveryRows[0].staffId )
-      throw new ApiError('Staff assigned',409)
-      // Use the actual delivery id to update (could be newly created)
-      const actualDeliveryId = deliveryRows[0].id;
-      // Mark delivery as assigned and set deliveryDate to now
-      // Use 'Assigned' which is included in the deliveries.status enum
-      await query(deliveryQueries.updateDelivery, [staffId, 'Assigned', new Date(), actualDeliveryId]);
 
-      // Also update the related order status to 'Assigned' so orders reflect that they are assigned to delivery
-      try {
-        const orderId = deliveryRows[0].orderId;
-        if (orderId) await query(deliveryQueries.updateOrderStatus, ['Assigned', orderId]);
-      } catch (orderErr) {
-        console.error('Failed to update order status when assigning delivery staff', orderErr);
-      }
+    if (deliveryRows[0].staffId) {
+      throw new ApiError('Staff assigned', 409);
+    }
 
-      const updatedDelivery = await query(
-        deliveryQueries.getDeliveryById,
-        [actualDeliveryId]
-      );
-      res.status(200).json({ success: true, data: updatedDelivery[0] });
+    const actualDeliveryId = deliveryRows[0].id;
+
+    // Mark delivery as assigned and set deliveryDate to now
+    await connection.query(deliveryQueries.updateDelivery, [staffId, 'Assigned', new Date(), actualDeliveryId]);
+
+    // Also update the related order status to 'Assigned' so orders reflect that they are assigned to delivery
+    const orderId = deliveryRows[0].orderId;
+    if (orderId) {
+      // This may fail if DB enum doesn't include 'Assigned' — let it bubble so transaction rolls back
+      await connection.query(deliveryQueries.updateOrderStatus, ['Assigned', orderId]);
+    }
+
+    await connection.commit();
+
+    const [updatedDeliveryRows] = await connection.query(deliveryQueries.getDeliveryById, [actualDeliveryId]);
+    res.status(200).json({ success: true, data: updatedDeliveryRows[0] });
   } catch (error) {
+    if (connection) {
+      try { await connection.rollback(); } catch (e) { console.error('rollback failed', e); }
+    }
     next(error);
+  } finally {
+    if (connection) connection.release();
   }
 }
 
