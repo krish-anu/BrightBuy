@@ -15,7 +15,7 @@ SELECT
                         'SKU', pv.SKU,
                         'price', pv.price,
                         'stockQnt', pv.stockQnt,
-                        'image', pv.imageURL || '',
+                        'image', IFNULL(pv.imageURL, ''),
                         'status', CASE 
                             WHEN pv.stockQnt > 10 THEN 'In Stock'
                             WHEN pv.stockQnt > 0 THEN 'Low Stock'
@@ -182,6 +182,13 @@ const insertProductCategory = `
 INSERT INTO product_categories (productId, categoryId) VALUES (?, ?)
 `;
 
+const getCategoriesByProduct = `
+SELECT c.id, c.name
+FROM categories c
+JOIN product_categories pc ON pc.categoryId = c.id
+WHERE pc.productId = ?
+`;
+
 module.exports = {
   getAllProducts,
   getAllProductsPaginated,
@@ -200,5 +207,6 @@ module.exports = {
   getAttributeById,
   insertVariantOption,
   getPopularProducts,
-  insertProductCategory
+  insertProductCategory,
+  getCategoriesByProduct
 };

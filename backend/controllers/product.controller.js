@@ -21,7 +21,8 @@ const getProduct = async (req, res, next) => {
     const variants = await query(productQueries.getVariantsByProduct, [req.params.id]);
     const product = rows[0];
     product.variants = variants;
-
+    const categories = await query(productQueries.getCategoriesByProduct, [req.params.id]);
+    product.categories = categories;
     res.status(200).json({ success: true, data: product });
   } catch (err) { next(err); }
 };
