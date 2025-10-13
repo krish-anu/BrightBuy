@@ -1,176 +1,619 @@
--- Simple seed file with essential data for testing
+-- Deterministic, idempotent data-only seed for BrightBuy
+-- - Does NOT modify schema or enums
+-- - Inserts: brands, products(50), product_variants(60), product_categories, variant_attributes,
+--   product_variant_options, cities, users, orders, order_items, deliveries, payments
+-- - Uses explicit ids and INSERT IGNORE so re-running is safe and counts are deterministic
 
--- 1. Cities table
-CREATE TABLE IF NOT EXISTS cities (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(200) NOT NULL,
-  isMainCategory BOOLEAN DEFAULT FALSE
-) ENGINE=InnoDB; 
+-- Create tables if they do not exist (data-only seed must not rely on external migrations)
+CREATE TABLE IF NOT EXISTS brands ( 
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(200) NOT NULL UNIQUE,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 2. Users table
-CREATE TABLE IF NOT EXISTS users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(200) NOT NULL,
-  email VARCHAR(200) NOT NULL UNIQUE,
-  role ENUM('Admin','Customer','WarehouseStaff','DeliveryStaff',"SuperAdmin") NOT NULL DEFAULT 'Customer',
-  password VARCHAR(255) NOT NULL,
-  role_accepted BOOLEAN DEFAULT FALSE, 
-  phone VARCHAR(15) NULL,
-  address JSON NULL,
-  cityId INT NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_users_city FOREIGN KEY (cityId) REFERENCES cities(id)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE
-) ENGINE=InnoDB;
-
--- insert into users (email,password,name,role) VALUES(
--- 'anu@gmail.com','anu','Anu','Admin'
--- );
-
--- 3. Categories table
-CREATE TABLE IF NOT EXISTS categories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE,
-  parentId INT NULL,
-  isMainCategory BOOLEAN DEFAULT FALSE,
-  CONSTRAINT fk_category_parent
-    FOREIGN KEY (parentId) REFERENCES categories(id)
-    ON UPDATE CASCADE
-    ON DELETE SET NULL,
-  INDEX idx_parentId (parentId)
-) ENGINE=InnoDB;
-
--- 4. Products table
 CREATE TABLE IF NOT EXISTS products (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(200) NOT NULL UNIQUE,
-  description TEXT NULL,
-  brand VARCHAR(100) NULL,
-  INDEX idx_brand (brand)
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(255) NOT NULL,
+	description TEXT,
+	brand VARCHAR(200),
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Variant Attributes table
-CREATE TABLE IF NOT EXISTS variant_attributes (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE
-) ENGINE=InnoDB;
-
--- 6. Product Variants table
 CREATE TABLE IF NOT EXISTS product_variants (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  productId INT NOT NULL,
-  variantName VARCHAR(200) NOT NULL,
-  SKU VARCHAR(100) NOT NULL UNIQUE,
-  stockQnt INT NOT NULL DEFAULT 1 CHECK (stockQnt >= 0),
-  price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
-  imageURL VARCHAR(255) NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_productvariants_product FOREIGN KEY (productId) REFERENCES products(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	productId INT NOT NULL,
+	variantName VARCHAR(255) NOT NULL,
+	SKU VARCHAR(120) NOT NULL UNIQUE,
+	stockQnt INT NOT NULL DEFAULT 0,
+	price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+	imageURL VARCHAR(1024) DEFAULT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. Product Variant Options table
-CREATE TABLE IF NOT EXISTS product_variant_options (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  variantId INT NOT NULL,
-  attributeId INT NOT NULL,
-  value VARCHAR(200) NOT NULL,
-  CONSTRAINT fk_variantoptions_variant FOREIGN KEY (variantId) REFERENCES product_variants(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT fk_variantoptions_attribute FOREIGN KEY (attributeId) REFERENCES variant_attributes(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE=InnoDB;
-
--- 8. Product Categories table 
 CREATE TABLE IF NOT EXISTS product_categories (
-  productId INT NOT NULL,
-  categoryId INT NOT NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_productcategories_product FOREIGN KEY (productId) REFERENCES products(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT fk_productcategories_category FOREIGN KEY (categoryId) REFERENCES categories(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  UNIQUE KEY uq_product_category (productId, categoryId)
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	productId INT NOT NULL,
+	categoryId INT NOT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS variant_attributes (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(200) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS product_variant_options (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	variantId INT NOT NULL,
+	attributeId INT NOT NULL,
+	value VARCHAR(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS categories (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(255) NOT NULL,
+	isMainCategory TINYINT(1) DEFAULT 0,
+	parentId INT DEFAULT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS category_attributes (
-  categoryId INT NOT NULL,
-  attributeId INT NOT NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_categoryattributes_attribute FOREIGN KEY (attributeId) REFERENCES variant_attributes(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT fk_categoryattributes_category FOREIGN KEY (categoryId) REFERENCES categories(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  UNIQUE KEY uq_category_attribute (categoryId,attributeId)
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	categoryId INT NOT NULL,
+	attributeId INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 9. Orders table 
+CREATE TABLE IF NOT EXISTS cities (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(200) NOT NULL,
+	isMainCategory TINYINT(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS users (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	name VARCHAR(200) NOT NULL,
+	email VARCHAR(200) NOT NULL UNIQUE,
+	role ENUM('Admin','Customer','WarehouseStaff','DeliveryStaff','SuperAdmin') NOT NULL DEFAULT 'Customer',
+	password VARCHAR(255) NOT NULL,
+	role_accepted TINYINT(1) DEFAULT 0,
+	phone VARCHAR(32) DEFAULT NULL,
+	address JSON DEFAULT NULL,
+	cityId INT DEFAULT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS orders (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  userId INT NOT NULL,
-  orderDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  totalPrice DECIMAL(10,2) NOT NULL CHECK (totalPrice >= 0),
-  deliveryMode ENUM('Store Pickup', 'Standard Delivery') NOT NULL,
-  deliveryAddress JSON NULL,
-  deliveryCharge DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (deliveryCharge >= 0),
-  estimatedDeliveryDate DATETIME NULL DEFAULT NULL,
-  status ENUM('Pending','Confirmed','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
-  paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
-  cancelReason ENUM('PaymentFailed','Expired','UserCancelled') NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_orderDate (orderDate),
-  INDEX idx_status (status),
-  CONSTRAINT fk_orders_user FOREIGN KEY (userId) REFERENCES users(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	userId INT NOT NULL,
+	orderDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	totalPrice DECIMAL(10,2) NOT NULL,
+	deliveryMode ENUM('Store Pickup','Standard Delivery') NOT NULL,
+	deliveryAddress JSON DEFAULT NULL,
+	deliveryCharge DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+	status ENUM('Pending','Confirmed','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+	paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 10. Order Items table
 CREATE TABLE IF NOT EXISTS order_items (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  orderId INT NOT NULL,
-  variantId INT NULL,
-  quantity INT NOT NULL DEFAULT 1 CHECK (quantity >= 1),
-  unitPrice DECIMAL(10,2) NOT NULL CHECK (unitPrice >= 0),
-  totalPrice DECIMAL(10,2) NOT NULL CHECK (totalPrice >= 0),
-  isBackOrdered BOOLEAN DEFAULT FALSE,
-  CONSTRAINT fk_orderitems_order FOREIGN KEY (orderId) REFERENCES orders(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT fk_orderitems_variant FOREIGN KEY (variantId) REFERENCES product_variants(id)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE
-) ENGINE=InnoDB;
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	orderId INT NOT NULL,
+	variantId INT DEFAULT NULL,
+	quantity INT NOT NULL DEFAULT 1,
+	unitPrice DECIMAL(10,2) NOT NULL,
+	totalPrice DECIMAL(10,2) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Insert Main Categories
-INSERT INTO categories (name, isMainCategory, parentId) VALUES
-('Mobiles & Tablets', TRUE, NULL),
-('Laptops & Computers', TRUE, NULL),
-('Audio Devices', TRUE, NULL),
-('Cameras & Photography', TRUE, NULL),
-('Home Appliances', TRUE, NULL),
-('Wearable & Smart Devices', TRUE, NULL),
-('Power & Charging', TRUE, NULL),
-('Personal Care & Health', TRUE, NULL),
-('Security & Safety', TRUE, NULL),
-('Toys & Gadgets', TRUE, NULL);
+CREATE TABLE IF NOT EXISTS deliveries (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	orderId INT NOT NULL,
+	staffId INT DEFAULT NULL,
+	status ENUM('Pending','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
+	deliveryDate DATETIME DEFAULT NULL,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Insert 25 Products per Category (250 total)
--- Mobiles & Tablets (25 products)
-INSERT INTO products (name, description, brand) VALUES
+CREATE TABLE IF NOT EXISTS payments (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	userId INT NOT NULL,
+	orderId INT NOT NULL,
+	amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+	paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
+	status ENUM('Pending','Paid','Cancelled','Failed') NOT NULL DEFAULT 'Pending',
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET FOREIGN_KEY_CHECKS=0;
+
+-- Clear product-related data only (safe for dev seeding)
+TRUNCATE TABLE product_variant_options;
+TRUNCATE TABLE variant_attributes;
+TRUNCATE TABLE product_variants;
+TRUNCATE TABLE product_categories;
+TRUNCATE TABLE products;
+TRUNCATE TABLE brands;
+
+ALTER TABLE products AUTO_INCREMENT = 1;
+ALTER TABLE product_variants AUTO_INCREMENT = 1;
+ALTER TABLE brands AUTO_INCREMENT = 1;
+ALTER TABLE variant_attributes AUTO_INCREMENT = 1;
+ALTER TABLE product_variant_options AUTO_INCREMENT = 1;
+
+SET FOREIGN_KEY_CHECKS=1;
+
+-- Brands (explicit ids)\nINSERT IGNORE INTO brands (id, name) VALUES\n(1,'Samsung'),(2,'Apple'),(3,'Google'),(4,'Sony'),(5,'Xiaomi'),(6,'OnePlus'),(7,'Anker'),(8,'JBL'),(9,'Canon'),(10,'Dyson');
+
+-- Products: explicit ids 1..50 (keeps total products < 60)
+INSERT IGNORE INTO products (id, name, description, brand) VALUES
+(1,'Galaxy S25 Ultra','Flagship Samsung phone','Samsung'),
+(2,'iPhone 17 Pro','Flagship Apple phone','Apple'),
+(3,'Pixel 10 Pro','Flagship Google phone','Google'),
+(4,'OnePlus 13','Flagship OnePlus phone','OnePlus'),
+(5,'Xiaomi 15 Pro','Flagship Xiaomi phone','Xiaomi'),
+(6,'Nokia G70','Reliable everyday phone','Nokia'),
+(7,'MacBook Air M3 15"','Lightweight Apple laptop','Apple'),
+(8,'Lenovo Legion 9','Gaming laptop','Lenovo'),
+(9,'Dell XPS 15','Premium Windows laptop','Dell'),
+(10,'Asus ROG G16','Gaming laptop','Asus'),
+(11,'HP Spectre x360','Convertible laptop','HP'),
+(12,'Acer Swift 3','Student laptop','Acer'),
+(13,'Sony WH-1000XM6','Noise cancelling headphones','Sony'),
+(14,'AirPods Pro 3','Apple earbuds','Apple'),
+(15,'Bose QC Earbuds','Bose earbuds','Bose'),
+(16,'JBL Charge 6','Portable speaker','JBL'),
+(17,'Sennheiser Momentum','Audiophile headphones','Sennheiser'),
+(18,'Beats Studio Pro','Beats headphones','Beats'),
+(19,'Sony A7R V','High-res mirrorless','Sony'),
+(20,'Canon EOS R7','Mirrorless APS-C','Canon'),
+(21,'GoPro Hero 12','Action camera','GoPro'),
+(22,'Fujifilm X-T5','APS-C classic','Fujifilm'),
+(23,'DJI Mini 4','Compact drone','DJI'),
+(24,'Nikon Z8','Full-frame mirrorless','Nikon'),
+(25,'Samsung Family Hub','Smart fridge','Samsung'),
+(26,'Dyson V15','Cordless vacuum','Dyson'),
+(27,'Instant Vortex 10QT','Air fryer','Instant'),
+(28,'LG ThinQ Washer','Smart washing machine','LG'),
+(29,'KitchenAid 6Q','Stand mixer','KitchenAid'),
+(30,'Breville Barista','Espresso machine','Breville'),
+(31,'Apple Watch Series 10','Smartwatch','Apple'),
+(32,'Fitbit Luxe 3','Fitness tracker','Fitbit'),
+(33,'Garmin Fenix 8','Outdoor smartwatch','Garmin'),
+(34,'Oura Ring Gen3','Sleep & readiness ring','Oura'),
+(35,'Samsung Galaxy Watch 6','Android smartwatch','Samsung'),
+(36,'Whoop 4.0','Performance band','Whoop'),
+(37,'Anker 737 Power Bank','High-capacity power bank','Anker'),
+(38,'Belkin 65W Charger','GaN charger','Belkin'),
+(39,'Mophie MagSafe 3','MagSafe charger','Mophie'),
+(40,'RavPower 120W','Multi-port charger','RavPower'),
+(41,'Baseus 100W','USB-C charger','Baseus'),
+(42,'UGREEN PD 65W','Portable charger','UGREEN'),
+(43,'Philips Series 9000','Electric shaver','Philips'),
+(44,'Oral-B iO10','Smart electric toothbrush','Oral-B'),
+(45,'Omron Platinum BP','Blood pressure monitor','Omron'),
+(46,'Withings Body+','Smart scale','Withings'),
+(47,'Theragun Prime','Percussive massager','Theragun'),
+(48,'Beurer UB90','Pulse oximeter','Beurer'),
+(49,'Arlo Pro 4','Security camera','Arlo'),
+(50,'Ring Spotlight Cam','Security camera','Ring');
+
+-- Product variants: explicit ids 1..60 (exactly 60 variants)
+INSERT IGNORE INTO product_variants (id, productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+-- products 1..40: single variant each (ids 1..40)
+(1,1,'Galaxy S25 Ultra - 256GB','SKU-GAL-S25-256',120,1099.99,NULL),
+(2,2,'iPhone 17 Pro - 256GB','SKU-APP-17-256',100,1199.99,NULL),
+(3,3,'Pixel 10 Pro - 256GB','SKU-GOO-10-256',90,999.99,NULL),
+(4,4,'OnePlus 13 - 256GB','SKU-ONE-13-256',130,899.99,NULL),
+(5,5,'Xiaomi 15 Pro - 128GB','SKU-XIA-15-128',140,699.99,NULL),
+(6,6,'Nokia G70 - 128GB','SKU-NOK-G70-128',200,229.99,NULL),
+(7,7,'MacBook Air M3 15" - 512GB','SKU-APP-MBA-512',90,1299.99,NULL),
+(8,8,'Lenovo Legion 9 - 1TB','SKU-LEN-LEG9-1TB',60,2499.99,NULL),
+(9,9,'Dell XPS 15 - 512GB','SKU-DEL-XPS15-512',80,1499.99,NULL),
+(10,10,'Asus ROG G16 - 1TB','SKU-ASU-ROG-1TB',70,1999.99,NULL),
+(11,11,'HP Spectre x360 - 512GB','SKU-HP-SPX-512',100,1399.99,NULL),
+(12,12,'Acer Swift 3 - 256GB','SKU-ACR-SW3-256',150,699.99,NULL),
+(13,13,'Sony WH-1000XM6 - Black','SKU-SON-WH-1000XM6',180,349.99,NULL),
+(14,14,'AirPods Pro 3','SKU-APP-AIRP3',220,249.99,NULL),
+(15,15,'Bose QC Earbuds','SKU-BOS-QC',140,279.99,NULL),
+(16,16,'JBL Charge 6 - Black','SKU-JBL-CHG6',150,179.99,NULL),
+(17,17,'Sennheiser Momentum','SKU-SEN-MOM',60,399.99,NULL),
+(18,18,'Beats Studio Pro - Black','SKU-BEA-SP',70,329.99,NULL),
+(19,19,'Sony A7R V - Body','SKU-SON-A7RV',40,3499.99,NULL),
+(20,20,'Canon EOS R7 - Body','SKU-CAN-R7',60,1799.99,NULL),
+(21,21,'GoPro Hero 12 - Black','SKU-GPR-12',120,499.99,NULL),
+(22,22,'Fujifilm X-T5 - Body','SKU-FUJ-XT5',90,999.99,NULL),
+(23,23,'DJI Mini 4','SKU-DJI-MINI4',110,599.99,NULL),
+(24,24,'Nikon Z8 - Body','SKU-NIK-Z8',40,4299.99,NULL),
+(25,25,'Samsung Family Hub','SKU-SAM-FH',20,3499.99,NULL),
+(26,26,'Dyson V15','SKU-DYS-V15',60,599.99,NULL),
+(27,27,'Instant Vortex 10QT','SKU-INS-VX10',140,169.99,NULL),
+(28,28,'LG ThinQ Washer','SKU-LG-WASH',30,899.99,NULL),
+(29,29,'KitchenAid 6Q','SKU-KA-6Q',100,499.99,NULL),
+(30,30,'Breville Barista','SKU-BRV-B',60,699.99,NULL),
+(31,31,'Apple Watch Series 10 - 41mm','SKU-APP-AW10-41',200,399.99,NULL),
+(32,32,'Fitbit Luxe 3','SKU-FIT-LUXE3',180,149.99,NULL),
+(33,33,'Garmin Fenix 8','SKU-GAR-FEN8',60,599.99,NULL),
+(34,34,'Oura Ring Gen3 - Size 8','SKU-OUR-8',50,299.99,NULL),
+(35,35,'Samsung Galaxy Watch 6','SKU-SAM-GW6',160,249.99,NULL),
+(36,36,'Whoop 4.0','SKU-WHOOP-4',120,199.99,NULL),
+(37,37,'Anker 737 Power Bank','SKU-ANK-737',250,119.99,NULL),
+(38,38,'Belkin 65W Charger','SKU-BEL-65W',300,59.99,NULL),
+(39,39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
+(40,40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
+-- products 41..50: two variants each (ids 41..60) -> 20 variants
+(41,41,'Baseus 100W - Single Port','SKU-BAS-100-1',160,79.99,NULL),
+(42,41,'Baseus 100W - Dual Port','SKU-BAS-100-2',120,99.99,NULL),
+(43,42,'UGREEN PD 65W - 65W','SKU-UGR-65-1',200,69.99,NULL),
+(44,42,'UGREEN PD 65W - 45W','SKU-UGR-65-2',150,59.99,NULL),
+(45,43,'Philips Series 9000 - Standard','SKU-PHI-9000-1',120,299.99,NULL),
+(46,43,'Philips Series 9000 - Travel','SKU-PHI-9000-2',80,279.99,NULL),
+(47,44,'Oral-B iO10 - Standard','SKU-ORA-IO10-1',140,249.99,NULL),
+(48,44,'Oral-B iO10 - Travel','SKU-ORA-IO10-2',100,229.99,NULL),
+(49,45,'Omron Platinum BP - Monitor Only','SKU-OMR-PL-1',100,129.99,NULL),
+(50,45,'Omron Platinum BP - With Cuff','SKU-OMR-PL-2',80,149.99,NULL),
+(51,46,'Withings Body+ - Metric','SKU-WIT-BP-1',150,99.99,NULL),
+(52,46,'Withings Body+ - Pro','SKU-WIT-BP-2',110,119.99,NULL),
+(53,47,'Theragun Prime - Standard','SKU-THER-P-1',80,199.99,NULL),
+(54,47,'Theragun Prime - Lite','SKU-THER-P-2',60,149.99,NULL),
+(55,48,'Beurer UB90 - Small','SKU-BEUR-UB-1',200,49.99,NULL),
+(56,48,'Beurer UB90 - Large','SKU-BEUR-UB-2',150,59.99,NULL),
+(57,49,'Arlo Pro 4 - Single','SKU-ARLO-P4-1',90,249.99,NULL),
+(58,49,'Arlo Pro 4 - Starter Kit','SKU-ARLO-P4-2',40,449.99,NULL),
+(59,50,'Ring Spotlight Cam - Wired','SKU-RING-SP-1',110,199.99,NULL),
+(60,50,'Ring Spotlight Cam - Battery','SKU-RING-SP-2',80,229.99,NULL);
+
+-- Product categories (idempotent)
+INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
+(1,1,NOW(),NOW()),(2,1,NOW(),NOW()),(3,1,NOW(),NOW()),(4,1,NOW(),NOW()),(5,1,NOW(),NOW()),
+(6,1,NOW(),NOW()),(7,2,NOW(),NOW()),(8,2,NOW(),NOW()),(9,2,NOW(),NOW()),(10,2,NOW(),NOW()),
+(11,2,NOW(),NOW()),(12,2,NOW(),NOW()),(13,3,NOW(),NOW()),(14,3,NOW(),NOW()),(15,3,NOW(),NOW()),
+(16,3,NOW(),NOW()),(17,3,NOW(),NOW()),(18,3,NOW(),NOW()),(19,4,NOW(),NOW()),(20,4,NOW(),NOW()),
+(21,4,NOW(),NOW()),(22,4,NOW(),NOW()),(23,4,NOW(),NOW()),(24,4,NOW(),NOW()),(25,5,NOW(),NOW()),
+(26,5,NOW(),NOW()),(27,5,NOW(),NOW()),(28,5,NOW(),NOW()),(29,5,NOW(),NOW()),(30,5,NOW(),NOW()),
+(31,6,NOW(),NOW()),(32,6,NOW(),NOW()),(33,6,NOW(),NOW()),(34,6,NOW(),NOW()),(35,6,NOW(),NOW()),
+(36,6,NOW(),NOW()),(37,7,NOW(),NOW()),(38,7,NOW(),NOW()),(39,7,NOW(),NOW()),(40,7,NOW(),NOW()),
+(41,8,NOW(),NOW()),(42,8,NOW(),NOW()),(43,8,NOW(),NOW()),(44,8,NOW(),NOW()),(45,8,NOW(),NOW()),
+(46,8,NOW(),NOW()),(47,9,NOW(),NOW()),(48,9,NOW(),NOW()),(49,9,NOW(),NOW()),(50,9,NOW(),NOW());
+
+-- Variant attributes (idempotent)
+INSERT IGNORE INTO variant_attributes (id, name) VALUES
+(1,'RAM'),(2,'Memory'),(3,'Storage'),(4,'Display'),(5,'Color');
+
+-- Product variant options (use SKU subselects) - phones and laptops get attributes
+INSERT IGNORE INTO product_variant_options (variantId, attributeId, value) VALUES
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 1, '12GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 2, '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 4, '6.8"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 1, '8GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 2, '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 4, '6.1"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 1, '16GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 3, '512GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 4, '15"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 5, 'Silver');
+
+-- Cities, Users, Orders, Order Items, Deliveries and Payments (idempotent)
+INSERT IGNORE INTO cities (id, name, isMainCategory) VALUES
+(1,'New York',TRUE),(2,'Los Angeles',TRUE),(3,'Chicago',TRUE),(4,'Houston',TRUE),(5,'Philadelphia',TRUE),(6,'Phoenix',TRUE),(7,'San Antonio',TRUE),(8,'San Diego',TRUE),(9,'Dallas',TRUE),(10,'San Jose',TRUE);
+
+INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_accepted) VALUES
+(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',1,TRUE),
+(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',1,TRUE),
+(3,'john@customer.com','password123','John Doe','Customer','1234567890',2,TRUE),
+(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE),
+(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE);
+   
+INSERT IGNORE INTO orders (id, userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod) VALUES
+(1,3,'2025-09-01 10:10:00',1299.99,'Standard Delivery',15.00,'Delivered','Card'),
+(2,4,'2025-09-05 12:20:00',499.99,'Store Pickup',0.00,'Confirmed','Card'),
+(3,5,'2025-09-07 14:30:00',349.99,'Standard Delivery',12.00,'Shipped','CashOnDelivery'); 
+
+-- Order items reference variants via SKU subselects to avoid numeric id mismatch
+INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
+(1, (SELECT id FROM product_variants WHERE SKU='SKU-APP-MOB-002' LIMIT 1), 1, 1199.99, 1199.99),
+(2, (SELECT id FROM product_variants WHERE SKU='APP-AUD-027' LIMIT 1), 1, 299.99, 299.99),
+(3, (SELECT id FROM product_variants WHERE SKU='SKU-DYS-V15' LIMIT 1), 1, 599.99, 599.99);
+
+INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
+(1, NULL, 'Delivered', '2025-09-06 10:00:00'),
+(3, NULL, 'Assigned', NULL);
+
+INSERT IGNORE INTO payments (id, userId, orderId, amount, paymentMethod, status) VALUES
+(1,3,1,1199.99,'Card','Paid'),
+(2,4,2,499.99,'Card','Paid'),
+(3,5,3,179.99,'CashOnDelivery','Pending');
+-- Final verification comments:
+-- SELECT COUNT(*) FROM products; -- expected 50
+-- SELECT COUNT(*) FROM product_variants; -- expected 60
+
+-- End of deterministic data-only seed
+
+-- Insert a small brands list to seed the brands table (frontend will merge this with distinct product.brand values)
+INSERT IGNORE INTO brands (name) VALUES
+('Samsung'),('Apple'),('Google'),('Sony'),('Xiaomi'),('OnePlus'),('Anker'),('JBL'),('Canon'),('Dyson');
+
+-- Insert 50 products (no schema changes) - brands provided as plain text in `brand` column
+INSERT IGNORE INTO products (name, description, brand) VALUES
+('Galaxy S25 Ultra','Flagship Samsung phone','Samsung'),
+('iPhone 17 Pro','Flagship Apple phone','Apple'),
+('Pixel 10 Pro','Flagship Google phone','Google'),
+('OnePlus 13','Flagship OnePlus phone','OnePlus'),
+('Xiaomi 15 Pro','Flagship Xiaomi phone','Xiaomi'),
+('Nokia G70','Reliable everyday phone','Nokia'),
+('MacBook Air M3 15"','Lightweight Apple laptop','Apple'),
+('Lenovo Legion 9','Gaming laptop','Lenovo'),
+('Dell XPS 15','Premium Windows laptop','Dell'),
+('Asus ROG G16','Gaming laptop','Asus'),
+('HP Spectre x360','Convertible laptop','HP'),
+('Acer Swift 3','Student laptop','Acer'),
+('Sony WH-1000XM6','Noise cancelling headphones','Sony'),
+('AirPods Pro 3','Apple earbuds','Apple'),
+('Bose QC Earbuds','Bose earbuds','Bose'),
+('JBL Charge 6','Portable speaker','JBL'),
+('Sennheiser Momentum','Audiophile headphones','Sennheiser'),
+('Beats Studio Pro','Beats headphones','Beats'),
+('Sony A7R V','High-res mirrorless','Sony'),
+('Canon EOS R7','Mirrorless APS-C','Canon'),
+('GoPro Hero 12','Action camera','GoPro'),
+('Fujifilm X-T5','APS-C classic','Fujifilm'),
+('DJI Mini 4','Compact drone','DJI'),
+('Nikon Z8','Full-frame mirrorless','Nikon'),
+('Samsung Family Hub','Smart fridge','Samsung'),
+('Dyson V15','Cordless vacuum','Dyson'),
+('Instant Vortex 10QT','Air fryer','Instant'),
+('LG ThinQ Washer','Smart washing machine','LG'),
+('KitchenAid 6Q','Stand mixer','KitchenAid'),
+('Breville Barista','Espresso machine','Breville'),
+('Apple Watch Series 10','Smartwatch','Apple'),
+('Fitbit Luxe 3','Fitness tracker','Fitbit'),
+('Garmin Fenix 8','Outdoor smartwatch','Garmin'),
+('Oura Ring Gen3','Sleep & readiness ring','Oura'),
+('Samsung Galaxy Watch 6','Android smartwatch','Samsung'),
+('Whoop 4.0','Performance band','Whoop'),
+('Anker 737 Power Bank','High-capacity power bank','Anker'),
+('Belkin 65W Charger','GaN laptop charger','Belkin'),
+('Mophie MagSafe 3','MagSafe wireless charger','Mophie'),
+('RavPower 120W','Multi-port charger','RavPower'),
+('Baseus 100W','USB-C charger','Baseus'),
+('UGREEN PD 65W','Portable charger','UGREEN'),
+('Philips Series 9000','Electric shaver','Philips'),
+('Oral-B iO10','Smart electric toothbrush','Oral-B'),
+('Omron Platinum BP','Blood pressure monitor','Omron'),
+('Withings Body+','Smart scale','Withings'),
+('Theragun Prime','Percussive massager','Theragun'),
+('Beurer UB90','Pulse oximeter','Beurer');
+
+-- At this point there are 50 products. We'll insert variants such that total variants = 60.
+-- Strategy: products 1..40 => 1 variant each (40 variants)
+-- products 41..50 => 2 variants each (20 variants) => total 60
+
+-- Single-variant products (1..40)
+-- single-variant block - idempotent
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+(1,'Galaxy S25 Ultra - 256GB','SKU-GAL-S25-256',120,1099.99,NULL),
+(2,'iPhone 17 Pro - 256GB','SKU-APP-17-256',100,1199.99,NULL),
+(3,'Pixel 10 Pro - 256GB','SKU-GOO-10-256',90,999.99,NULL),
+(4,'OnePlus 13 - 256GB','SKU-ONE-13-256',130,899.99,NULL),
+(5,'Xiaomi 15 Pro - 128GB','SKU-XIA-15-128',140,699.99,NULL),
+(6,'Nokia G70 - 128GB','SKU-NOK-G70-128',200,229.99,NULL),
+(7,'MacBook Air M3 15" - 512GB','SKU-APP-MBA-512',90,1299.99,NULL),
+(8,'Lenovo Legion 9 - 1TB','SKU-LEN-LEG9-1TB',60,2499.99,NULL),
+(9,'Dell XPS 15 - 512GB','SKU-DEL-XPS15-512',80,1499.99,NULL),
+(10,'Asus ROG G16 - 1TB','SKU-ASU-ROG-1TB',70,1999.99,NULL),
+(11,'HP Spectre x360 - 512GB','SKU-HP-SPX-512',100,1399.99,NULL),
+(12,'Acer Swift 3 - 256GB','SKU-ACR-SW3-256',150,699.99,NULL),
+(13,'Sony WH-1000XM6 - Black','SKU-SON-WH-1000XM6',180,349.99,NULL),
+(14,'AirPods Pro 3','SKU-APP-AIRP3',220,249.99,NULL),
+(15,'Bose QC Earbuds','SKU-BOS-QC',140,279.99,NULL),
+(16,'JBL Charge 6 - Black','SKU-JBL-CHG6',150,179.99,NULL),
+(17,'Sennheiser Momentum','SKU-SEN-MOM',60,399.99,NULL),
+(18,'Beats Studio Pro - Black','SKU-BEA-SP',70,329.99,NULL),
+(19,'Sony A7R V - Body','SKU-SON-A7RV',40,3499.99,NULL),
+(20,'Canon EOS R7 - Body','SKU-CAN-R7',60,1799.99,NULL),
+(21,'GoPro Hero 12 - Black','SKU-GPR-12',120,499.99,NULL),
+(22,'Fujifilm X-T5 - Body','SKU-FUJ-XT5',90,999.99,NULL),
+(23,'DJI Mini 4','SKU-DJI-MINI4',110,599.99,NULL),
+(24,'Nikon Z8 - Body','SKU-NIK-Z8',40,4299.99,NULL),
+(25,'Samsung Family Hub','SKU-SAM-FH',20,3499.99,NULL),
+(26,'Dyson V15','SKU-DYS-V15',60,599.99,NULL),
+(27,'Instant Vortex 10QT','SKU-INS-VX10',140,169.99,NULL),
+(28,'LG ThinQ Washer','SKU-LG-WASH',30,899.99,NULL),
+(29,'KitchenAid 6Q','SKU-KA-6Q',100,499.99,NULL),
+(30,'Breville Barista','SKU-BRV-B',60,699.99,NULL),
+(31,'Apple Watch Series 10 - 41mm','SKU-APP-AW10-41',200,399.99,NULL),
+(32,'Fitbit Luxe 3','SKU-FIT-LUXE3',180,149.99,NULL),
+(33,'Garmin Fenix 8','SKU-GAR-FEN8',60,599.99,NULL),
+(34,'Oura Ring Gen3 - Size 8','SKU-OUR-8',50,299.99,NULL),
+(35,'Samsung Galaxy Watch 6','SKU-SAM-GW6',160,249.99,NULL),
+(36,'Whoop 4.0','SKU-WHOOP-4',120,199.99,NULL),
+(37,'Anker 737 Power Bank','SKU-ANK-737',250,119.99,NULL),
+(38,'Belkin 65W Charger','SKU-BEL-65W',300,59.99,NULL),
+(39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
+(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL);
+
+-- Double-variant products (41..50) -> two variants each (20 variants)
+(-- double-variant block - idempotent
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+(41,'Baseus 100W - Single Port','SKU-BAS-100-1',160,79.99,NULL),
+(41,'Baseus 100W - Dual Port','SKU-BAS-100-2',120,99.99,NULL),
+(42,'UGREEN PD 65W - 65W','SKU-UGR-65-1',200,69.99,NULL),
+(42,'UGREEN PD 65W - 45W','SKU-UGR-65-2',150,59.99,NULL),
+(43,'Philips Series 9000 - Standard','SKU-PHI-9000-1',120,299.99,NULL),
+(43,'Philips Series 9000 - Travel','SKU-PHI-9000-2',80,279.99,NULL),
+(44,'Oral-B iO10 - Standard','SKU-ORA-IO10-1',140,249.99,NULL),
+(44,'Oral-B iO10 - Travel','SKU-ORA-IO10-2',100,229.99,NULL),
+(45,'Omron Platinum BP - Monitor Only','SKU-OMR-PL-1',100,129.99,NULL),
+(45,'Omron Platinum BP - With Cuff','SKU-OMR-PL-2',80,149.99,NULL),
+(46,'Withings Body+ - Metric','SKU-WIT-BP-1',150,99.99,NULL),
+(46,'Withings Body+ - Pro','SKU-WIT-BP-2',110,119.99,NULL),
+(47,'Theragun Prime - Standard','SKU-THER-P-1',80,199.99,NULL),
+(47,'Theragun Prime - Lite','SKU-THER-P-2',60,149.99,NULL),
+(48,'Beurer UB90 - Small','SKU-BEUR-UB-1',200,49.99,NULL),
+(48,'Beurer UB90 - Large','SKU-BEUR-UB-2',150,59.99,NULL),
+(49,'Arlo Pro 4 - Single','SKU-ARLO-P4-1',90,249.99,NULL),
+(49,'Arlo Pro 4 - Starter Kit','SKU-ARLO-P4-2',40,449.99,NULL),
+(50,'Ring Spotlight Cam - Wired','SKU-RING-SP-1',110,199.99,NULL),
+(50,'Ring Spotlight Cam - Battery','SKU-RING-SP-2',80,229.99,NULL);
+
+-- Insert product_categories mappings (cycle categories 1..10 across products)
+(INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
+(1,1,NOW(),NOW()),(2,1,NOW(),NOW()),(3,1,NOW(),NOW()),(4,1,NOW(),NOW()),(5,1,NOW(),NOW()),
+(6,1,NOW(),NOW()),(7,2,NOW(),NOW()),(8,2,NOW(),NOW()),(9,2,NOW(),NOW()),(10,2,NOW(),NOW()),
+(11,2,NOW(),NOW()),(12,2,NOW(),NOW()),(13,3,NOW(),NOW()),(14,3,NOW(),NOW()),(15,3,NOW(),NOW()),
+(16,3,NOW(),NOW()),(17,3,NOW(),NOW()),(18,3,NOW(),NOW()),(19,4,NOW(),NOW()),(20,4,NOW(),NOW()),
+(21,4,NOW(),NOW()),(22,4,NOW(),NOW()),(23,4,NOW(),NOW()),(24,4,NOW(),NOW()),(25,5,NOW(),NOW()),
+(26,5,NOW(),NOW()),(27,5,NOW(),NOW()),(28,5,NOW(),NOW()),(29,5,NOW(),NOW()),(30,5,NOW(),NOW()),
+(31,6,NOW(),NOW()),(32,6,NOW(),NOW()),(33,6,NOW(),NOW()),(34,6,NOW(),NOW()),(35,6,NOW(),NOW()),
+(36,6,NOW(),NOW()),(37,7,NOW(),NOW()),(38,7,NOW(),NOW()),(39,7,NOW(),NOW()),(40,7,NOW(),NOW()),
+(41,8,NOW(),NOW()),(42,8,NOW(),NOW()),(43,8,NOW(),NOW()),(44,8,NOW(),NOW()),(45,8,NOW(),NOW()),
+(46,8,NOW(),NOW()),(47,9,NOW(),NOW()),(48,9,NOW(),NOW()),(49,9,NOW(),NOW()),(50,9,NOW(),NOW());
+
+-- Final verification comments (run manually after applying seed):
+-- SELECT COUNT(*) FROM products; -- should return 50
+-- SELECT COUNT(*) FROM product_variants; -- should return 60
+
+-- End of data-only seed
+
+-- Ensure attribute names exist (idempotent)
+INSERT IGNORE INTO variant_attributes (name) VALUES
+('RAM'), ('Memory'), ('Storage'), ('Display'), ('Color');
+
+-- Add attribute option values for phone variants (products 1..6)
+-- Use subqueries to map SKU -> variantId and attribute name -> attributeId
+INSERT INTO product_variant_options (variantId, attributeId, value)
+VALUES
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '12GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.8"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.1"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.3"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '12GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.7"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Memory'), '128GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Storage'), '128GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.73"'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='RAM'), '6GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Memory'), '128GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Storage'), '128GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.5"');
+  
+-- Add attribute option values for laptop variants (products 7..12)
+INSERT INTO product_variant_options (variantId, attributeId, value)
+VALUES
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), (SELECT id FROM variant_attributes WHERE name='RAM'), '16GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), (SELECT id FROM variant_attributes WHERE name='Storage'), '512GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), (SELECT id FROM variant_attributes WHERE name='Display'), '15"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Silver'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-LEN-LEG9-1TB'), (SELECT id FROM variant_attributes WHERE name='RAM'), '32GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-LEN-LEG9-1TB'), (SELECT id FROM variant_attributes WHERE name='Storage'), '1TB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-LEN-LEG9-1TB'), (SELECT id FROM variant_attributes WHERE name='Display'), '16"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-LEN-LEG9-1TB'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Black'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-DEL-XPS15-512'), (SELECT id FROM variant_attributes WHERE name='RAM'), '16GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-DEL-XPS15-512'), (SELECT id FROM variant_attributes WHERE name='Storage'), '512GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-DEL-XPS15-512'), (SELECT id FROM variant_attributes WHERE name='Display'), '15"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-DEL-XPS15-512'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Silver'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-ASU-ROG-1TB'), (SELECT id FROM variant_attributes WHERE name='RAM'), '32GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ASU-ROG-1TB'), (SELECT id FROM variant_attributes WHERE name='Storage'), '1TB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ASU-ROG-1TB'), (SELECT id FROM variant_attributes WHERE name='Display'), '16"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ASU-ROG-1TB'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Black'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-HP-SPX-512'), (SELECT id FROM variant_attributes WHERE name='RAM'), '16GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-HP-SPX-512'), (SELECT id FROM variant_attributes WHERE name='Storage'), '512GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-HP-SPX-512'), (SELECT id FROM variant_attributes WHERE name='Display'), '13.5"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-HP-SPX-512'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Nightfall'),
+
+((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '14"'),
+((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Gray');
+INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+(38,'Belkin 65W Charger','SKU-BEL-65',300,59.99,NULL),
+(39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
+(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
+(41,'Baseus 100W','SKU-BAS-100',160,79.99,NULL),
+(42,'UGREEN PD 65W','SKU-UGR-65',200,69.99,NULL),
+(43,'Philips Series 9000','SKU-PHI-9000',120,299.99,NULL),
+(44,'Oral-B iO10','SKU-ORALB-IO10',140,249.99,NULL),
+(45,'Omron Platinum BP','SKU-OMR-BP',100,129.99,NULL),
+(46,'Withings Body+','SKU-WITH-B',150,99.99,NULL),
+(47,'Theragun Prime','SKU-THER-P',80,199.99,NULL),
+(48,'Beurer UB90','SKU-BEUR-UB',200,49.99,NULL),
+(49,'Arlo Pro 4','SKU-ARLO-P4',90,249.99,NULL),
+(50,'Ring Spotlight Cam','SKU-RING-SP',110,199.99,NULL),
+(51,'Anki Vector - Robot','SKU-ANKI-VEC',60,299.99,NULL),
+(52,'Sphero Mini','SKU-SPHERO-M',200,49.99,NULL),
+(53,'Osmo Starter Kit','SKU-OSMO-1',80,59.99,NULL),
+(54,'LEGO Mindstorms - Base','SKU-LEGO-MB',40,349.99,NULL),
+(55,'Wireless Charger Pad','SKU-WIRE-CHG',300,29.99,NULL),
+(56,'USB-C to HDMI Cable','SKU-CABL-CHD',400,19.99,NULL),
+(57,'Portable Bluetooth Speaker','SKU-PORT-SPK',250,39.99,NULL),
+(58,'Compact Action Camera','SKU-ACT-CAM',220,89.99,NULL),
+(59,'Mini Air Fryer','SKU-MINI-AF',260,39.99,NULL),
+(60,'Smart LED Bulb Pack','SKU-LED-PL',500,24.99,NULL);
+
+-- Sample orders and items (10 orders)
+INSERT INTO orders (userId,orderDate,totalPrice,deliveryMode,deliveryCharge,status,paymentMethod) VALUES
+(3,'2025-09-01 10:10:00',1299.99,'Standard Delivery',15.00,'Delivered','Card'),
+(4,'2025-09-05 12:20:00',499.99,'Store Pickup',0.00,'Confirmed','Card'),
+(5,'2025-09-07 14:30:00',349.99,'Standard Delivery',12.00,'Shipped','CashOnDelivery'),
+(3,'2025-09-10 09:00:00',69.98,'Standard Delivery',5.00,'Pending','Card'),
+(6,'2025-09-12 16:40:00',249.99,'Standard Delivery',10.00,'Delivered','Card'),
+(3,'2025-09-15 11:11:00',399.99,'Store Pickup',0.00,'Delivered','Card'),
+(4,'2025-09-18 13:22:00',89.99,'Standard Delivery',8.00,'Confirmed','CashOnDelivery'),
+(5,'2025-09-20 15:33:00',1599.99,'Standard Delivery',20.00,'Delivered','Card'),
+(6,'2025-09-22 17:44:00',199.99,'Store Pickup',0.00,'Pending','Card'),
+(3,'2025-09-25 08:55:00',59.99,'Standard Delivery',5.00,'Delivered','Card');
+
+INSERT INTO order_items (orderId,variantId,quantity,unitPrice,totalPrice) VALUES
+(1,2,1,1199.99,1199.99),
+(2,13,1,349.99,349.99),
+(3,16,1,179.99,179.99),
+(3,39,1,69.99,69.99),
+(4,37,2,29.99,59.98),
+(5,26,1,599.99,599.99),
+(6,31,1,399.99,399.99),
+(7,8,1,1599.99,1599.99),
+(8,12,1,199.99,199.99),
+(9,57,1,59.99,59.99);
+
+INSERT INTO payments (userId,orderId,amount,paymentMethod,status) VALUES
+(3,1,1199.99,'Card','Paid'),
+(4,2,349.99,'Card','Paid'),
+(5,3,179.99,'CashOnDelivery','Pending'),
+(3,4,59.98,'Card','Paid'),
+(6,5,599.99,'Card','Paid');
+
+-- Done. 60 products with variable variants and categories distributed.
+
+INSERT IGNORE INTO products (name, description, brand) VALUES
 ('Samsung Galaxy S25 Ultra', 'Flagship smartphone with AI camera', 'Samsung'),
 ('iPhone 17 Pro Max', 'Premium iPhone with A19 chip', 'Apple'),
 ('Google Pixel 10 Pro', 'AI-powered smartphone with Tensor G4', 'Google'),
@@ -302,7 +745,7 @@ INSERT IGNORE INTO orders (id, userId, deliveryMode, deliveryAddress, totalPrice
 (1, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 1299.99, 15.00, 'Card', 'Delivered'),
 (2, 3, 'Store Pickup', NULL, 299.99, 0.00, 'Card', 'Confirmed'),
 (3, 4, 'Standard Delivery', '{"street": "456 Oak Ave", "city": "City", "state": "State", "zipCode": "67890"}', 399.99, 10.00, 'CashOnDelivery', 'Shipped'),
-(4, 5, 'Standard Delivery', '{"street": "789 Pine St", "city": "City", "state": "State", "zipCode": "11111"}', 199.99, 20.00, 'Card', 'Processing'),
+(4, 5, 'Standard Delivery', '{"street": "789 Pine St", "city": "City", "state": "State", "zipCode": "11111"}', 199.99, 20.00, 'Card', 'Confirmed'),
 (5, 6, 'Store Pickup', NULL, 249.99, 0.00, 'Card', 'Pending'),
 (6, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 599.99, 15.00, 'Card', 'Delivered'),
 (7, 3, 'Store Pickup', NULL, 899.99, 0.00, 'Card', 'Delivered'),
@@ -326,6 +769,39 @@ INSERT IGNORE INTO order_items (id, orderId, variantId, quantity, unitPrice, tot
 (7, 7, 4, 1, 899.99, 899.99),    -- OnePlus 13 Pro
 -- Order 8: Audio Devices
 (8, 8, 32, 1, 349.99, 349.99);   -- Beats Studio Pro 2
+
+-- Seed deliveries for Standard Delivery orders
+-- (orderId, staffId left NULL for now; deliveryDate set for delivered orders)
+INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
+(1, NULL, 'delivered', '2024-01-20 10:00:00'),
+(3, NULL, 'Assigned', NULL),
+(4, NULL, 'Assigned', NULL),
+(6, NULL, 'delivered', '2024-02-10 12:00:00'),
+(8, NULL, 'Assigned', NULL);
+
+-- Seed payments for sample orders (simple statuses)
+INSERT IGNORE INTO payments (userId, orderId, amount, paymentMethod, status) VALUES
+(2, 1, 1299.99, 'Card', 'Paid'),
+(3, 2, 299.99, 'Card', 'Paid'),
+(4, 3, 399.99, 'CashOnDelivery', 'Pending'),
+(5, 4, 199.99, 'Card', 'Pending'),
+(6, 5, 249.99, 'Card', 'Pending'),
+(2, 6, 599.99, 'Card', 'Paid'),
+(3, 7, 899.99, 'Card', 'Paid'),
+(4, 8, 349.99, 'CashOnDelivery', 'Pending');
+
+-- Insert Main Categories (idempotent, explicit ids so subcategories can reference parentId safely)
+INSERT IGNORE INTO categories (id, name, isMainCategory, parentId) VALUES
+(1, 'Mobiles & Tablets', TRUE, NULL),
+(2, 'Laptops & Computers', TRUE, NULL),
+(3, 'Audio Devices', TRUE, NULL),
+(4, 'Cameras & Photography', TRUE, NULL),
+(5, 'Home Appliances', TRUE, NULL),
+(6, 'Wearable & Smart Devices', TRUE, NULL),
+(7, 'Power & Charging', TRUE, NULL),
+(8, 'Personal Care & Health', TRUE, NULL),
+(9, 'Security & Safety', TRUE, NULL),
+(10, 'Toys & Gadgets', TRUE, NULL);
 
 -- Insert Subcategories (continuing from main categories which are already inserted)
 -- Mobiles & Tablets Subcategories
@@ -389,141 +865,7 @@ INSERT INTO categories (name, isMainCategory, parentId) VALUES
 ('Fun Gadgets', FALSE, 10);
 
 -- Additional Products for more comprehensive catalog
--- Products 51-100 will be added to reach our target
-
--- Additional Mobiles & Tablets (Products 51-60)
-INSERT INTO products (name, description, brand) VALUES
-('Galaxy Z Fold 7 Pro', 'Foldable smartphone with 7.6-inch AMOLED display.', 'Samsung'),
-('iPhone 17 Compact', 'Compact smartphone with A19 chip and 5.4-inch display.', 'Apple'),
-('Google Pixel Fold 2', 'Foldable phone with Tensor G5 and AI features.', 'Google'),
-('Poco F7 Pro', 'High-performance phone with Snapdragon 8 Gen 5.', 'Poco'),
-('Sony Xperia 1 VII', 'Cinematic smartphone with 4K HDR display.', 'Sony'),
-('Galaxy A75 5G', 'Mid-range smartphone with excellent camera.', 'Samsung'),
-('Pixel 10a Pro', 'Budget-friendly phone with AI features.', 'Google'),
-('OnePlus Nord 6 Pro', 'Premium mid-range phone with OxygenOS.', 'OnePlus'),
-('Xiaomi Redmi Note 14', 'Value smartphone with MIUI 16.', 'Xiaomi'),
-('iPad Pro 13-inch M4', 'Professional tablet with M4 chip.', 'Apple');
-
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(51, 'Galaxy Z Fold 7 Pro 512GB', 'SAMSUNG-MOB-051', 90, 1799.99, NULL),
-(52, 'iPhone 17 Compact 128GB', 'APPLE-MOB-052', 100, 799.99, NULL),
-(53, 'Pixel Fold 2 256GB', 'GOOGLE-MOB-053', 80, 1699.99, NULL),
-(54, 'Poco F7 Pro 256GB', 'POCO-MOB-054', 120, 649.99, NULL),
-(55, 'Sony Xperia 1 VII 256GB', 'SONY-MOB-055', 85, 1299.99, NULL),
-(56, 'Galaxy A75 5G 128GB', 'SAMSUNG-MOB-056', 200, 399.99, NULL),
-(57, 'Pixel 10a Pro 128GB', 'GOOGLE-MOB-057', 180, 449.99, NULL),
-(58, 'OnePlus Nord 6 Pro 256GB', 'ONEPLUS-MOB-058', 160, 549.99, NULL),
-(59, 'Xiaomi Redmi Note 14 128GB', 'XIAOMI-MOB-059', 220, 299.99, NULL),
-(60, 'iPad Pro 13" M4 512GB', 'APPLE-TAB-060', 60, 1299.99, NULL);
-
--- Additional Laptops & Computers (Products 61-70)
-INSERT INTO products (name, description, brand) VALUES
-('MacBook Air M3 15-inch', 'Ultra-thin laptop with M3 chip and 15-inch display.', 'Apple'),
-('Lenovo Legion Pro 7i Gen 9', 'Gaming laptop with Intel Core Ultra 9 and RTX 5080.', 'Lenovo'),
-('HP Omen 16 2025', 'High-performance gaming laptop with 240Hz display.', 'HP'),
-('Asus ROG Zephyrus G16 2025', 'Sleek gaming laptop with OLED screen.', 'Asus'),
-('Dell Inspiron 14 Plus', 'Versatile laptop for productivity and entertainment.', 'Dell'),
-('Surface Laptop Studio 6', 'Sleek laptop with Windows 12.', 'Microsoft'),
-('ThinkPad X1 Carbon Gen 13', 'Business laptop with excellent keyboard.', 'Lenovo'),
-('ASUS ZenBook 14X OLED', 'Ultrabook with OLED display.', 'ASUS'),
-('Acer Swift 3 OLED', 'Affordable laptop for students.', 'Acer'),
-('LG Gram 17 2025', 'Ultra-light 17-inch laptop.', 'LG');
-
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(61, 'MacBook Air M3 15-inch 512GB', 'APPLE-LAP-061', 90, 1499.99, NULL),
-(62, 'Legion Pro 7i Gen 9 1TB', 'LENOVO-LAP-062', 70, 2699.99, NULL),
-(63, 'HP Omen 16 2025 512GB', 'HP-LAP-063', 80, 1799.99, NULL),
-(64, 'ROG Zephyrus G16 2025 1TB', 'ASUS-LAP-064', 75, 1999.99, NULL),
-(65, 'Inspiron 14 Plus 256GB', 'DELL-LAP-065', 100, 899.99, NULL),
-(66, 'Surface Laptop Studio 6 512GB', 'MICROSOFT-LAP-066', 120, 1299.99, NULL),
-(67, 'ThinkPad X1 Carbon Gen 13', 'LENOVO-LAP-067', 100, 1899.99, NULL),
-(68, 'ASUS ZenBook 14X OLED', 'ASUS-LAP-068', 110, 999.99, NULL),
-(69, 'Acer Swift 3 OLED 256GB', 'ACER-LAP-069', 150, 799.99, NULL),
-(70, 'LG Gram 17 2025 512GB', 'LG-LAP-070', 90, 1399.99, NULL);
-
--- Personal Care & Health (Products 71-80)
-INSERT INTO products (name, description, brand) VALUES
-('Philips Series 9000', 'Electric shaver with SkinIQ technology.', 'Philips'),
-('Dyson Supersonic', 'High-speed hair dryer with heat control.', 'Dyson'),
-('Braun Series 9 Pro', 'Premium electric trimmer for precision.', 'Braun'),
-('Omron Platinum BP', 'Blood pressure monitor with Bluetooth.', 'Omron'),
-('Withings Body+', 'Smart scale with body composition.', 'Withings'),
-('iHealth Track', 'Smart blood pressure monitor.', 'iHealth'),
-('LOreal Cell BioPrint', 'Tabletop skin diagnostic device using microfluidics and proteomics for personalized analysis.', 'LOreal'),
-('Beurer Pulse Oximeter', 'Portable oximeter for oxygen levels.', 'Beurer'),
-('Oral-B iO Series 10', 'Smart toothbrush with AI brushing.', 'Oral-B'),
-('Theragun Elite', 'Percussive therapy device for muscle relief.', 'Theragun');
-
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(71, 'Philips Series 9000', 'PHILIPS-HEA-071', 100, 299.99, NULL),
-(72, 'Dyson Supersonic', 'DYSON-HEA-072', 80, 399.99, NULL),
-(73, 'Braun Series 9 Pro', 'BRAUN-HEA-073', 90, 249.99, NULL),
-(74, 'Omron Platinum BP', 'OMRON-HEA-074', 120, 129.99, NULL),
-(75, 'Withings Body+', 'WITHINGS-HEA-075', 110, 99.99, NULL),
-(76, 'iHealth Track', 'IHEALTH-HEA-076', 130, 79.99, NULL),
-(77, 'LOreal Cell BioPrint', 'LOREAL-HEA-077', 60, 499.99, NULL),
-(78, 'Beurer Pulse Oximeter', 'BEURER-HEA-078', 150, 49.99, NULL),
-(79, 'Oral-B iO Series 10', 'ORALB-HEA-079', 100, 199.99, NULL),
-(80, 'Theragun Elite', 'THERAGUN-HEA-080', 90, 399.99, NULL);
-
-INSERT INTO product_categories (productId, categoryId) VALUES
-(71, 8), (72, 8), (73, 8), (74, 8), (75, 8), (76, 8), (77, 8), (78, 8), (79, 8), (80, 8);
-
--- Additional Cameras & Photography (Products 81-90)
-INSERT INTO products (name, description, brand) VALUES
-('Canon PowerShot G7 X Mark IV', 'Compact camera for vloggers.', 'Canon'),
-('Sony Alpha 6700', 'APS-C mirrorless camera with AI autofocus.', 'Sony'),
-('GoPro MAX 2', '360-degree action camera with 6K video.', 'GoPro'),
-('Fujifilm Instax Mini 99', 'Instant camera with creative modes.', 'Fujifilm'),
-('DJI Pocket 3', 'Gimbal camera for stabilized 4K video.', 'DJI'),
-('Sony A7R VI', 'High-resolution mirrorless camera.', 'Sony'),
-('Canon EOS R6 Mark III', 'Professional mirrorless camera.', 'Canon'),
-('Nikon Z9 II', 'Flagship camera with 8K video.', 'Nikon'),
-('Leica Q3', 'Premium compact camera.', 'Leica'),
-('Insta360 X4', '360-degree action camera.', 'Insta360');
-
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(81, 'PowerShot G7 X Mark IV', 'CANON-CAM-081', 100, 799.99, NULL),
-(82, 'Sony Alpha 6700 Body', 'SONY-CAM-082', 70, 1499.99, NULL),
-(83, 'GoPro MAX 2', 'GOPRO-CAM-083', 120, 599.99, NULL),
-(84, 'Instax Mini 99', 'FUJIFILM-CAM-084', 150, 199.99, NULL),
-(85, 'DJI Pocket 3', 'DJI-CAM-085', 90, 499.99, NULL),
-(86, 'Sony A7R VI Body', 'SONY-CAM-086', 50, 3899.99, NULL),
-(87, 'Canon EOS R6 Mark III', 'CANON-CAM-087', 60, 2999.99, NULL),
-(88, 'Nikon Z9 II Body', 'NIKON-CAM-088', 40, 4299.99, NULL),
-(89, 'Leica Q3', 'LEICA-CAM-089', 30, 5999.99, NULL),
-(90, 'Insta360 X4', 'INSTA360-CAM-090', 120, 599.99, NULL);
-
-INSERT INTO product_categories (productId, categoryId) VALUES
-(81, 4), (82, 4), (83, 4), (84, 4), (85, 4), (86, 4), (87, 4), (88, 4), (89, 4), (90, 4);
-
--- Additional Home Appliances (Products 91-100)
-INSERT INTO products (name, description, brand) VALUES
-('Samsung Family Hub Fridge', 'Smart refrigerator with 21.5-inch touchscreen.', 'Samsung'),
-('LG ThinQ Dryer', 'Smart dryer with AI fabric sensing.', 'LG'),
-('Philips PerfectCare Steam Iron', 'Steam iron with auto temperature control.', 'Philips'),
-('LG OLED G4 65"', 'Premium OLED TV with AI processing.', 'LG'),
-('Instant Vortex Air Fryer', '6-quart air fryer with smart controls.', 'Instant'),
-('Samsung QN95D 55"', 'Neo QLED TV with Quantum Matrix.', 'Samsung'),
-('Dyson V15 Detect', 'Laser detect vacuum cleaner.', 'Dyson'),
-('Ninja Foodi XL', 'Pressure cooker air fryer combo.', 'Ninja'),
-('KitchenAid Stand Mixer', 'Professional 6-quart stand mixer.', 'KitchenAid'),
-('Breville Barista Express', 'Espresso machine with grinder.', 'Breville');
-
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(91, 'Family Hub Fridge', 'SAMSUNG-APP-091', 50, 3499.99, NULL),
-(92, 'LG ThinQ Dryer', 'LG-APP-092', 60, 1199.99, NULL),
-(93, 'PerfectCare Steam Iron', 'PHILIPS-APP-093', 130, 149.99, NULL),
-(94, 'LG OLED G4 65"', 'LG-TV-094', 40, 2499.99, NULL),
-(95, 'Instant Vortex Air Fryer', 'INSTANT-APP-095', 120, 129.99, NULL),
-(96, 'Samsung QN95D 55"', 'SAMSUNG-TV-096', 50, 1899.99, NULL),
-(97, 'Dyson V15 Detect', 'DYSON-APP-097', 120, 749.99, NULL),
-(98, 'Ninja Foodi XL', 'NINJA-APP-098', 250, 199.99, NULL),
-(99, 'KitchenAid Stand Mixer', 'KITCHENAID-APP-099', 120, 599.99, NULL),
-(100, 'Breville Barista Express', 'BREVILLE-APP-100', 110, 699.99, NULL);
-
-INSERT INTO product_categories (productId, categoryId) VALUES
-(91, 5), (92, 5), (93, 5), (94, 5), (95, 5), (96, 5), (97, 5), (98, 5), (99, 5), (100, 5);
+-- (No additional products beyond the initial 50 as per user's constraint)
 
 -- Additional categorizations for products 51-70
 INSERT INTO product_categories (productId, categoryId) VALUES
@@ -559,7 +901,10 @@ INSERT INTO cities (name, isMainCategory) VALUES
 
 -- Insert Users data (including customers and one admin)
 INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
-('admin@brightbuy.com', 'admin123', 'Admin User', 'Admin', '555-0000', 1, TRUE),
+('admin@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User', 'Admin', '555-0000', 1, TRUE),
+('anudelivery@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff', 'DeliveryStaff', '555-0101', 1, TRUE),
+('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', 1, TRUE),
+('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', 1, TRUE),
 ('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
 ('jane.doe@email.com', 'password123', 'Jane Doe', 'Customer', '555-0002', 2, TRUE),
 ('mike.johnson@email.com', 'password123', 'Mike Johnson', 'Customer', '555-0003', 3, TRUE),
@@ -577,21 +922,21 @@ INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VA
 ('ryan.clark@email.com', 'password123', 'Ryan Clark', 'Customer', '555-0015', 5, TRUE);
 
 -- Insert 35 Orders with different amounts across different months (Jan 2024 - Oct 2025)
-INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod, estimatedDeliveryDate) VALUES
+INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod) VALUES
 -- January 2024 orders
-(2, '2024-01-15 10:30:00', 1249.99, 'Standard Delivery', 19.99, 'Delivered', 'Card', '2024-01-20 00:00:00'),
-(3, '2024-01-18 14:45:00', 849.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(4, '2024-01-22 09:15:00', 2999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card', '2024-01-27 00:00:00'),
+(2, '2024-01-15 10:30:00', 1249.99, 'Standard Delivery', 19.99, 'Delivered', 'Card'),
+(3, '2024-01-18 14:45:00', 849.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(4, '2024-01-22 09:15:00', 2999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card'),
 
 -- February 2024 orders
-(5, '2024-02-05 16:20:00', 599.99, 'Standard Delivery', 15.99, 'Delivered', 'CashOnDelivery', '2024-02-10 00:00:00'),
-(6, '2024-02-12 11:30:00', 1899.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(7, '2024-02-20 13:45:00', 449.99, 'Standard Delivery', 12.99, 'Delivered', 'Card', '2024-02-25 00:00:00'),
+(5, '2024-02-05 16:20:00', 599.99, 'Standard Delivery', 15.99, 'Delivered', 'CashOnDelivery'),
+(6, '2024-02-12 11:30:00', 1899.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(7, '2024-02-20 13:45:00', 449.99, 'Standard Delivery', 12.99, 'Delivered', 'Card'),
 
 -- March 2024 orders
-(8, '2024-03-08 10:15:00', 3499.99, 'Standard Delivery', 39.99, 'Delivered', 'Card', '2024-03-15 00:00:00'),
-(9, '2024-03-14 15:30:00', 799.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(10, '2024-03-25 12:20:00', 1699.99, 'Standard Delivery', 24.99, 'Delivered', 'CashOnDelivery', '2024-03-30 00:00:00'),
+(8, '2024-03-08 10:15:00', 3499.99, 'Standard Delivery', 39.99, 'Delivered', 'Card'),
+(9, '2024-03-14 15:30:00', 799.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(10, '2024-03-25 12:20:00', 1699.99, 'Standard Delivery', 24.99, 'Delivered', 'CashOnDelivery'),
 
 -- April 2024 orders
 (11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card', '2024-04-08 00:00:00'),
@@ -643,121 +988,91 @@ INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge,
 (9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card', '2025-10-12 00:00:00');
 
 -- Insert Order Items for the orders
+
 INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
 -- Order 1 items (iPhone 17 Pro Max)
-(1, 2, 1, 1249.99, 1249.99),
-
+(1, (SELECT id FROM product_variants WHERE variantName LIKE '%iPhone 17 Pro Max%' LIMIT 1), 1, 1249.99, 1249.99),
 -- Order 2 items (Samsung Galaxy S25 Ultra)
-(2, 1, 1, 849.99, 849.99),
-
+(2, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy S25 Ultra%' LIMIT 1), 1, 849.99, 849.99),
 -- Order 3 items (Canon EOS R6 Mark III)
-(3, 87, 1, 2999.99, 2999.99),
-
+(3, (SELECT id FROM product_variants WHERE variantName LIKE '%Canon EOS R6%' LIMIT 1), 1, 2999.99, 2999.99),
 -- Order 4 items (GoPro MAX 2)
-(4, 83, 1, 599.99, 599.99),
-
+(4, (SELECT id FROM product_variants WHERE variantName LIKE '%GoPro%' LIMIT 1), 1, 599.99, 599.99),
 -- Order 5 items (Samsung QN95D 55")
-(5, 96, 1, 1899.99, 1899.99),
-
+(5, (SELECT id FROM product_variants WHERE variantName LIKE '%QN95%' LIMIT 1), 1, 1899.99, 1899.99),
 -- Order 6 items (Google Pixel 10a Lite)
-(6, 13, 1, 449.99, 449.99),
-
+(6, (SELECT id FROM product_variants WHERE variantName LIKE '%Pixel 10a Lite%' LIMIT 1), 1, 449.99, 449.99),
 -- Order 7 items (Samsung Family Hub Fridge)
-(7, 91, 1, 3499.99, 3499.99),
-
--- Order 8 items (MacBook Air M3 15-inch)
-(8, 61, 1, 799.99, 799.99),
-
+(7, (SELECT id FROM product_variants WHERE variantName LIKE '%Family Hub%' LIMIT 1), 1, 3499.99, 3499.99),
+-- Order 8 items (MacBook Air M3 15-inch) 
+(8, (SELECT id FROM product_variants WHERE variantName LIKE '%MacBook Air M3%' LIMIT 1), 1, 799.99, 799.99),
 -- Order 9 items (Pixel Fold 2 256GB)
-(9, 53, 1, 1699.99, 1699.99),
-
+(9, (SELECT id FROM product_variants WHERE variantName LIKE '%Pixel Fold 2%' LIMIT 1), 1, 1699.99, 1699.99),
 -- Order 10 items (Xiaomi Redmi Note 15)
-(10, 15, 1, 299.99, 299.99),
-
+(10, (SELECT id FROM product_variants WHERE variantName LIKE '%Redmi Note 15%' LIMIT 1), 1, 299.99, 299.99),
 -- Order 11 items (LG OLED G4 65")
-(11, 94, 1, 2499.99, 2499.99),
-
+(11, (SELECT id FROM product_variants WHERE variantName LIKE '%LG OLED G4%' LIMIT 1), 1, 2499.99, 2499.99),
 -- Order 12 items (Poco F7 Pro 256GB)
-(12, 54, 1, 649.99, 649.99),
-
+(12, (SELECT id FROM product_variants WHERE variantName LIKE '%Poco F7 Pro%' LIMIT 1), 1, 649.99, 649.99),
 -- Order 13 items (Sony A7R VI Body)
-(13, 86, 1, 1299.99, 1299.99),
-
+(13, (SELECT id FROM product_variants WHERE variantName LIKE '%Sony A7R VI%' LIMIT 1), 1, 1299.99, 1299.99),
 -- Order 14 items (OnePlus Nord 6 Pro 256GB)
-(14, 58, 1, 549.99, 549.99),
-
+(14, (SELECT id FROM product_variants WHERE variantName LIKE '%OnePlus Nord 6 Pro%' LIMIT 1), 1, 549.99, 549.99),
 -- Order 15 items (Lenovo Legion Pro 7i Gen 9 1TB)
-(15, 62, 1, 1999.99, 1999.99),
-
+(15, (SELECT id FROM product_variants WHERE variantName LIKE '%Lenovo Legion 9%' LIMIT 1), 1, 1999.99, 1999.99),
 -- Order 16 items (Dell Inspiron 14 Plus 256GB)
-(16, 65, 1, 899.99, 899.99),
-
+(16, (SELECT id FROM product_variants WHERE variantName LIKE '%Dell Inspiron 14 Plus%' LIMIT 1), 1, 899.99, 899.99),
 -- Order 17 items (Galaxy A75 5G 128GB)
 (17, 56, 1, 399.99, 399.99),
-
 -- Order 18 items (Nikon Z9 II Body)
 (18, 88, 1, 4299.99, 4299.99),
-
 -- Order 19 items (Dyson V15 Detect)
-(19, 97, 1, 749.99, 749.99),
+(17, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy A75%' LIMIT 1), 1, 399.99, 399.99),
+(18, (SELECT id FROM product_variants WHERE variantName LIKE '%Nikon Z9 II%' LIMIT 1), 1, 4299.99, 4299.99),
 
--- Order 20 items (LG Gram 17 2025 512GB)
-(20, 70, 1, 1399.99, 1399.99),
+(19, (SELECT id FROM product_variants WHERE variantName LIKE '%Dyson V15%' LIMIT 1), 1, 749.99, 749.99),
 
--- Order 21 items (Instax Mini 99)
-(21, 84, 1, 199.99, 199.99),
+(20, (SELECT id FROM product_variants WHERE variantName LIKE '%LG Gram 17%' LIMIT 1), 1, 1399.99, 1399.99),
 
--- Order 22 items (Lenovo Legion Pro 7i Gen 9)
-(22, 62, 1, 2699.99, 2699.99),
+(21, (SELECT id FROM product_variants WHERE variantName LIKE '%Instax Mini 99%' LIMIT 1), 1, 199.99, 199.99),
 
--- Order 23 items (DJI Pocket 3)
-(23, 85, 1, 499.99, 499.99),
+(22, (SELECT id FROM product_variants WHERE variantName LIKE '%Lenovo Legion%' LIMIT 1), 1, 2699.99, 2699.99),
 
--- Order 24 items (HP Omen 16 2025 512GB)
-(24, 63, 1, 1799.99, 1799.99),
+(23, (SELECT id FROM product_variants WHERE variantName LIKE '%DJI Pocket%' LIMIT 1), 1, 499.99, 499.99),
 
--- Order 25 items (Beurer Pulse Oximeter)
-(25, 78, 1, 99.99, 99.99),
+(24, (SELECT id FROM product_variants WHERE variantName LIKE '%HP Omen 16%' LIMIT 1), 1, 1799.99, 1799.99),
 
--- Order 26 items (Leica Q3)
-(26, 89, 1, 5999.99, 5999.99),
+(25, (SELECT id FROM product_variants WHERE variantName LIKE '%Beurer Pulse%' LIMIT 1), 1, 99.99, 99.99),
 
--- Order 27 items (Instant Vortex Air Fryer)
-(27, 95, 1, 129.99, 129.99),
+(26, (SELECT id FROM product_variants WHERE variantName LIKE '%Leica Q3%' LIMIT 1), 1, 5999.99, 5999.99),
 
--- Order 28 items (ASUS ZenBook 14X OLED)
-(28, 68, 1, 999.99, 999.99),
+(27, (SELECT id FROM product_variants WHERE variantName LIKE '%Instant Vortex%' LIMIT 1), 1, 129.99, 129.99),
 
--- Order 29 items (Apple iPad Pro 13-inch M4 Max)
-(29, 23, 1, 1499.99, 1499.99),
+(28, (SELECT id FROM product_variants WHERE variantName LIKE '%ASUS ZenBook 14X%' LIMIT 1), 1, 999.99, 999.99),
 
--- Order 30 items (Breville Barista Express)
-(30, 100, 1, 699.99, 699.99),
+(29, (SELECT id FROM product_variants WHERE variantName LIKE '%iPad Pro%' LIMIT 1), 1, 1499.99, 1499.99),
 
--- Order 31 items (Sony A7R VI Body)
-(31, 86, 1, 3899.99, 3899.99),
+(30, (SELECT id FROM product_variants WHERE variantName LIKE '%Breville Barista%' LIMIT 1), 1, 699.99, 699.99),
 
--- Order 32 items (Philips Series 9000)
-(32, 71, 1, 249.99, 249.99),
+(31, (SELECT id FROM product_variants WHERE variantName LIKE '%Sony A7R VI%' LIMIT 1), 1, 3899.99, 3899.99),
 
--- Order 33 items (LG ThinQ Dryer)
-(33, 92, 1, 1199.99, 1199.99),
+(32, (SELECT id FROM product_variants WHERE variantName LIKE '%Philips Series 9000%' LIMIT 1), 1, 249.99, 249.99),
 
--- Order 34 items (Acer Swift 3 OLED 256GB)
-(34, 69, 1, 149.99, 149.99),
+(33, (SELECT id FROM product_variants WHERE variantName LIKE '%LG ThinQ Dryer%' LIMIT 1), 1, 1199.99, 1199.99),
 
--- Order 35 items (Samsung Galaxy Tab S10, iPhone 17 Mini Pro)
-(35, 21, 1, 1299.99, 1299.99),
-(35, 12, 1, 999.99, 999.99);
+(34, (SELECT id FROM product_variants WHERE variantName LIKE '%Acer Swift 3%' LIMIT 1), 1, 149.99, 149.99),
+
+(35, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy Tab S10%' LIMIT 1), 1, 1299.99, 1299.99),
+
+(35, (SELECT id FROM product_variants WHERE variantName LIKE '%iPhone 17 Mini Pro%' LIMIT 1), 1, 999.99, 999.99);
 
 -- Add recent order items for 2025 orders
 INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
 -- Order 33 items (Surface Laptop Studio 6)
-(33, 66, 1, 1599.99, 1599.99),
-
+(33, (SELECT id FROM product_variants WHERE variantName LIKE '%Surface Laptop Studio%' LIMIT 1), 1, 1599.99, 1599.99),
 -- Order 34 items (MacBook Air M3 15-inch)
-(34, 61, 1, 799.99, 799.99),
-
+(34, (SELECT id FROM product_variants WHERE variantName LIKE '%MacBook Air M3%' LIMIT 1), 1, 799.99, 799.99),
 -- Order 35 items (ROG Zephyrus G16 2025 1TB + ThinkPad X1 Carbon Gen 13)
-(35, 64, 1, 1999.99, 1999.99),
-(35, 67, 1, 199.99, 199.99);
+(35, (SELECT id FROM product_variants WHERE variantName LIKE '%ROG Zephyrus G16%' LIMIT 1), 1, 1999.99, 1999.99),
+(35, (SELECT id FROM product_variants WHERE variantName LIKE '%ThinkPad X1 Carbon%' LIMIT 1), 1, 199.99, 199.99);
+-- Order 33 items (Surface Laptop Studio 6)

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getAllOrders } from '../../services/order.services';
+import { getAllOrders, getAssignedOrders } from '../../services/order.services';
+import { getDeliveryStaff } from '../../services/user.services';
+import { assignStaffToDelivery } from '../../services/delivery.services';
+import { getCurrentUserFromToken } from '../../services/auth.services';
 import type { Order } from '../../services/order.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
@@ -23,6 +26,13 @@ const Orders: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'shipped' | 'assigned'>('all');
+  const [deliveryModeFilter, setDeliveryModeFilter] = useState<'all' | 'Store Pickup' | 'Standard Delivery'>('all');
+  const [shippedOrders, setShippedOrders] = useState<Order[]>([]);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [availableDeliveryStaff, setAvailableDeliveryStaff] = useState<any[]>([]);
+  const [assigningDelivery, setAssigningDelivery] = useState(false);
+  const [deliveryToAssign, setDeliveryToAssign] = useState<{ deliveryId?: number; orderId?: number } | null>(null);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,13 +49,39 @@ const Orders: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const ordersData = await getAllOrders();
+      // Decide which endpoint to call based on token role to avoid 403 Forbidden
+      const current = getCurrentUserFromToken();
+      const role = (current?.role || '').toString().toLowerCase();
+      let ordersData: Order[] = [];
+      if (role === 'admin' || role === 'superadmin') {
+        ordersData = await getAllOrders();
+      } else if (role === 'warehousestaff' || role === 'deliverystaff' || role.includes('delivery')) {
+        // warehouse and delivery staff should only get their assigned orders
+        ordersData = await getAssignedOrders();
+      } else {
+        // Other roles are not allowed to list all orders; surface a helpful message and return empty
+        setError('You do not have permission to list all orders.');
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
+      // If admin and activeTab is shipped, load shipped orders too
+      if (role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin') {
+        // lazy load shipped orders
+        // lazy load placeholder - no-op
+      }
     } catch (err) {
       console.error('Error loading orders:', err);
-      setError('Failed to load orders. Please try again.');
+      // Distinguish forbidden from other errors
+      const e: any = err;
+      if (e?.message === 'Forbidden' || e?.response?.status === 403) {
+        setError('You do not have permission to view orders. Contact an admin.');
+      } else {
+        setError('Failed to load orders. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -55,6 +91,41 @@ const Orders: React.FC = () => {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  // Load shipped orders (admin only)
+  const loadShippedOrders = async () => {
+    try {
+      setLoading(true);
+      const axiosInstance = (await import('../../axiosConfig')).default;
+      const response = await axiosInstance.get('/api/order/shipped');
+      setShippedOrders(response.data?.data || []);
+    } catch (err) {
+      console.error('Error loading shipped orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Modal state for view/edit
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [editStatus, setEditStatus] = useState<string>('');
+
+  const getAllowedNextStatuses = (current: string | undefined) => {
+    const curr = current ? current.charAt(0).toUpperCase() + current.slice(1).toLowerCase() : 'Pending';
+    switch (curr) {
+      case 'Pending':
+        return ['Confirmed', 'Cancelled'];
+      case 'Confirmed':
+          return ['Shipped', 'Cancelled'];
+      case 'Shipped':
+        return ['Delivered'];
+      default:
+        return [];
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
@@ -66,8 +137,15 @@ const Orders: React.FC = () => {
     const orderDate = new Date(order.orderDate || order.createdAt);
     const matchesDateFrom = !dateFrom || orderDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || orderDate <= new Date(dateTo);
-    
-    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+
+    // Delivery mode filtering: respect 'all' or match string (order.deliveryMode may be object/string)
+    let matchesDeliveryMode = true;
+    if (deliveryModeFilter !== 'all') {
+      const mode = typeof order.deliveryMode === 'string' ? order.deliveryMode : (order.deliveryMode && JSON.stringify(order.deliveryMode)) || '';
+      matchesDeliveryMode = (mode || '').toLowerCase() === deliveryModeFilter.toLowerCase();
+    }
+
+    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo && matchesDeliveryMode;
   }).sort((a, b) => {
     let aValue, bValue;
     
@@ -96,12 +174,15 @@ const Orders: React.FC = () => {
     }
   });
 
-  // Pagination calculations
-  const totalCount = filteredOrders.length;
+  const displayedOrders = activeTab === 'shipped'
+    ? shippedOrders
+    : (activeTab === 'assigned' ? filteredOrders.filter(o => o.deliveryId) : filteredOrders);
+
+  // Pagination calculations (use displayedOrders which respects tab)
+  const totalCount = displayedOrders.length;
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
   // Pagination handlers
   const handlePreviousPage = () => {
@@ -128,12 +209,12 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'assigned':
+        return 'bg-blue-100 text-blue-800';
       case 'pending':
         return 'bg-orange-100 text-orange-800';
       case 'confirmed':
         return 'bg-blue-100 text-blue-800';
-      case 'processing':
-        return 'bg-indigo-100 text-indigo-800';
       case 'shipped':
         return 'bg-yellow-100 text-yellow-800';
       case 'delivered':
@@ -147,6 +228,17 @@ const Orders: React.FC = () => {
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString();
+
+  // Safely stringify possible object fields (addresses, names) returned as JSON
+  const stringifyField = (v: any) => {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    try {
+      return JSON.stringify(v);
+    } catch (_) {
+      return String(v);
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -189,7 +281,7 @@ const Orders: React.FC = () => {
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">Pending</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {orders.filter(o => ['pending', 'confirmed', 'processing'].includes(o.status.toLowerCase())).length}
+                    {orders.filter(o => ['pending', 'confirmed'].includes(o.status.toLowerCase())).length}
                   </p>
                 </div>
               </div>
@@ -217,6 +309,25 @@ const Orders: React.FC = () => {
         )}
       </div>
 
+      {/* Tabs */}
+      <div className="mb-4 flex items-center justify-between">
+        
+
+        {/* Delivery mode selector */}
+        <div>
+          <label className="text-sm mr-2">Delivery Mode:</label>
+          <select
+            className="px-3 py-1 border border-gray-300 rounded"
+            value={deliveryModeFilter}
+            onChange={e => setDeliveryModeFilter(e.target.value as 'all' | 'Store Pickup' | 'Standard Delivery')}
+          >
+            <option value="all">All</option>
+            <option value="Store Pickup">Store Pickup</option>
+            <option value="Standard Delivery">Standard Delivery</option>
+          </select>
+        </div>
+      </div>
+
       {/* Search & Filter */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -239,9 +350,10 @@ const Orders: React.FC = () => {
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">All Statuses</option>
+            <option value="assigned">Assigned</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
-            <option value="processing">Processing</option>
+            {/* Processing removed */}
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
@@ -367,7 +479,7 @@ const Orders: React.FC = () => {
         )}
       </div>
 
-      {/* Orders Table */}
+        {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center p-8">
@@ -419,12 +531,15 @@ const Orders: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedOrders.map(order => (
+                  {displayedOrders.slice(startIndex, endIndex).filter(Boolean).map(order => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.customer?.name || 'Unknown Customer'}</div>
-                      <div className="text-sm text-gray-500">{order.customer?.email || 'No email'}</div>
+                      <div className="text-sm text-gray-900">{(typeof order.customer?.name === 'object') ? stringifyField(order.customer?.name) : (order.customer?.name || 'Unknown Customer')}</div>
+                      <div className="text-sm text-gray-500">{(typeof order.customer?.email === 'object') ? stringifyField(order.customer?.email) : (order.customer?.email || 'No email')}</div>
+                      {order.deliveryAddress && (
+                        <div className="text-xs text-gray-400 mt-1">{typeof order.deliveryAddress === 'object' ? stringifyField(order.deliveryAddress) : order.deliveryAddress}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
@@ -448,24 +563,53 @@ const Orders: React.FC = () => {
                         <button 
                           className="text-blue-600 hover:text-blue-900"
                           title="View Details"
-                          onClick={() => console.log('View order:', order.id)}
+                          onClick={() => { setSelectedOrder(order); setViewModalOpen(true); }}
                         >
                           <IconComponent iconName="Eye" size={16} />
                         </button>
                         <button 
                           className="text-green-600 hover:text-green-900"
                           title="Update Status"
-                          onClick={() => console.log('Update status:', order.id)}
+                          onClick={() => { 
+                            const titleCase = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+                            setSelectedOrder(order); 
+                            const allowed = getAllowedNextStatuses(order.status);
+                            setEditStatus(allowed.length ? allowed[0] : titleCase(order.status)); 
+                            setEditModalOpen(true); 
+                          }}
                         >
                           <IconComponent iconName="Edit" size={16} />
                         </button>
-                        <button 
+                        { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
+                        <button
                           className="text-purple-600 hover:text-purple-900"
                           title="Assign Delivery"
-                          onClick={() => console.log('Assign delivery:', order.id)}
+                          onClick={async () => {
+                            // Guard client-side: ensure current token belongs to Admin or SuperAdmin
+                            const current = getCurrentUserFromToken();
+                            if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
+                              alert('You are not authorized to assign deliveries. Please login as Admin.');
+                              return;
+                            }
+                            // Open assign modal for this order
+                            try {
+                              setDeliveryToAssign({ orderId: order.id, deliveryId: order.deliveryId });
+                              setAssignModalOpen(true);
+                              // fetch delivery staff
+                              const staff = await getDeliveryStaff();
+                              setAvailableDeliveryStaff(staff || []);
+                            } catch (err: any) {
+                              console.error('Failed to fetch delivery staff', err);
+                              const status = err?.response?.status || err?.status;
+                              if (status === 401) alert('Unauthorized — please login');
+                              else if (status === 403) alert('Forbidden — you do not have permission to perform assignments');
+                              else alert('Failed to fetch delivery staff');
+                            }
+                          }}
                         >
                           <IconComponent iconName="Truck" size={16} />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -554,6 +698,162 @@ const Orders: React.FC = () => {
           </>
         )}
       </div>
+      {/* View Order Modal */}
+      {viewModalOpen && selectedOrder && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Order #{selectedOrder.id}</h3>
+              <button onClick={() => { setViewModalOpen(false); setSelectedOrder(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Customer</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.customer?.name || 'Unknown'}</p>
+                <p className="text-xs text-gray-500">{selectedOrder.customer?.email || 'No email'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Items</label>
+                <ul className="mt-1 text-sm text-gray-900 list-disc list-inside">
+                  {selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items.map(it => (<li key={it.id}>{it.variantName} x {it.quantity}</li>)) : <li>No items</li>}
+                </ul>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Total</label>
+                <p className="mt-1 text-sm text-gray-900">${(Number(selectedOrder.totalPrice) || 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.status}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal - change status flow */}
+      {editModalOpen && selectedOrder && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Update Order Status</h3>
+              <button onClick={() => { setEditModalOpen(false); setSelectedOrder(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Current Status</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedOrder.status}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Change Status</label>
+                <div className="mt-2">
+                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full px-3 py-2 border rounded">
+                    {getAllowedNextStatuses(selectedOrder?.status).length === 0 ? (
+                      <option value={selectedOrder?.status || 'Pending'}>{selectedOrder?.status || 'Pending'}</option>
+                    ) : (
+                      getAllowedNextStatuses(selectedOrder?.status).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div className="mt-3 flex space-x-2">
+                    <button disabled={isUpdatingStatus} onClick={async () => {
+                      try {
+                        setIsUpdatingStatus(true);
+                        const { updateOrderStatus } = await import('@/services/order.services');
+                        const updated = await updateOrderStatus(selectedOrder.id, editStatus);
+
+                        if (updated && updated.id) {
+                          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                        } else {
+                          // If backend did not return updated order, reload list to ensure UI consistency
+                          await loadOrders();
+                        }
+
+                        setEditModalOpen(false);
+                        setSelectedOrder(null);
+                      } catch (err: any) {
+                        console.error('Failed to update order status', err);
+                        const serverMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update status';
+                        alert(`Failed to update status: ${serverMsg}`);
+                        // Reload orders to ensure UI isn't stale
+                        await loadOrders();
+                        setEditModalOpen(false);
+                        setSelectedOrder(null);
+                      } finally {
+                        setIsUpdatingStatus(false);
+                      }
+                    }} className={`px-3 py-1 ${isUpdatingStatus ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{isUpdatingStatus ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditModalOpen(false); setSelectedOrder(null); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Delivery Modal (Admin only) */}
+      {assignModalOpen && deliveryToAssign && (
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Assign Delivery Staff</h3>
+              <button onClick={() => { setAssignModalOpen(false); setDeliveryToAssign(null); }} className="text-gray-400 hover:text-gray-600"><IconComponent iconName="X" size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Select Delivery Staff</label>
+                <div className="mt-2">
+                  <select className="w-full px-3 py-2 border rounded" onChange={(e) => setAvailableDeliveryStaff(prev => prev.map(s => ({...s, _selected: s.id === Number(e.target.value)})))}>
+                    <option value="">-- Select --</option>
+                    {availableDeliveryStaff.map(st => (
+                      <option key={st.id} value={st.id}>{st.name} ({st.email})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-3 flex space-x-2">
+                    <button onClick={async () => {
+                      const selected = availableDeliveryStaff.find(s => s._selected);
+                      if (!selected) { alert('Please select a staff'); return; }
+                      try {
+                        setAssigningDelivery(true);
+                        // Use deliveryId if present, otherwise pass the orderId — backend will create a delivery record when missing
+                        const idToUse = deliveryToAssign.deliveryId || deliveryToAssign.orderId;
+                        const resp = await assignStaffToDelivery(Number(idToUse), selected.id);
+                        // If the service returns an error-like response, surface it
+                        if (resp && resp.success === false) {
+                          let msg = 'Failed to assign delivery staff';
+                          if (resp.error) {
+                            if (typeof resp.error === 'string') {
+                              msg = resp.error;
+                            } else if (typeof resp.error === 'object' && 'message' in resp.error) {
+                              msg = (resp.error as { message?: string }).message || msg;
+                            }
+                          }
+                          alert(msg);
+                        } else {
+                          // refresh lists
+                          await loadOrders();
+                          await loadShippedOrders();
+                          setAssignModalOpen(false);
+                          setDeliveryToAssign(null);
+                        }
+                      } catch (err: any) {
+                        console.error('Assign failed', err);
+                        const serverMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to assign delivery staff';
+                        alert(serverMsg);
+                      } finally {
+                        setAssigningDelivery(false);
+                      }
+                    }} className={`px-3 py-1 ${assigningDelivery ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{assigningDelivery ? 'Assigning...' : 'Assign'}</button>
+                  <button onClick={() => { setAssignModalOpen(false); setDeliveryToAssign(null); }} className="px-3 py-1 bg-gray-100 rounded">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

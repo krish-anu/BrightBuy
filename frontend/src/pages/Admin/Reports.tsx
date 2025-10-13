@@ -205,14 +205,14 @@ const Reports: React.FC = () => {
               <Pie
                 data={reportsData && Array.isArray(reportsData.categoryWiseOrders) && reportsData.categoryWiseOrders.length > 0 ? 
                   reportsData.categoryWiseOrders
-                    .filter((category: any) => {
-                      const orderCount = Number(category.orderCount) || Number(category.count) || 0;
+                    .filter((cat: any) => {
+                      const orderCount = Number(cat.orderCount) || Number(cat.count) || 0;
                       return orderCount > 0; // Only show categories with orders
                     })
-                    .map((category: any, index: number) => {
-                      const orderCount = Number(category.orderCount) || Number(category.count) || 0;
+                    .map((cat: any, index: number) => {
+                      const orderCount = Number(cat.orderCount) || Number(cat.count) || 0;
                       return {
-                        name: category.categoryName || category.name || 'Unknown',
+                        name: cat.categoryName || cat.name || 'Unknown',
                         value: orderCount,
                         actualValue: orderCount,
                         color: `hsl(${index * 72}, 70%, 60%)` // Use 72 degrees for better color distribution
@@ -228,11 +228,11 @@ const Reports: React.FC = () => {
               >
                 {reportsData && Array.isArray(reportsData.categoryWiseOrders) && reportsData.categoryWiseOrders.length > 0 ? 
                   reportsData.categoryWiseOrders
-                    .filter((category: any) => {
-                      const orderCount = Number(category.orderCount) || Number(category.count) || 0;
+                    .filter((cat: any) => {
+                      const orderCount = Number(cat.orderCount) || Number(cat.count) || 0;
                       return orderCount > 0;
                     })
-                    .map((category: any, index: number) => {
+                    .map((_: any, index: number) => {
                       return (
                         <Cell 
                           key={`cell-${index}`} 
@@ -243,7 +243,7 @@ const Reports: React.FC = () => {
                   <Cell key="no-data" fill="#E5E7EB" />
                 }
               </Pie>
-              <Tooltip formatter={(value: number, name: string) => [value, 'Orders']} />
+              <Tooltip formatter={(value: number) => [value, 'Orders']} />
             </PieChart>
           </ResponsiveContainer>
           
@@ -333,12 +333,7 @@ const Reports: React.FC = () => {
                 {reportsData && reportsData.orderStatusOverview ? reportsData.orderStatusOverview.Pending || 0 : 0}
               </span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-              <span className="text-sm font-medium text-gray-700">Processing Orders</span>
-              <span className="text-lg font-bold text-blue-600">
-                {reportsData && reportsData.orderStatusOverview ? reportsData.orderStatusOverview.Processing || 0 : 0}
-              </span>
-            </div>
+            {/* Processing status removed from reports */}
             <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
               <span className="text-sm font-medium text-gray-700">Shipped Orders</span>
               <span className="text-lg font-bold text-purple-600">

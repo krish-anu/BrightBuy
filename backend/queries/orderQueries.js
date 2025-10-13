@@ -1,9 +1,11 @@
 // Orders Queries
 const getAllOrders = `
   SELECT o.*, 
-         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone,
+         d.id AS deliveryId, d.status AS deliveryStatus, d.staffId AS deliveryStaffId
   FROM orders o
   LEFT JOIN users u ON o.userId = u.id
+  LEFT JOIN deliveries d ON d.orderId = o.id
   ORDER BY o.orderDate DESC
 `;
 
@@ -62,6 +64,29 @@ const getOrderStatusById = `
   SELECT id, status, deliveryMode, deliveryAddress, estimatedDeliveryDate, userId
   FROM orders
   WHERE id = ?
+`;
+
+// Orders assigned to a delivery staff (via deliveries.staffId)
+const getOrdersAssignedToStaff = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+  FROM orders o
+  JOIN deliveries d ON d.orderId = o.id
+  LEFT JOIN users u ON o.userId = u.id
+  WHERE d.staffId = ?
+  ORDER BY o.orderDate DESC
+`;
+
+// Get orders with status 'Shipped' (include delivery info)
+const getShippedOrders = `
+  SELECT o.*, 
+         u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone,
+         d.id AS deliveryId, d.status AS deliveryStatus, d.staffId AS deliveryStaffId
+  FROM orders o
+  LEFT JOIN deliveries d ON d.orderId = o.id
+  LEFT JOIN users u ON o.userId = u.id
+  WHERE o.status = 'Shipped'
+  ORDER BY o.orderDate DESC
 `;
 
 const getTotalRevenue = `SELECT SUM(totalPrice) AS totalRevenue FROM orders`;
@@ -128,6 +153,8 @@ module.exports = {
   getCategoryWiseOrders,
   getTotalRevenue,
   getOrderStatusById,
+  getOrdersAssignedToStaff,
+  getShippedOrders,
   updateOrderStatus,
   updatePaymentStatus,
   restockItems,

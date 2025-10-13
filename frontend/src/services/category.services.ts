@@ -10,10 +10,17 @@ export const getAllCategories = async () => {
     throw error;
   }
 };
-export const addProductsToCategory = async (
-  categoryId: number,
-  productIds: number[],
-) => {
+
+export const createCategory = async (name: string, parentId: number | null = null) => {
+  try {
+    const response = await axiosInstance.post('/api/category', { name, parentId });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating category:', error);
+    throw error;
+  }
+};
+export const addProductsToCategory = async (categoryId: number, productIds: number[]) => {
   try {
     const response = await axiosInstance.post(
       `api/category/addProductsCategory`,

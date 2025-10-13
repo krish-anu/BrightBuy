@@ -12,6 +12,8 @@ router.get('/stats',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),get
 router.get('/category',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),getCategoryWiseOrders)
 router.get('/user', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getUserOrders);
 router.get('/track/:id', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getOrderStatus);
+router.get('/assigned', verifyToken, authorizeRoles(ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/order.controller').getAssignedOrders);
+router.get('/shipped', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/order.controller').getShippedOrders);
 router.get('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), getOrders);
 router.get('/:id', verifyToken, authorizeRoles( ROLES.USER,ROLES.ADMIN, ROLES.SUPERADMIN), getOrder);
 

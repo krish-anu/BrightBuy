@@ -34,12 +34,15 @@ export interface Order {
   totalPrice: number;
   deliveryCharge: number;
   paymentMethod: 'CreditCard' | 'CashOnDelivery' | 'Stripe';
-  status: 'Pending' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  status: 'Pending' | 'Confirmed' | 'Shipped' | 'Delivered' | 'Cancelled';
   createdAt: string;
   updatedAt: string;
   // Additional fields from joins
   customer?: Customer;
   items?: OrderItem[];
+  // delivery info
+  deliveryId?: number;
+  deliveryStatus?: string;
 }
 
 export interface OrdersResponse {
@@ -52,14 +55,6 @@ export interface OrdersResponse {
     itemsPerPage: number;
   };
 }
-
-type OrderStats = {
-  pending: number;
-  confirmed: number;
-  shipped: number;
-  delivered: number;
-  cancelled: number;
-};
 
 type StatsResponse = {
   totalOrders: number;
@@ -81,6 +76,11 @@ export const getAllOrders = async (): Promise<Order[]> => {
     return response.data.data || [];
   } catch (error) {
     console.error("Error fetching orders:", error);
+    // Normalize 403 into a friendly error that the UI can detect
+    const anyErr: any = error;
+    if (anyErr?.response?.status === 403) {
+      throw new Error('Forbidden');
+    }
     throw error;
   }
 };
@@ -108,6 +108,19 @@ export const getOrdersPaginated = async (
   }
 };
 
+// Get orders assigned to the authenticated warehouse/delivery staff
+export const getAssignedOrders = async (): Promise<Order[]> => {
+  try {
+    const response = await axiosInstance.get<{ success: boolean; data: Order[] }>("/api/order/assigned");
+    return response.data.data || [];
+  } catch (error) {
+    console.error("Error fetching assigned orders:", error);
+    const anyErr: any = error;
+    if (anyErr?.response?.status === 403) throw new Error('Forbidden');
+    throw error;
+  }
+};
+
 // Get single order by ID
 export const getOrderById = async (orderId: number): Promise<Order> => {
   try {
@@ -122,11 +135,13 @@ export const getOrderById = async (orderId: number): Promise<Order> => {
 // Update order status
 export const updateOrderStatus = async (orderId: number, status: string): Promise<Order> => {
   try {
-    const response = await axiosInstance.patch<{success: boolean; data: Order}>(
-      `/api/order/update/${orderId}`,
-      { status }
-    );
-    return response.data.data;
+    const response = await axiosInstance.patch(`/api/order/update/${orderId}`, { status });
+    // Backend may return { success: true, data: Order } or { success: true, message: '...' }
+    const returned = response.data?.data ?? null;
+    if (returned) return returned as Order;
+    // If backend returned only a message, fetch the order explicitly
+    const order = await getOrderById(orderId);
+    return order;
   } catch (error) {
     console.error("Error updating order status:", error);
     throw error;

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/auth.middleware");
 const authorizeRoles = require("../middlewares/role.middleware");
-const { getAllUsers, updateUserById, deleteUser } = require("../controllers/user.controller");
+const { getAllUsers, updateUserById, deleteUser, getDeliveryStaff } = require("../controllers/user.controller");
 
 // ===================== SUPER ADMIN ROUTES =====================
 // // Only super-admin can permit admins
@@ -88,6 +88,10 @@ const { getAllUsers, updateUserById, deleteUser } = require("../controllers/user
 // );
 
 router.get("/", getAllUsers);
+
+// Admin: get list of delivery staff for assignment
+const ROLES = require("../roles");
+router.get('/delivery-staff', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), getDeliveryStaff);
 
 // Admin routes for user management
 router.put("/:id", updateUserById);

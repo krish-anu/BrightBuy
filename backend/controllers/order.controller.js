@@ -273,6 +273,57 @@ const getOrderStatus = async (req, res, next) => {
   }
 };
 
+// Get orders assigned to the authenticated delivery/warehouse staff
+const getAssignedOrders = async (req, res, next) => {
+  try {
+    const role = (req.user.role || '').toString().toLowerCase();
+    let rows = [];
+
+    // If WarehouseStaff should see the same orders as Admin, fetch all orders for them
+    if (role === 'warehousestaff' || role === 'warehouse') {
+      rows = await query(orderQueries.getAllOrders);
+    } else {
+      const staffId = req.user.id;
+      rows = await query(orderQueries.getOrdersAssignedToStaff, [staffId]);
+    }
+
+    // Transform the data to include order items for each order
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+    res.status(200).json({ success: true, data: ordersWithItems });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin/SuperAdmin: Get orders with status 'Shipped' so admin can assign delivery staff
+const getShippedOrders = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getShippedOrders);
+
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+
+    res.status(200).json({ success: true, data: ordersWithItems });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateOrderStatus = async (req, res, next) => {
   const connection = await pool.getConnection();
   await connection.beginTransaction();
@@ -289,7 +340,11 @@ const updateOrderStatus = async (req, res, next) => {
 
     if (!orderRows.length) throw new ApiError('Order not found', 404);
     const order = orderRows[0];
-    const { status } = req.body;
+  const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+  let { status } = req.body;
+  if (!status) throw new ApiError('Status is required', 400);
+  // Normalize status to Title Case (e.g., 'shipped' -> 'Shipped') to avoid casing issues
+  status = String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase();
 
     // Validate transition
     const isValid = await isValidUpdate(status, order.status);
@@ -334,8 +389,12 @@ const updateOrderStatus = async (req, res, next) => {
       }
       
     }
-    if (status === 'Delivered' && order.paymentMethod === 'Card') {
-      if (order.deliveryId && order.deliveryStaffId !== req.user.id) {
+    // --- Case: Delivered ---
+    else if (status === 'Delivered') {
+      // Only allow delivery staff to mark delivered when there's a delivery record
+      // Admins and SuperAdmins can also update delivery status
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
         throw new ApiError('Forbidden access', 403);
       }
       await connection.query(
@@ -349,14 +408,49 @@ const updateOrderStatus = async (req, res, next) => {
         );
       }
     }
+    // --- Case: Simple status updates (Confirmed, Pending) ---
+    else if (['Confirmed', 'Pending'].includes(status)) {
+      await connection.query(
+        `UPDATE orders SET status = ? WHERE id = ?`,
+        [status, order.id]
+      );
+    }
     else {
+      // For any other status not explicitly handled above (e.g., Cancelled),
+      // prevent non-assigned delivery staff from updating delivery-specific orders.
+      // Admins and SuperAdmins may bypass this restriction.
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
+        throw new ApiError('Forbidden access', 403);
+      }
       throw new ApiError("Invalid update", 400);
     }
 
 
-    // Commit transaction
-    await connection.commit();
-    res.status(200).json({ success: true, message: 'Order status updated' });
+  // Commit transaction
+  await connection.commit();
+
+  // Fetch and return updated order details so frontend can update state
+  // Select order with joined user fields to construct customer object (same shape as getOrder/getOrders)
+  const [updatedRows] = await connection.query(
+    `SELECT o.*, u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+     FROM orders o
+     LEFT JOIN users u ON o.userId = u.id
+     WHERE o.id = ?`,
+    [order.id]
+  );
+  const updatedOrderRow = updatedRows[0];
+  const [orderItems] = await connection.query(orderQueries.getOrderItemsByOrderId, [order.id]);
+
+  // Build response object matching getOrder/getOrders shape
+  const { customerId, customerName, customerEmail, customerPhone, ...orderData } = updatedOrderRow;
+  const updatedOrder = {
+    ...orderData,
+    customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+    items: orderItems
+  };
+
+  res.status(200).json({ success: true, data: updatedOrder });
   } catch (error) {
     await connection.rollback();
     next(error);
@@ -418,6 +512,8 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
+  getAssignedOrders,
+  getShippedOrders,
   getTotalOrders,
   getStats
 };

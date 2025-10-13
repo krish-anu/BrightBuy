@@ -12,6 +12,69 @@ const getProducts = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Get all brands (from a dedicated brands table). If table doesn't exist, create it.
+const getBrands = async (req, res, next) => {
+  try {
+    // ensure brands table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS brands (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // fetch brands table entries
+    const brandRows = await query(`SELECT id, name FROM brands ORDER BY name ASC`);
+
+    // also fetch distinct brand values from products table (some older products may have brand text but not exist in brands table)
+    const productBrandRows = await query(`SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand != ''`);
+
+    // merge and dedupe by name (case-insensitive), prefer brands table id when available
+    const map = new Map();
+    for (const r of brandRows) {
+      if (!r || !r.name) continue;
+      map.set(r.name.toString().toLowerCase(), { id: r.id, name: r.name });
+    }
+    for (const pr of productBrandRows) {
+      const name = pr && pr.brand ? pr.brand.toString() : null;
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!map.has(key)) map.set(key, { id: null, name });
+    }
+
+    const merged = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    res.status(200).json({ success: true, data: merged });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Create a brand (idempotent)
+const createBrand = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.toString().trim()) throw new ApiError('Brand name is required', 400);
+    const brandName = name.toString().trim();
+
+    // ensure brands table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS brands (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // Insert if not exists
+    await query(`INSERT IGNORE INTO brands (name) VALUES (?)`, [brandName]);
+    const [rows] = await query(`SELECT id, name FROM brands WHERE name = ?`, [brandName]);
+    res.status(201).json({ success: true, data: rows[0] || { name: brandName } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get single product with variants
 const getProduct = async (req, res, next) => {
   try {
@@ -31,46 +94,71 @@ const getProduct = async (req, res, next) => {
 const addProduct = async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
-    const { name, description, brand, attributes, stockQnt, price,categoryIds } = req.body;
+    const { name, description, brand, attributes, stockQnt, price, categoryIds, imageURL } = req.body;
 
-    if (!name || !description || !attributes || !price )
-      throw new ApiError('Name, description, price and attributes are required', 400);
+    // defensive defaults and validation
+    const attrs = Array.isArray(attributes) ? attributes : [];
+    if (!name || !description || !price) throw new ApiError('Name, description and price are required', 400);
 
     await connection.beginTransaction();
 
     const [existing] = await connection.query(productQueries.getProductByName, [name]);
-    if (existing.length) throw new ApiError('Product exists', 409);
-
-    const [productResult] = await connection.query(
-      productQueries.insertProduct,
-      [name, description, brand || null]
-    );
-    const productId = productResult.insertId;
+    let productId;
+    if (existing.length) {
+      // If a product with the same name exists, use its id and create a new variant for it
+      productId = existing[0].id;
+    } else {
+      const [productResult] = await connection.query(
+        productQueries.insertProduct,
+        [name, description, brand || null]
+      );
+      productId = productResult.insertId;
+    }
 
     if (Array.isArray(categoryIds)) {
       for (const categoryId of categoryIds) {
+        // insertProductCategory is idempotent (INSERT IGNORE) so duplicates won't error
         await connection.query(productQueries.insertProductCategory, [productId, categoryId]);
       }
     }
 
-    const variantName = `${ name } ${ attributes.map(a => a.value).join(' ') }`;
-    const SKU = generateSKU(name, variantName);
-
-    const [variantResult] = await connection.query(productQueries.insertVariant, [
-      productId,
-      variantName,
-      SKU,
-      stockQnt || 1,
-      price,
-    ]);
+  const variantName = `${ name } ${ attrs.map(a => a && a.value ? a.value : '').join(' ') }`;
+    // Generate SKU and ensure uniqueness (retry a few times if collision occurs)
+    let SKU;
+    let variantResult;
+    const maxSkuTries = 5;
+    for (let attempt = 0; attempt < maxSkuTries; attempt++) {
+      SKU = generateSKU(name, variantName);
+      try {
+        [variantResult] = await connection.query(productQueries.insertVariant, [
+          productId,
+          variantName,
+          SKU,
+          stockQnt || 1,
+          price,
+          imageURL || null,
+        ]);
+        break; // success
+      } catch (err) {
+        // If duplicate SKU (ER_DUP_ENTRY) then retry; otherwise rethrow
+        if (err && err.code === 'ER_DUP_ENTRY') {
+          console.warn(`SKU collision, retrying (${attempt + 1}/${maxSkuTries})`);
+          if (attempt === maxSkuTries - 1) throw new ApiError('Failed to generate unique SKU, try again', 500);
+          // else continue loop to generate a new SKU
+        } else {
+          throw err;
+        }
+      }
+    }
     const variantId = variantResult.insertId;
-    for (const attr of attributes) {
-      if (!attr.id || !attr.value) continue;
+    for (const attr of attrs) {
+      if (!attr || !attr.id || !attr.value) continue;
 
-      const [attribute] = await connection.query(productQueries.getAttributeById, [attr.id]);
-      if (!attribute.length) throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
+      const attributeRows = await connection.query(productQueries.getAttributeById, [attr.id]);
+      const attribute = Array.isArray(attributeRows) && attributeRows[0] ? attributeRows[0] : null;
+      if (!attribute || attribute.length === 0) throw new ApiError(`Attribute with id ${ attr.id } not found`, 404);
 
-      const attributeId = attribute[0].id;
+      const attributeId = attribute[0].id || attribute[0].id;
       await connection.query(productQueries.insertVariantOption, [
         variantId,
         attributeId,
@@ -78,10 +166,11 @@ const addProduct = async (req, res, next) => {
       ]);
     }
 
-    await connection.commit();
-    const [newProduct] = await connection.query(productQueries.getProductById, [productId]);
+  await connection.commit();
+  const [newProduct] = await connection.query(productQueries.getProductById, [productId]);
 
-    res.status(201).json({ success: true, data: newProduct[0] });
+  // Return created product and the newly created variant id so frontend can upload image with correct entityId
+  res.status(201).json({ success: true, data: newProduct[0], variantId });
   } catch (err) {
     if (connection) await connection.rollback();
     next(err);
@@ -158,9 +247,10 @@ const getProductsPaginated = async (req, res, next) => {
 
     console.log(`Fetching products - page: ${page}, limit: ${limit}, offset: ${offset}`);
 
-    // Get paginated products
-    console.log('Executing paginated products query...');
-    const products = await query(productQueries.getAllProductsPaginated, [limit, offset]);
+  // Get paginated products
+  console.log('Executing paginated products query...');
+  const paginatedSql = `${productQueries.getAllProductsPaginated} LIMIT ${limit} OFFSET ${offset}`;
+  const products = await query(paginatedSql);
     console.log(`Products fetched: ${products.length}`);
     
     // Get total count
@@ -244,5 +334,10 @@ module.exports = {
   getProductVariantCount,
   getVariantsOfProduct,
   getProductCount,
-  getPopularProduct
+  getPopularProduct,
+  getBrands,
+  createBrand
 };
+ 
+
+

@@ -19,10 +19,10 @@ const getUserById = `
   SELECT id, role FROM users WHERE id = ?;
 `;
 
-// Update delivery
+// Update delivery (assign staff) - set staff, status and deliveryDate
 const updateDelivery = `
   UPDATE deliveries
-  SET staffId = ?, assignedDate = ?
+  SET staffId = ?, status = ?, deliveryDate = ?
   WHERE id = ?;
 `;
 

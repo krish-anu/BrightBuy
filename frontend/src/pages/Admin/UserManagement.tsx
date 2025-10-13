@@ -63,7 +63,8 @@ const UserManagement: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
+  // Editing state
+  const [, setIsUpdating] = useState(false);
   
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -82,8 +83,6 @@ const UserManagement: React.FC = () => {
       const res = await getAllUsers();
       if (res?.data) {
         setUsers(res.data);
-        console.log("Fetched users:", res?.data);
-        console.log("User roles:", res?.data.map((u: any) => ({ id: u.id, role: u.role, normalized: normalizeRole(u.role) })));
       }
     } catch (error) {
       console.error("Error fetching users:", error);

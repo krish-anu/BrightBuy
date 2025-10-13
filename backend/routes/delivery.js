@@ -7,7 +7,13 @@ const router = require('express').Router();
 
 router.get('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), getDeliveries)
 
+// Delivery staff: get deliveries assigned to them
+router.get('/assigned', verifyToken, authorizeRoles(ROLES.DELIVERY, ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/delivery.controller').getAssignedDeliveriesForStaff)
+
 router.patch('/:id/assignStaff',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),assignDeliveryStaff)
+
+// Update delivery status (delivery staff can update only their assigned deliveries)
+router.patch('/:id/status', verifyToken, authorizeRoles(ROLES.DELIVERY, ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/delivery.controller').updateDeliveryStatusController)
 
 module.exports = router;
 

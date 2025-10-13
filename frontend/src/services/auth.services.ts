@@ -35,3 +35,17 @@ export const loginUser = async (email: string, password: string) => {
     };
   }
 };
+
+// Decode JWT payload (no verification) to retrieve current user info
+export const getCurrentUserFromToken = () => {
+  try {
+    const token = localStorage.getItem(LOCAL_STORAGE__TOKEN);
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload; // contains id, role, iat, exp
+  } catch (err) {
+    return null;
+  }
+};

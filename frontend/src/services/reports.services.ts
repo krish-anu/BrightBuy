@@ -15,7 +15,6 @@ export interface ReportsData {
   orderStatusOverview: {
     Pending: number;
     Confirmed: number;
-    Processing: number;
     Shipped: number;
     Delivered: number;
     Cancelled: number;
@@ -95,7 +94,6 @@ export const getOrderStats = async () => {
       orderStatusOverview: {
         Pending: 0,
         Confirmed: 0,
-        Processing: 0,
         Shipped: 0,
         Delivered: 0,
         Cancelled: 0

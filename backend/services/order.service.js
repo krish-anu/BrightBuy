@@ -80,11 +80,15 @@ const isValidUpdate = async (newStatus, currStatus) => {
   };
 
   if (!(newStatus in validStatus)) {
-    throw new ApiError('Invalid status', 400);
+    throw new ApiError(`Invalid status: ${newStatus}`, 400);
+  }
+
+  if (!(currStatus in validStatus)) {
+    throw new ApiError(`Invalid current status in DB: ${currStatus}`, 500);
   }
 
   if (validStatus[newStatus] <= validStatus[currStatus]) {
-    throw new ApiError('Invalid update', 400);
+    throw new ApiError(`Invalid update from ${currStatus} to ${newStatus}`, 400);
   }
 
   return true;

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
+import axiosInstance from '../../axiosConfig';
+import { useNavigate } from 'react-router-dom';
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -30,6 +32,12 @@ const UserSignup: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
+  // Determine if this signup is for admin creation (show role dropdown)
+  const isAdminSignup = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('admin') === 'true' || window.location.pathname.toLowerCase().includes('/admin'));
+  const [role, setRole] = useState<string>(isAdminSignup ? 'Admin' : 'Customer');
+
+  const navigate = useNavigate();
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
@@ -44,8 +52,23 @@ const UserSignup: React.FC = () => {
       return;
     }
 
-    // Just show an alert for demo
-    alert(`Signup Success!\nName: ${name}\nEmail: ${email}`);
+    // Call backend register endpoint
+    (async () => {
+      try {
+        const payload: any = { name, email, password, role };
+        const res = await axiosInstance.post('/api/auth/register', payload);
+        if (res.status === 201) {
+          // redirect to login page; carry admin query if present
+          const loginUrl = isAdminSignup ? '/login?admin=true' : '/login';
+          navigate(loginUrl);
+        } else {
+          setError(res.data?.message || 'Registration failed');
+        }
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || 'Registration failed';
+        setError(String(msg));
+      }
+    })();
   };
 
   return (
@@ -170,6 +193,26 @@ const UserSignup: React.FC = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600 flex items-center gap-2">
               <IconComponent iconName="AlertCircle" size={18} />
               {error}
+            </div>
+          )}
+
+          {/* Role selection for admin signup */}
+          {isAdminSignup && (
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                Role
+              </label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="Admin">Admin</option>
+                <option value="SuperAdmin">SuperAdmin</option>
+                <option value="WarehouseStaff">WarehouseStaff</option>
+                <option value="DeliveryStaff">DeliveryStaff</option>
+              </select>
             </div>
           )}
 

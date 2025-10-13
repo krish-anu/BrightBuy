@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { deliveries, orders } from "../../../data/mockData";
-import * as LucideIcons from "lucide-react";
+import React, { useState } from 'react';
+import { getAssignedDeliveries } from '../../services/delivery.services';
+import * as LucideIcons from 'lucide-react';
 // import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
@@ -11,16 +11,15 @@ interface Delivery {
   customerPhone: string;
   estimatedDelivery?: string; // <-- optional
   deliveredAt?: string;
+  orderTotal?: number;
 }
 
-interface Order {
-  id: string;
-  total: number;
-}
 
 const AssignedDeliveries: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [deliveriesList, setDeliveriesList] = useState<Delivery[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const IconComponent: React.FC<{
     iconName: keyof typeof LucideIcons;
@@ -36,7 +35,7 @@ const AssignedDeliveries: React.FC = () => {
     );
   };
 
-  const filteredDeliveries = deliveries.filter((delivery: Delivery) => {
+  const filteredDeliveries = (loading ? [] : deliveriesList).filter((delivery: Delivery) => {
     const matchesSearch =
       delivery.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       delivery.orderId.toLowerCase().includes(searchTerm.toLowerCase());
@@ -63,8 +62,83 @@ const AssignedDeliveries: React.FC = () => {
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleString();
 
-  const getOrderDetails = (orderId: string): Order | undefined =>
-    orders.find((order) => order.id === orderId);
+  // safely coerce various API shapes into a number
+  const safeNumber = (value: any): number => {
+    if (value == null) return 0;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      // remove non-numeric characters (currency symbols, commas)
+      const cleaned = value.replace(/[^0-9.-]+/g, '');
+      const n = parseFloat(cleaned);
+      return Number.isFinite(n) ? n : 0;
+    }
+    if (typeof value === 'object') {
+      if ('amount' in value) return safeNumber(value.amount);
+      if ('total' in value) return safeNumber(value.total);
+    }
+    return 0;
+  };
+
+  // Safely turn address-like values into a readable string
+  const stringifyAddress = (value: any): string => {
+    if (value == null) return 'No address';
+    if (typeof value === 'string') {
+      // try to parse if it's a JSON string
+      try {
+        const parsed = JSON.parse(value);
+        value = parsed;
+      } catch (_) {
+        return value;
+      }
+    }
+    if (typeof value === 'object') {
+      // prefer common address fields
+      const parts: string[] = [];
+      const street = value.street || value.line1 || value.address || value.line_1 || value.lineOne;
+      const city = value.city || value.town;
+      const state = value.state || value.region;
+      const zip = value.zipCode || value.postalCode || value.postcode || value.zip;
+      if (street) parts.push(street);
+      if (city) parts.push(city);
+      if (state) parts.push(state);
+      if (zip) parts.push(zip);
+      const out = parts.join(', ');
+      return out || JSON.stringify(value);
+    }
+    return String(value);
+  };
+
+  // load assigned deliveries from API
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const resp = await getAssignedDeliveries();
+        if (resp.success) {
+          const rows = resp.data.map((r: any) => ({
+            id: String(r.id),
+            orderId: String(r.orderId),
+            status: ((r.status || '').toString().toLowerCase() === 'delivered' ? 'delivered' : (r.status || '').toString().toLowerCase() === 'shipped' ? 'in_transit' : (r.status || '').toString().toLowerCase() === 'failed' || (r.status || '').toString().toLowerCase() === 'cancelled' ? 'failed' : 'assigned') as Delivery['status'],
+            customerAddress: stringifyAddress(r.deliveryAddress ?? r.shippingAddress ?? r.address ?? 'No address'),
+            customerPhone: r.customerPhone || r.phone || 'No phone',
+            estimatedDelivery: r.estimatedDelivery || r.estimatedDeliveryDate || undefined,
+            deliveredAt: r.deliveryDate || undefined,
+            orderTotal: safeNumber(r.orderTotal ?? r.totalPrice ?? 0),
+          }));
+          if (mounted) setDeliveriesList(rows);
+        } else {
+          if (mounted) setDeliveriesList([]);
+        }
+      } catch (e) {
+        if (mounted) setDeliveriesList([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -111,7 +185,9 @@ const AssignedDeliveries: React.FC = () => {
       {/* Deliveries Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredDeliveries.map((delivery: Delivery) => {
-          const orderDetails = getOrderDetails(delivery.orderId);
+          // order details aren't available from the API payload in this component; show orderTotal if present
+          // show orderTotal if present (allow 0 values)
+          const orderDetails = (delivery as any).orderTotal != null ? { id: delivery.orderId, total: Number((delivery as any).orderTotal) } : undefined;
           return (
             <div
               key={delivery.id}
@@ -180,12 +256,8 @@ const AssignedDeliveries: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <IconComponent iconName="Package" size={16} />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">
-                        Order Value
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        ${orderDetails.total.toFixed(2)}
-                      </p>
+                      <p className="text-sm font-medium text-gray-700">Order Value</p>
+                      <p className="text-sm text-gray-600">${(Number(orderDetails.total) || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 )}
@@ -225,7 +297,7 @@ const AssignedDeliveries: React.FC = () => {
             </div>
             <div className="ml-4">
               <div className="text-2xl font-bold text-gray-900">
-                {deliveries.filter((d) => d.status === "assigned").length}
+                {deliveriesList.filter((d: Delivery) => d.status === 'assigned').length}
               </div>
               <div className="text-sm text-gray-500">Pending Deliveries</div>
             </div>
@@ -238,7 +310,7 @@ const AssignedDeliveries: React.FC = () => {
             </div>
             <div className="ml-4">
               <div className="text-2xl font-bold text-gray-900">
-                {deliveries.filter((d) => d.status === "in_transit").length}
+                {deliveriesList.filter((d: Delivery) => d.status === 'in_transit').length}
               </div>
               <div className="text-sm text-gray-500">In Transit</div>
             </div>
@@ -251,7 +323,7 @@ const AssignedDeliveries: React.FC = () => {
             </div>
             <div className="ml-4">
               <div className="text-2xl font-bold text-gray-900">
-                {deliveries.filter((d) => d.status === "delivered").length}
+                {deliveriesList.filter((d: Delivery) => d.status === 'delivered').length}
               </div>
               <div className="text-sm text-gray-500">Completed</div>
             </div>
