@@ -8,7 +8,7 @@ export default interface Product {
     id: string;
     sku: string;
     price: number;
-    image: string;
+    imageUrl?: string;
     stockQnt: number;
     attributes: {
       attributeID: string;
@@ -22,18 +22,19 @@ export default interface SingleProduct{
   id: string;
   name: string;
   description: string;
-  image: string;
   category: string;
   variants: {
     id: string;
-    sku: string;
+    SKU: string;
     price: number;
+    imageUrl?: string;
     stockQnt: number;
     attributes: {
       attributeID: string;
       attributeName: string;
       attributeValue: string;
     }[];
+    categories: { id: number; name: string }[];
   }[];
 }
 

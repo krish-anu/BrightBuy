@@ -5,11 +5,11 @@ import { Dot } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ShoppingBagIcon, ShoppingCart } from "lucide-react";
-import type SingleProduct from "@/types/Product";
+// import type SingleProduct from "@/types/Product";
 import { useState, useEffect } from "react";
 
 interface ProductPageProps {
-  product: SingleProduct;
+  product: Product;
 }
 
 export interface Attribute {
@@ -19,17 +19,18 @@ export interface Attribute {
 }
 export interface Variant {
   id: string;
-  sku: string;
+  SKU: string;
   price: number;
   stockQnt: number;
   image?: string;  
   attributes: Attribute[];
 }
-export interface product {
+export interface Product {
   id: string;
   name: string;
   description: string;
   variants: Variant[];
+  categories: { id: number; name: string }[];
 }
 
 export default function ProductInfo({ product }: ProductPageProps) {
@@ -92,7 +93,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
           <div className="flex flex-col gap-2 px-4 text-md md:text-lg text-foreground">
             <div className="flex flex-row justify-between">
               <span className="text-sm text-muted-foreground">
-                SKU: {displayVariant?.sku}
+                SKU: {displayVariant?.SKU || "N/A"}
               </span>
               {stockStatus === "in-stock" ? (
                 <Badge variant="outline" className="text-sm text-chart-3">
@@ -117,7 +118,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
                   variant="outline"
                   className="text-sm text-muted-foreground"
                 >
-                  {product.category}
+                  {product.categories?.[0].name ?? "Uncategorized"}
                 </Badge>
               </span>
             </div>
@@ -167,7 +168,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
             <span className="text-md text-muted-foreground">
               Available Stock:{" "}
               <span className="font-bold text-chart-3">
-                {displayVariant?.stockQnt} {/* Fixed property name */}
+                {displayVariant?.stockQnt} 
               </span>
             </span>
           ) : null}

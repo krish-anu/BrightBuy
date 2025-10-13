@@ -15,7 +15,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <CardContent className="px-0">
         <AspectRatio ratio={9 / 11} className="">
           <img
-            src={product.ProductVariants[0]?.image || "/src/assets/product-placeholder.png"}
+            src={product.ProductVariants[0]?.imageUrl || "/src/assets/product-placeholder.png"}
             alt={product.name}
             className="object-cover h-full w-full rounded-sm"
           />
