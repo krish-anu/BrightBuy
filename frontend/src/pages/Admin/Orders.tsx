@@ -24,6 +24,7 @@ const Orders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'shipped' | 'assigned'>('all');
+  const [deliveryModeFilter, setDeliveryModeFilter] = useState<'all' | 'Store Pickup' | 'Standard Delivery'>('all');
   const [shippedOrders, setShippedOrders] = useState<Order[]>([]);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [availableDeliveryStaff, setAvailableDeliveryStaff] = useState<any[]>([]);
@@ -133,8 +134,15 @@ const Orders: React.FC = () => {
     const orderDate = new Date(order.orderDate || order.createdAt);
     const matchesDateFrom = !dateFrom || orderDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || orderDate <= new Date(dateTo);
-    
-    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+
+    // Delivery mode filtering: respect 'all' or match string (order.deliveryMode may be object/string)
+    let matchesDeliveryMode = true;
+    if (deliveryModeFilter !== 'all') {
+      const mode = typeof order.deliveryMode === 'string' ? order.deliveryMode : (order.deliveryMode && JSON.stringify(order.deliveryMode)) || '';
+      matchesDeliveryMode = (mode || '').toLowerCase() === deliveryModeFilter.toLowerCase();
+    }
+
+    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo && matchesDeliveryMode;
   }).sort((a, b) => {
     let aValue, bValue;
     
@@ -298,11 +306,25 @@ const Orders: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex space-x-2">
           <button onClick={() => setActiveTab('all')} className={`px-3 py-1 rounded ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white'}`}>All Orders</button>
           <button onClick={() => { setActiveTab('shipped'); loadShippedOrders(); }} className={`px-3 py-1 rounded ${activeTab === 'shipped' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Shipped</button>
           <button onClick={() => setActiveTab('assigned')} className={`px-3 py-1 rounded ${activeTab === 'assigned' ? 'bg-blue-600 text-white' : 'bg-white'}`}>Assigned</button>
+        </div>
+
+        {/* Delivery mode selector */}
+        <div>
+          <label className="text-sm mr-2">Delivery Mode:</label>
+          <select
+            className="px-3 py-1 border border-gray-300 rounded"
+            value={deliveryModeFilter}
+            onChange={e => setDeliveryModeFilter(e.target.value as 'all' | 'Store Pickup' | 'Standard Delivery')}
+          >
+            <option value="all">All</option>
+            <option value="Store Pickup">Store Pickup</option>
+            <option value="Standard Delivery">Standard Delivery</option>
+          </select>
         </div>
       </div>
 
