@@ -161,8 +161,8 @@ const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user,
     let finalAddress = deliveryAddress;
     if (deliveryMode === 'Standard Delivery') {
         if (!finalAddress?.city) {
-            if (!user.address || !user.city) throw new ApiError('Delivery address is required', 400);
-            finalAddress = { ...user.address, city: user.city };
+            if (!user.address || !user.address.line1 || !user.address.city) throw new ApiError('Delivery address is required', 400);
+            finalAddress = { ...user.address };
         }
 
         const cities = await connection.query(`SELECT * FROM cities WHERE name = ?`, [finalAddress.city]);

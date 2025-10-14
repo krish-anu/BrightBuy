@@ -7,7 +7,7 @@ const ApiError = require('../utils/ApiError');
 // Register user
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, role, address, phone, cityId } = req.body;
+  const { name, email, password, role, address, phone, cityId } = req.body;
 
     // Check if user already exists
     const existingUsers = await query(userQueries.getByEmail, [email]);
@@ -18,16 +18,28 @@ const registerUser = async (req, res, next) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
+    // Insert address row if provided
+    let addressId = null;
+    if (address && typeof address === 'object' && (address.line1 || address.city)) {
+      const line1 = address.line1 || '';
+      const line2 = address.line2 || null;
+      const city = address.city || '';
+      const postalCode = address.postalCode || null;
+      if (line1 && city) {
+        const addrRes = await query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
+        addressId = addrRes.insertId || addrRes[0]?.insertId;
+      }
+    }
+
     await query(userQueries.insert, [
       name,
       email,
       hashedPassword,
-      role || 'customer',
-      false, // role_accepted default
-      address || null,
+      role || 'Customer',
+      false,
       phone || null,
       cityId || null,
+      addressId
     ]);
 
     res.status(201).json({ message: 'User registered successfully' });

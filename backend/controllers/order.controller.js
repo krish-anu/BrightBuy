@@ -87,7 +87,6 @@ const addOrder = async (req, res, next) => {
     }
 
     const address = deliveryAddress || null;
-
     const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
       await calculateOrderDetails(items, deliveryMode, address, req.user, connection);
 

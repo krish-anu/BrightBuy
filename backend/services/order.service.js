@@ -3,18 +3,31 @@ const ApiError = require('../utils/ApiError');
 const { updateStock, } = require('../services/variant.service')
 
 const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
-  const orderId = await createOrder(userId, deliveryMode, JSON.stringify(finalAddress), totalPrice, deliveryCharge, paymentMethod, connection);
+  // Insert address if provided (Standard Delivery) and capture id
+  let deliveryAddressId = null;
+  if (deliveryMode === 'Standard Delivery' && finalAddress && typeof finalAddress === 'object') {
+    const line1 = finalAddress.line1 || '';
+    const line2 = finalAddress.line2 || null;
+    const city = finalAddress.city || '';
+    const postalCode = finalAddress.postalCode || null;
+    if (line1 && city) {
+      const addrRes = await connection.query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
+      const r = Array.isArray(addrRes) ? addrRes[0] : addrRes;
+      deliveryAddressId = r.insertId || r?.insertId;
+    }
+  }
+  const orderId = await createOrder(userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, connection);
   await addOrderItems(orderId, items, connection);
   return getOrderDetails(orderId, connection);
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod,connection) => {
+const createOrder = async (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod,connection) => {
   const status = paymentMethod === 'CashOnDelivery' ? 'Confirmed' : 'Pending';
   const sql = `
-    INSERT INTO orders (userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status)
+    INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
-  const values = [userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status];
+  const values = [userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status];
   const [result] = await connection.query(sql, values);
   return result.insertId;
 };

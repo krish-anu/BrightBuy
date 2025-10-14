@@ -61,7 +61,7 @@ const getCategoryWiseOrders = `
 `;
 
 const getOrderStatusById = `
-  SELECT id, status, deliveryMode, deliveryAddress, userId, orderDate, createdAt
+  SELECT id, status, deliveryMode, deliveryAddressId, userId, orderDate, createdAt
   FROM orders
   WHERE id = ?
 `;
