@@ -3,18 +3,18 @@ const ApiError = require('../utils/ApiError');
 const { updateStock, } = require('../services/variant.service')
 
 const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
-  const orderId = await createOrder(userId, deliveryMode, JSON.stringify(finalAddress), deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection);
+  const orderId = await createOrder(userId, deliveryMode, JSON.stringify(finalAddress), totalPrice, deliveryCharge, paymentMethod, connection);
   await addOrderItems(orderId, items, connection);
   return getOrderDetails(orderId, connection);
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod,connection) => {
+const createOrder = async (userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod,connection) => {
   const status = paymentMethod === 'CashOnDelivery' ? 'Confirmed' : 'Pending';
   const sql = `
-    INSERT INTO orders (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
-  const values = [userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status];
+  const values = [userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status];
   const [result] = await connection.query(sql, values);
   return result.insertId;
 };

@@ -28,8 +28,8 @@ const getOrderItemsByOrderId = `
 
 const insertOrder = `
   INSERT INTO orders 
-    (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    (userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
 `;
 
 const insertOrderItem = `
@@ -61,7 +61,7 @@ const getCategoryWiseOrders = `
 `;
 
 const getOrderStatusById = `
-  SELECT id, status, deliveryMode, deliveryAddress, estimatedDeliveryDate, userId
+  SELECT id, status, deliveryMode, deliveryAddress, userId, orderDate, createdAt
   FROM orders
   WHERE id = ?
 `;
@@ -141,6 +141,65 @@ const getOrderStatusCounts = `
   GROUP BY status
 `;
 
+// 4. Quarterly sales for a given year (use orderDate if present, otherwise createdAt)
+const quarterlySalesByYear = `
+  SELECT 
+    CONCAT('Q', QUARTER(d)) AS quarter,
+    YEAR(d) AS year,
+    COUNT(*) AS totalOrders,
+    SUM(totalPrice) AS totalSales
+  FROM (
+    SELECT COALESCE(orderDate, createdAt) AS d, totalPrice, status
+    FROM orders
+  ) AS sub
+  WHERE YEAR(d) = ? AND status != 'Cancelled'
+  GROUP BY YEAR(d), QUARTER(d)
+  ORDER BY QUARTER(d);
+`;
+
+// 5. Top selling products in a given period (startDate, endDate, limit)
+// Use LEFT JOIN so products with zero sales still appear (totalSold = 0)
+const topSellingProductsBetween = `
+  SELECT p.id AS productId, p.name AS productName, SUM(oi.quantity) AS totalSold
+  FROM order_items oi
+  JOIN orders o ON oi.orderId = o.id
+  JOIN products p ON oi.productId = p.id
+  WHERE COALESCE(o.orderDate, o.createdAt) BETWEEN ? AND ?
+    AND o.status != 'Cancelled'
+  GROUP BY p.id, p.name
+  ORDER BY totalSold DESC
+  LIMIT CAST(? AS UNSIGNED);
+`;
+
+// 6. Customer-wise order summary and payment status
+const customerOrderSummary = `
+  SELECT u.id AS customerId, u.name AS customerName, u.email AS customerEmail,
+         COUNT(o.id) AS totalOrders, COALESCE(SUM(o.totalPrice),0) AS totalSpent,
+         MAX(o.orderDate) AS lastOrderDate, GROUP_CONCAT(DISTINCT COALESCE(p.status,'Unknown')) AS paymentStatuses
+  FROM users u
+  LEFT JOIN orders o ON u.id = o.userId
+  LEFT JOIN payments p ON o.id = p.orderId
+  GROUP BY u.id, u.name, u.email
+  ORDER BY totalSpent DESC;
+`;
+
+// 7. Upcoming orders with delivery estimates (Standard Delivery and not delivered/cancelled)
+// Use estimatedDeliveryDate if set; otherwise add a default 3-day window from createdAt
+const getUpcomingOrdersWithEstimates = `
+  SELECT o.id AS orderId,
+         o.orderDate,
+         DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDeliveryDate,
+         o.status AS orderStatus,
+         u.id AS customerId, u.name AS customerName, u.email AS customerEmail,
+         d.status AS deliveryStatus
+  FROM orders o
+  LEFT JOIN users u ON o.userId = u.id
+  LEFT JOIN deliveries d ON o.id = d.orderId
+  WHERE o.deliveryMode = 'Standard Delivery'
+    AND o.status NOT IN ('Delivered','Cancelled')
+  ORDER BY estimatedDeliveryDate ASC, o.orderDate DESC;
+`;
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -162,4 +221,10 @@ module.exports = {
   getOrderDetailsByOrderId,
   getTotalOrders,
   getOrderStatusCounts
+  ,
+  // New report queries
+  quarterlySalesByYear,
+  topSellingProductsBetween,
+  customerOrderSummary,
+  getUpcomingOrdersWithEstimates
 };

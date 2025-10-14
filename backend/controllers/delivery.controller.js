@@ -18,7 +18,8 @@ const getAssignedDeliveriesForStaff = async (req, res, next) => {
     const staffId = req.user.id;
     // Return delivery with order total, delivery address and customer phone so frontend can render without extra calls
     const rows = await query(
-      `SELECT d.*, o.id AS orderId, o.totalPrice AS orderTotal, o.deliveryAddress AS deliveryAddress, o.estimatedDeliveryDate AS estimatedDelivery, o.status AS orderStatus, u.phone AS customerPhone
+      `SELECT d.*, o.id AS orderId, o.totalPrice AS orderTotal, o.deliveryAddress AS deliveryAddress, 
+              DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, o.status AS orderStatus, u.phone AS customerPhone
        FROM deliveries d
        JOIN orders o ON d.orderId = o.id
        LEFT JOIN users u ON o.userId = u.id

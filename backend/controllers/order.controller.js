@@ -264,7 +264,15 @@ const getOrderStatus = async (req, res, next) => {
 
     if (order.deliveryMode === 'Standard Delivery') {
       result.deliveryAddress = order.deliveryAddress;
-      result.estimatedDeliveryDate = order.estimatedDeliveryDate;
+      // Compute estimated delivery date: prefer orderDate else createdAt, add 3 days
+      const base = order.orderDate || order.createdAt;
+      try {
+        const d = new Date(base);
+        d.setDate(d.getDate() + 3);
+        result.estimatedDeliveryDate = d.toISOString();
+      } catch (e) {
+        result.estimatedDeliveryDate = null;
+      }
     }
 
     res.status(200).json({ success: true, data: result });
@@ -502,6 +510,43 @@ const getStats = async (req, res, next) => {
   }
 }
 
+// Quarterly sales for a given year
+const getQuarterlySales = async (req, res, next) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const rows = await query(orderQueries.quarterlySalesByYear, [year]);
+    res.status(200).json({ success: true, data: { year, quarters: rows } });
+  } catch (err) { next(err); }
+}
+
+// Top selling products in a period
+const getTopSellingProducts = async (req, res, next) => {
+  try {
+    const { startDate, endDate, limit } = req.query;
+    const s = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    const e = endDate || new Date().toISOString().split('T')[0];
+    const l = Number(limit) || 10;
+    const rows = await query(orderQueries.topSellingProductsBetween, [s, e, l]);
+    res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products: rows } });
+  } catch (err) { next(err); }
+}
+
+// Customer-wise order summary and payment status
+const getCustomerOrderSummary = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.customerOrderSummary);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+// Upcoming orders with delivery time estimates
+const getUpcomingDeliveryEstimates = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getUpcomingOrdersWithEstimates);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getOrders,
   getOrder,
@@ -515,5 +560,10 @@ module.exports = {
   getAssignedOrders,
   getShippedOrders,
   getTotalOrders,
-  getStats
+  getStats,
+  // New report endpoints
+  getQuarterlySales,
+  getTopSellingProducts,
+  getCustomerOrderSummary,
+  getUpcomingDeliveryEstimates
 };

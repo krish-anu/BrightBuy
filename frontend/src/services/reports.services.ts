@@ -167,3 +167,49 @@ export const getInventoryStats = async () => {
     };
   }
 };
+
+// New report service functions
+export const getQuarterlySales = async (year?: number) => {
+  try {
+    const params: any = {};
+    if (year) params.year = year;
+    const response = await axiosInstance.get('/api/order/reports/quarterly', { params });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching quarterly sales:', error);
+    return { year: year || new Date().getFullYear(), quarters: [] };
+  }
+}
+
+export const getTopProducts = async (startDate?: string, endDate?: string, limit = 10) => {
+  try {
+    const params: any = { limit };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await axiosInstance.get('/api/order/reports/top-products', { params });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching top products:', error);
+    return { startDate, endDate, limit, products: [] };
+  }
+}
+
+export const getCustomerSummaries = async () => {
+  try {
+    const response = await axiosInstance.get('/api/order/reports/customer-summary');
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching customer summaries:', error);
+    return [];
+  }
+}
+
+export const getUpcomingDeliveryEstimates = async () => {
+  try {
+    const response = await axiosInstance.get('/api/order/reports/upcoming-deliveries');
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching upcoming deliveries:', error);
+    return [];
+  }
+}

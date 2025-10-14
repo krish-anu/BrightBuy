@@ -8,6 +8,11 @@ const router = require('express').Router();
 router.get("/totalRevenue", verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getTotalRevenue)
 router.get("/totalOrders", verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getTotalOrders)
 router.get('/stats',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),getStats)
+// Reports
+router.get('/reports/quarterly', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/order.controller').getQuarterlySales);
+router.get('/reports/top-products', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/order.controller').getTopSellingProducts);
+router.get('/reports/customer-summary', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/order.controller').getCustomerOrderSummary);
+router.get('/reports/upcoming-deliveries', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.DELIVERY), require('../controllers/order.controller').getUpcomingDeliveryEstimates);
 
 router.get('/category',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),getCategoryWiseOrders)
 router.get('/user', verifyToken, authorizeRoles(ROLES.USER, ROLES.ADMIN, ROLES.SUPERADMIN), getUserOrders);
