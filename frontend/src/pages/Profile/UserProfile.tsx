@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axiosInstance from "../../axiosConfig"; // Import your configured axios instance
 
 /**
  * UserProfile
@@ -7,10 +8,6 @@ import React, { useEffect, useState } from "react";
  * - Shows a single "Full name" (from backend) and email (from backend)
  * - Editable fields: phone, addressLine1, addressLine2, postalCode, city
  * - Save button sends PATCH /api/user/profile with updated fields
- *
- * NOTE: adjust endpoint paths if your backend uses different routes (e.g. /api/auth/me).
- * The component reads the JWT token from localStorage.token by default. If your app stores
- * the token elsewhere (AuthContext) replace the token retrieval logic accordingly.
  */
 
 type Profile = {
@@ -32,6 +29,12 @@ export default function UserProfile() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Avatar (frontend-only) - persisted to localStorage
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [editingAvatar, setEditingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUrlInput, setAvatarUrlInput] = useState("");
+
   // Editable local form state
   const [phone, setPhone] = useState("");
   const [line1, setLine1] = useState("");
@@ -39,29 +42,29 @@ export default function UserProfile() {
   const [postalCode, setPostalCode] = useState("");
   const [city, setCity] = useState("");
 
-  const token =
-    // prefer localStorage but you can replace this with your AuthContext hook if available
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   async function fetchProfile() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch("/api/user/profile", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const resp = await axiosInstance.get("/api/users/profile");
 
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || `Failed to fetch profile: ${resp.status}`);
-      }
-
-      const data: Profile = await resp.json();
+      const data: Profile = resp.data;
       setProfile(data);
+
+      // try load avatar from localStorage (frontend-only) after profile loads
+      try {
+        const stored = localStorage.getItem('profile_avatar');
+        if (stored) setAvatarUrl(stored);
+      } catch (e) {
+        // ignore
+      }
 
       // populate editable fields
       setPhone(data.phone || "");
@@ -70,7 +73,7 @@ export default function UserProfile() {
       setPostalCode(data.address?.postalCode || "");
       setCity(data.address?.city || "");
     } catch (err: any) {
-      setError(err.message || "Failed to load profile");
+      setError(err.response?.data?.message || err.message || "Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -98,21 +101,9 @@ export default function UserProfile() {
     };
 
     try {
-      const resp = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
+      const resp = await axiosInstance.patch("/api/users/profile", payload);
 
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || `Failed to update profile: ${resp.status}`);
-      }
-
-      const updated: Profile = await resp.json();
+      const updated: Profile = resp.data;
       setProfile(updated);
       setSuccess("Profile updated successfully");
       // reflect saved values (in case backend normalizes)
@@ -122,7 +113,7 @@ export default function UserProfile() {
       setPostalCode(updated.address?.postalCode || "");
       setCity(updated.address?.city || "");
     } catch (err: any) {
-      setError(err.message || "Failed to save profile");
+      setError(err.response?.data?.message || err.message || "Failed to save profile");
     } finally {
       setSaving(false);
       // clear success after a short time
@@ -135,12 +126,119 @@ export default function UserProfile() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h2 className="text-2xl font-semibold mb-4">My Profile</h2>
+      <h2 className="text-2xl font-semibold text-primary mb-4">My Profile</h2>
 
       {error && <div className="text-red-600 mb-3">{error}</div>}
       {success && <div className="text-green-600 mb-3">{success}</div>}
 
       <form onSubmit={handleSave} className="space-y-4">
+        {/* Avatar display and Change button (frontend-only) */}
+        <div className="flex items-center mb-6 gap-4">
+          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+            <img
+              src={
+                avatarPreview ||
+                avatarUrl ||
+                (profile?.email
+                  ? `https://www.gravatar.com/avatar/${encodeURIComponent(profile.email)}?d=identicon`
+                  : "https://via.placeholder.com/80")
+              }
+              alt="Profile"
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          <div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAvatar(true);
+                  setAvatarUrlInput(avatarUrl || "");
+                  setAvatarPreview(null);
+                }}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+              >
+                Change
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem("profile_avatar");
+                  setAvatarUrl(null);
+                  setAvatarPreview(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+              >
+                Remove
+              </button>
+            </div>
+
+            {editingAvatar && (
+              <div className="mt-3 p-3 border rounded bg-gray-50">
+                <label className="block text-sm font-medium text-gray-700">Image URL</label>
+                <input
+                  type="text"
+                  value={avatarUrlInput}
+                  onChange={(e) => setAvatarUrlInput(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 block w-full border rounded p-2"
+                />
+
+                <div className="mt-2">OR upload file:</div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files && e.target.files[0];
+                    if (f) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setAvatarPreview(reader.result as string);
+                      };
+                      reader.readAsDataURL(f);
+                    }
+                  }}
+                  className="mt-1"
+                />
+
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const toSave = avatarPreview || avatarUrlInput || null;
+                      if (toSave) {
+                        try {
+                          localStorage.setItem("profile_avatar", toSave);
+                          setAvatarUrl(toSave);
+                        } catch (e) {
+                          console.error("Failed to save avatar to localStorage", e);
+                        }
+                      }
+                      setEditingAvatar(false);
+                      setAvatarPreview(null);
+                    }}
+                    className="px-3 py-2 bg-primary text-white rounded hover:bg-primary/90"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAvatar(false);
+                      setAvatarPreview(null);
+                      setAvatarUrlInput("");
+                    }}
+                    className="px-3 py-2 border rounded"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         {/* Full name (from backend) */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Full name</label>
@@ -150,7 +248,6 @@ export default function UserProfile() {
             disabled
             className="mt-1 block w-full border rounded p-2 bg-gray-100"
           />
-          <div className="text-xs text-gray-500 mt-1">Name comes from backend / database.</div>
         </div>
 
         {/* Email (from backend) */}
@@ -194,7 +291,7 @@ export default function UserProfile() {
             type="text"
             value={line2}
             onChange={(e) => setLine2(e.target.value)}
-            placeholder="Apartment, suite, unit, building, floor, etc."
+            placeholder="Address line 2"
             className="mt-1 block w-full border rounded p-2"
           />
         </div>
@@ -227,7 +324,7 @@ export default function UserProfile() {
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-60"
+            className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90"
           >
             {saving ? "Saving..." : "Save changes"}
           </button>
@@ -249,6 +346,103 @@ export default function UserProfile() {
           </button>
         </div>
       </form>
+
+      {/* Change Password Section */}
+      <div className="mt-8 bg-white border rounded p-4">
+        <h3 className="text-lg font-semibold text-primary mb-4">Change Password</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Current password"
+              className="mt-1 block w-full border rounded p-2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">New Password</label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New password"
+                className="mt-1 block w-full border rounded p-2 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-2 top-2 text-gray-500"
+              >
+                {showNewPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              className="mt-1 block w-full border rounded p-2"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={async () => {
+                // Basic client-side validation
+                setError(null);
+                setSuccess(null);
+                if (!currentPassword) return setError('Please enter your current password');
+                if (!newPassword) return setError('Please enter a new password');
+                if (newPassword !== confirmPassword) return setError('New passwords do not match');
+
+                setChangingPassword(true);
+                try {
+                  const resp = await axiosInstance.post('/api/users/change-password', {
+                    currentPassword,
+                    newPassword,
+                  });
+                  setSuccess(resp.data?.message || 'Password changed successfully');
+                  // clear fields
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                } catch (err: any) {
+                  setError(err.response?.data?.message || err.message || 'Failed to change password');
+                } finally {
+                  setChangingPassword(false);
+                  setTimeout(() => setSuccess(null), 3500);
+                }
+              }}
+              className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90"
+              disabled={changingPassword}
+            >
+              {changingPassword ? 'Changing...' : 'Change Password'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setError(null);
+              }}
+              className="px-3 py-2 border rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -46,6 +46,17 @@ const userQueries = {
     SET phone = ?, address = ?
     WHERE id = ?
   `
+  ,
+  getPasswordById: `
+    SELECT id, password
+    FROM users
+    WHERE id = ?
+  `,
+  updatePassword: `
+    UPDATE users
+    SET password = ?
+    WHERE id = ?
+  `
 };
 
 module.exports = userQueries;
