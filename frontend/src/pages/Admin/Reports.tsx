@@ -11,7 +11,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { getReportsData, getInventoryStats, getQuarterlySales, getTopProducts, getUpcomingDeliveryEstimates, getTopSellingProduct } from '../../services/reports.services';
+import { getReportsData, getInventoryStats, getQuarterlySales, getTopProducts, getUpcomingDeliveryEstimates, getTopSellingProduct, getCustomerSummaries } from '../../services/reports.services';
 import type { ReportsData } from '../../services/reports.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
@@ -33,6 +33,7 @@ const Reports: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [topProducts, setTopProducts] = useState<any>(null);
   const [upcomingDeliveries, setUpcomingDeliveries] = useState<any[]>([]);
+  const [customerSummaries, setCustomerSummaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,10 +47,11 @@ const Reports: React.FC = () => {
         getInventoryStats()
       ]);
       // Fetch additional reports in parallel
-      const [qs, tp, ud] = await Promise.all([
+      const [qs, tp, ud, cs] = await Promise.all([
         getQuarterlySales(selectedYear),
         getTopProducts(),
-        getUpcomingDeliveryEstimates()
+        getUpcomingDeliveryEstimates(),
+        getCustomerSummaries()
       ]);
       // Fallback: if backend didn't return top products, compute top product client-side
       let topProductsFallback = tp;
@@ -65,8 +67,7 @@ const Reports: React.FC = () => {
       setInventoryStats(inventory);
       setQuarterlySales(qs);
   setTopProducts(topProductsFallback);
-  // customer summaries intentionally not used in UI yet
-  // setCustomerSummaries(cs || []);
+  setCustomerSummaries(Array.isArray(cs) ? cs : []);
       setUpcomingDeliveries(ud || []);
     } catch (err) {
       console.error('Error loading reports data:', err);
@@ -401,7 +402,65 @@ const Reports: React.FC = () => {
             </div>
 
             {/* Customer Summaries Table */}
-            
+            <div className="bg-white rounded-lg shadow-md p-6 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Customer-wise Order Summary</h3>
+                <span className="text-sm text-gray-500">Top {Math.min(customerSummaries.length, 10) || 0} customers</span>
+              </div>
+              {customerSummaries && customerSummaries.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-600 border-b">
+                        <th className="py-2 pr-4">Customer</th>
+                        <th className="py-2 pr-4">Email</th>
+                        <th className="py-2 pr-4 text-right">Orders</th>
+                        <th className="py-2 pr-4 text-right">Total Spent</th>
+                        <th className="py-2 pr-4">Last Order</th>
+                        <th className="py-2 pr-4">Payment Statuses</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerSummaries.slice(0, 10).map((c: any) => {
+                        const statusesRaw = (c.paymentStatuses || '').toString();
+                        const statuses: string[] = Array.from(new Set<string>(
+                          statusesRaw.split(',').map((s: string) => s.trim()).filter(Boolean)
+                        ));
+                        const badgeClass = (s: string) => {
+                          const v = s.toLowerCase();
+                          if (v === 'paid' || v === 'succeeded') return 'bg-green-100 text-green-700 border-green-200';
+                          if (v === 'pending' || v === 'requires_payment_method') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+                          if (v === 'cancelled' || v === 'canceled' || v === 'failed') return 'bg-red-100 text-red-700 border-red-200';
+                          return 'bg-gray-100 text-gray-700 border-gray-200';
+                        };
+                        return (
+                          <tr key={c.customerId} className="border-b last:border-b-0">
+                            <td className="py-2 pr-4 font-medium text-gray-900">{c.customerName || '—'}</td>
+                            <td className="py-2 pr-4 text-gray-700">{c.customerEmail || '—'}</td>
+                            <td className="py-2 pr-4 text-right">{Number(c.totalOrders || 0)}</td>
+                            <td className="py-2 pr-4 text-right">LKR {Number(c.totalSpent || 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-gray-700">{c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : '—'}</td>
+                            <td className="py-2 pr-4">
+                              <div className="flex flex-wrap gap-1">
+                                {statuses.length > 0 ? (
+                                  statuses.map((s: string, idx: number) => (
+                                    <span key={idx} className={`px-2 py-0.5 rounded-full border text-xs ${badgeClass(s)}`}>{s}</span>
+                                  ))
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full border text-xs bg-gray-100 text-gray-700 border-gray-200">Unknown</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">No customer data available yet</div>
+              )}
+            </div>
         </div>
 
         {/* Order Status Breakdown */}
