@@ -192,15 +192,29 @@ const topSellingProductsBetweenNoLimit = `
 `;
 
 // 6. Customer-wise order summary and payment status
+// - Include only users with role = 'Customer'
+// - Consider only non-cancelled orders for spend and last order date
+// - Join payments and group distinct payment statuses actually recorded
+// - Limit to top 10 by totalSpent to match UI expectation
 const customerOrderSummary = `
-  SELECT u.id AS customerId, u.name AS customerName, u.email AS customerEmail,
-         COUNT(o.id) AS totalOrders, COALESCE(SUM(o.totalPrice),0) AS totalSpent,
-         MAX(o.orderDate) AS lastOrderDate, GROUP_CONCAT(DISTINCT COALESCE(p.status,'Unknown')) AS paymentStatuses
+  SELECT 
+    u.id AS customerId,
+    u.name AS customerName,
+    u.email AS customerEmail,
+    COUNT(o.id) AS totalOrders,
+    COALESCE(SUM(o.totalPrice), 0) AS totalSpent,
+    MAX(COALESCE(o.orderDate, o.createdAt)) AS lastOrderDate,
+    GROUP_CONCAT(DISTINCT p.status ORDER BY p.status SEPARATOR ',') AS paymentStatuses
   FROM users u
-  LEFT JOIN orders o ON u.id = o.userId
-  LEFT JOIN payments p ON o.id = p.orderId
+  LEFT JOIN orders o 
+    ON u.id = o.userId 
+   AND o.status != 'Cancelled'
+  LEFT JOIN payments p 
+    ON o.id = p.orderId
+  WHERE u.role = 'Customer'
   GROUP BY u.id, u.name, u.email
-  ORDER BY totalSpent DESC;
+  ORDER BY totalSpent DESC
+  LIMIT 10;
 `;
 
 // 7. Upcoming orders with delivery estimates (Standard Delivery and not delivered/cancelled)

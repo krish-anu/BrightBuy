@@ -422,7 +422,7 @@ const Reports: React.FC = () => {
                     </thead>
                     <tbody>
                       {customerSummaries.slice(0, 10).map((c: any) => {
-                        const statusesRaw = (c.paymentStatuses || '').toString();
+                        const statusesRaw = (c.paymentStatuses ?? '').toString();
                         const statuses: string[] = Array.from(new Set<string>(
                           statusesRaw.split(',').map((s: string) => s.trim()).filter(Boolean)
                         ));
