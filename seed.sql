@@ -287,20 +287,22 @@ INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updated
 INSERT IGNORE INTO variant_attributes (id, name) VALUES
 (1,'RAM'),(2,'Memory'),(3,'Storage'),(4,'Display'),(5,'Color');
 
--- Product variant options (use SKU subselects) - phones and laptops get attributes
+-- Product variant options (use explicit variant ids so subselects don't run before variants exist)
+-- Mapping: SKU-GAL-S25-256 -> variantId 1, SKU-APP-17-256 -> 2, SKU-APP-MBA-512 -> 7,
+-- SKU-GOO-10-256 -> 3, SKU-ONE-13-256 -> 4, SKU-XIA-15-128 -> 5, SKU-NOK-G70-128 -> 6
 INSERT IGNORE INTO product_variant_options (variantId, attributeId, value) VALUES
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 1, '12GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 2, '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), 4, '6.8"'),
+(1, 1, '12GB'),
+(1, 2, '256GB'),
+(1, 4, '6.8"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 1, '8GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 2, '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), 4, '6.1"'),
+(2, 1, '8GB'),
+(2, 2, '256GB'),
+(2, 4, '6.1"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 1, '16GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 3, '512GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 4, '15"'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-MBA-512'), 5, 'Silver');
+(7, 1, '16GB'),
+(7, 3, '512GB'),
+(7, 4, '15"'),
+(7, 5, 'Silver');
 
 -- Cities, Users, Orders, Order Items, Deliveries and Payments (idempotent)
 INSERT IGNORE INTO cities (id, name, isMainCategory) VALUES
@@ -313,16 +315,6 @@ INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_a
 (4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE),
 (5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE);
    
-INSERT IGNORE INTO orders (id, userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod) VALUES
-(1,3,'2025-09-01 10:10:00',1299.99,'Standard Delivery',15.00,'Delivered','Card'),
-(2,4,'2025-09-05 12:20:00',499.99,'Store Pickup',0.00,'Confirmed','Card'),
-(3,5,'2025-09-07 14:30:00',349.99,'Standard Delivery',12.00,'Shipped','CashOnDelivery'); 
-
--- Order items reference variants via SKU subselects to avoid numeric id mismatch
-INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
-(1, (SELECT id FROM product_variants WHERE SKU='SKU-APP-MOB-002' LIMIT 1), 1, 1199.99, 1199.99),
-(2, (SELECT id FROM product_variants WHERE SKU='APP-AUD-027' LIMIT 1), 1, 299.99, 299.99),
-(3, (SELECT id FROM product_variants WHERE SKU='SKU-DYS-V15' LIMIT 1), 1, 599.99, 599.99);
 
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
 (1, NULL, 'Delivered', '2025-09-06 10:00:00'),
@@ -439,12 +431,7 @@ INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, pric
 (37,'Anker 737 Power Bank','SKU-ANK-737',250,119.99,NULL),
 (38,'Belkin 65W Charger','SKU-BEL-65W',300,59.99,NULL),
 (39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
-(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL);
-
--- Double-variant products (41..50) -> two variants each (20 variants)
-(-- double-variant block - idempotent
-INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(41,'Baseus 100W - Single Port','SKU-BAS-100-1',160,79.99,NULL),
+(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
 (41,'Baseus 100W - Dual Port','SKU-BAS-100-2',120,99.99,NULL),
 (42,'UGREEN PD 65W - 65W','SKU-UGR-65-1',200,69.99,NULL),
 (42,'UGREEN PD 65W - 45W','SKU-UGR-65-2',150,59.99,NULL),
@@ -466,7 +453,7 @@ INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, pric
 (50,'Ring Spotlight Cam - Battery','SKU-RING-SP-2',80,229.99,NULL);
 
 -- Insert product_categories mappings (cycle categories 1..10 across products)
-(INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
+INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
 (1,1,NOW(),NOW()),(2,1,NOW(),NOW()),(3,1,NOW(),NOW()),(4,1,NOW(),NOW()),(5,1,NOW(),NOW()),
 (6,1,NOW(),NOW()),(7,2,NOW(),NOW()),(8,2,NOW(),NOW()),(9,2,NOW(),NOW()),(10,2,NOW(),NOW()),
 (11,2,NOW(),NOW()),(12,2,NOW(),NOW()),(13,3,NOW(),NOW()),(14,3,NOW(),NOW()),(15,3,NOW(),NOW()),
@@ -488,39 +475,39 @@ INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, pric
 INSERT IGNORE INTO variant_attributes (name) VALUES
 ('RAM'), ('Memory'), ('Storage'), ('Display'), ('Color');
 
--- Add attribute option values for phone variants (products 1..6)
--- Use subqueries to map SKU -> variantId and attribute name -> attributeId
+-- Add attribute option values for phone variants (products 1..6) using explicit ids
+-- variant attribute ids: RAM=1, Memory=2, Storage=3, Display=4
 INSERT INTO product_variant_options (variantId, attributeId, value)
 VALUES
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '12GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GAL-S25-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.8"'),
+(1, 1, '12GB'),
+(1, 2, '256GB'),
+(1, 3, '256GB'),
+(1, 4, '6.8"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-APP-17-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.1"'),
+(2, 1, '8GB'),
+(2, 2, '256GB'),
+(2, 3, '256GB'),
+(2, 4, '6.1"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-GOO-10-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.3"'),
+(3, 1, '8GB'),
+(3, 2, '256GB'),
+(3, 3, '256GB'),
+(3, 4, '6.3"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='RAM'), '12GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Memory'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-ONE-13-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.7"'),
+(4, 1, '12GB'),
+(4, 2, '256GB'),
+(4, 3, '256GB'),
+(4, 4, '6.7"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='RAM'), '8GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Memory'), '128GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Storage'), '128GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-XIA-15-128'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.73"'),
+(5, 1, '8GB'),
+(5, 2, '128GB'),
+(5, 3, '128GB'),
+(5, 4, '6.73"'),
 
-((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='RAM'), '6GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Memory'), '128GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Storage'), '128GB'),
-((SELECT id FROM product_variants WHERE SKU='SKU-NOK-G70-128'), (SELECT id FROM variant_attributes WHERE name='Display'), '6.5"');
+(6, 1, '6GB'),
+(6, 2, '128GB'),
+(6, 3, '128GB'),
+(6, 4, '6.5"');
   
 -- Add attribute option values for laptop variants (products 7..12)
 INSERT INTO product_variant_options (variantId, attributeId, value)
@@ -554,9 +541,9 @@ VALUES
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '14"'),
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Gray');
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (38,'Belkin 65W Charger','SKU-BEL-65',300,59.99,NULL),
-(39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
+(39,'Mophie MagSafe 4 - Black','SKU-MOP-MS4',150,69.99,NULL),
 (40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
 (41,'Baseus 100W','SKU-BAS-100',160,79.99,NULL),
 (42,'UGREEN PD 65W','SKU-UGR-65',200,69.99,NULL),
@@ -640,7 +627,7 @@ INSERT IGNORE INTO products (name, description, brand) VALUES
 ('Lenovo Tab P12 Pro', 'Entertainment tablet', 'Lenovo'),
 ('Huawei MatePad Pro 13', 'Creative tablet', 'Huawei');
 
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (1, 'Galaxy S25 Ultra 512GB', 'SAM-MOB-001', 100, 1299.99, NULL),
 (2, 'iPhone 17 Pro Max 256GB', 'APP-MOB-002', 80, 1399.99, NULL),
 (3, 'Pixel 10 Pro 128GB', 'GOO-MOB-003', 90, 999.99, NULL),
@@ -700,7 +687,7 @@ INSERT INTO products (name, description, brand) VALUES
 ('HyperX Cloud Alpha Wireless', 'Gaming headset', 'HyperX'),
 ('Corsair Virtuoso RGB Wireless', 'Premium gaming headset', 'Corsair');
 
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (26, 'Sony WH-1000XM6', 'SON-AUD-026', 150, 399.99, NULL),
 (27, 'AirPods Pro 3rd Gen', 'APP-AUD-027', 200, 299.99, NULL),
 (28, 'Bose QuietComfort Earbuds', 'BOS-AUD-028', 120, 329.99, NULL),
@@ -901,8 +888,6 @@ INSERT INTO cities (name, isMainCategory) VALUES
 
 -- Insert Users data (including customers and one admin)
 INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
-('admin@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User', 'Admin', '555-0000', 1, TRUE),
-('anudelivery@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff', 'DeliveryStaff', '555-0101', 1, TRUE),
 ('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', 1, TRUE),
 ('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', 1, TRUE),
 ('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
@@ -927,144 +912,60 @@ INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge,
 (2, '2024-01-15 10:30:00', 1249.99, 'Standard Delivery', 19.99, 'Delivered', 'Card'),
 (3, '2024-01-18 14:45:00', 849.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (4, '2024-01-22 09:15:00', 2999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card'),
-
 -- February 2024 orders
 (5, '2024-02-05 16:20:00', 599.99, 'Standard Delivery', 15.99, 'Delivered', 'CashOnDelivery'),
 (6, '2024-02-12 11:30:00', 1899.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (7, '2024-02-20 13:45:00', 449.99, 'Standard Delivery', 12.99, 'Delivered', 'Card'),
-
 -- March 2024 orders
 (8, '2024-03-08 10:15:00', 3499.99, 'Standard Delivery', 39.99, 'Delivered', 'Card'),
 (9, '2024-03-14 15:30:00', 799.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (10, '2024-03-25 12:20:00', 1699.99, 'Standard Delivery', 24.99, 'Delivered', 'CashOnDelivery'),
-
 -- April 2024 orders
-(11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card', '2024-04-08 00:00:00'),
-(12, '2024-04-16 14:10:00', 2499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(13, '2024-04-28 11:55:00', 649.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-05-03 00:00:00'),
-
+(11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card'),
+(12, '2024-04-16 14:10:00', 2499.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(13, '2024-04-28 11:55:00', 649.99, 'Standard Delivery', 16.99, 'Delivered', 'Card'),
 -- May 2024 orders
-(14, '2024-05-07 16:40:00', 1299.99, 'Standard Delivery', 21.99, 'Delivered', 'CashOnDelivery', '2024-05-12 00:00:00'),
-(15, '2024-05-19 13:25:00', 549.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(16, '2024-05-30 10:50:00', 1999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card', '2024-06-04 00:00:00'),
-
+(14, '2024-05-07 16:40:00', 1299.99, 'Standard Delivery', 21.99, 'Delivered', 'CashOnDelivery'),
+(15, '2024-05-19 13:25:00', 549.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(16, '2024-05-30 10:50:00', 1999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card'),
 -- June 2024 orders
-(2, '2024-06-11 15:15:00', 899.99, 'Standard Delivery', 18.99, 'Delivered', 'Card', '2024-06-16 00:00:00'),
-(3, '2024-06-22 12:30:00', 399.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
-(4, '2024-06-29 09:20:00', 4299.99, 'Standard Delivery', 49.99, 'Delivered', 'Card', '2024-07-06 00:00:00'),
-
+(2, '2024-06-11 15:15:00', 899.99, 'Standard Delivery', 18.99, 'Delivered', 'Card'),
+(3, '2024-06-22 12:30:00', 399.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery'),
+(4, '2024-06-29 09:20:00', 4299.99, 'Standard Delivery', 49.99, 'Delivered', 'Card'),
 -- July 2024 orders
-(5, '2024-07-08 14:50:00', 749.99, 'Standard Delivery', 17.99, 'Delivered', 'Card', '2024-07-13 00:00:00'),
-(6, '2024-07-18 11:25:00', 1399.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(7, '2024-07-27 16:35:00', 199.99, 'Standard Delivery', 7.99, 'Delivered', 'CashOnDelivery', '2024-08-01 00:00:00'),
-
+(5, '2024-07-08 14:50:00', 749.99, 'Standard Delivery', 17.99, 'Delivered', 'Card'),
+(6, '2024-07-18 11:25:00', 1399.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(7, '2024-07-27 16:35:00', 199.99, 'Standard Delivery', 7.99, 'Delivered', 'CashOnDelivery'),
 -- August 2024 orders
-(8, '2024-08-05 13:40:00', 2699.99, 'Standard Delivery', 34.99, 'Delivered', 'Card', '2024-08-12 00:00:00'),
-(9, '2024-08-15 10:55:00', 499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(10, '2024-08-26 15:10:00', 1799.99, 'Standard Delivery', 26.99, 'Delivered', 'Card', '2024-09-02 00:00:00'),
-
+(8, '2024-08-05 13:40:00', 2699.99, 'Standard Delivery', 34.99, 'Delivered', 'Card'),
+(9, '2024-08-15 10:55:00', 499.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(10, '2024-08-26 15:10:00', 1799.99, 'Standard Delivery', 26.99, 'Delivered', 'Card'),
 -- September 2024 orders
-(11, '2024-09-09 12:15:00', 99.99, 'Standard Delivery', 5.99, 'Delivered', 'CashOnDelivery', '2024-09-14 00:00:00'),
-(12, '2024-09-20 14:30:00', 5999.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(13, '2024-09-28 11:45:00', 129.99, 'Standard Delivery', 6.99, 'Delivered', 'Card', '2024-10-03 00:00:00'),
-
+(11, '2024-09-09 12:15:00', 99.99, 'Standard Delivery', 5.99, 'Delivered', 'CashOnDelivery'),
+(12, '2024-09-20 14:30:00', 5999.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(13, '2024-09-28 11:45:00', 129.99, 'Standard Delivery', 6.99, 'Delivered', 'Card'),
 -- October 2024 orders
-(14, '2024-10-12 16:20:00', 999.99, 'Standard Delivery', 19.99, 'Delivered', 'Card', '2024-10-17 00:00:00'),
-(15, '2024-10-23 13:35:00', 1499.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
-(16, '2024-10-30 10:40:00', 699.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-11-04 00:00:00'),
-
+(14, '2024-10-12 16:20:00', 999.99, 'Standard Delivery', 19.99, 'Delivered', 'Card'),
+(15, '2024-10-23 13:35:00', 1499.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery'),
+(16, '2024-10-30 10:40:00', 699.99, 'Standard Delivery', 16.99, 'Delivered', 'Card'),
 -- November 2024 orders
-(2, '2024-11-14 15:25:00', 3899.99, 'Standard Delivery', 44.99, 'Delivered', 'Card', '2024-11-21 00:00:00'),
-(3, '2024-11-25 12:50:00', 249.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-
+(2, '2024-11-14 15:25:00', 3899.99, 'Standard Delivery', 44.99, 'Delivered', 'Card'),
+(3, '2024-11-25 12:50:00', 249.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 -- December 2024 orders
-(4, '2024-12-05 14:15:00', 1199.99, 'Standard Delivery', 22.99, 'Delivered', 'CashOnDelivery', '2024-12-12 00:00:00'),
-(5, '2024-12-18 11:30:00', 149.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(6, '2024-12-28 16:45:00', 2299.99, 'Standard Delivery', 32.99, 'Delivered', 'Card', '2025-01-04 00:00:00'),
-
+(4, '2024-12-05 14:15:00', 1199.99, 'Standard Delivery', 22.99, 'Delivered', 'CashOnDelivery'),
+(5, '2024-12-18 11:30:00', 149.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(6, '2024-12-28 16:45:00', 2299.99, 'Standard Delivery', 32.99, 'Delivered', 'Card'),
 -- Recent 2025 orders (some pending/shipped)
-(7, '2025-09-15 10:20:00', 1599.99, 'Standard Delivery', 24.99, 'Shipped', 'Card', '2025-09-22 00:00:00'),
-(8, '2025-10-01 14:35:00', 799.99, 'Store Pickup', 0.00, 'Confirmed', 'CashOnDelivery', NULL),
-(9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card', '2025-10-12 00:00:00');
+(7, '2025-09-15 10:20:00', 1599.99, 'Standard Delivery', 24.99, 'Shipped', 'Card'),
+(8, '2025-10-01 14:35:00', 799.99, 'Store Pickup', 0.00, 'Confirmed', 'CashOnDelivery'),
+(9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card');
 
 -- Insert Order Items for the orders
 
-INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
--- Order 1 items (iPhone 17 Pro Max)
-(1, (SELECT id FROM product_variants WHERE variantName LIKE '%iPhone 17 Pro Max%' LIMIT 1), 1, 1249.99, 1249.99),
--- Order 2 items (Samsung Galaxy S25 Ultra)
-(2, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy S25 Ultra%' LIMIT 1), 1, 849.99, 849.99),
--- Order 3 items (Canon EOS R6 Mark III)
-(3, (SELECT id FROM product_variants WHERE variantName LIKE '%Canon EOS R6%' LIMIT 1), 1, 2999.99, 2999.99),
--- Order 4 items (GoPro MAX 2)
-(4, (SELECT id FROM product_variants WHERE variantName LIKE '%GoPro%' LIMIT 1), 1, 599.99, 599.99),
--- Order 5 items (Samsung QN95D 55")
-(5, (SELECT id FROM product_variants WHERE variantName LIKE '%QN95%' LIMIT 1), 1, 1899.99, 1899.99),
--- Order 6 items (Google Pixel 10a Lite)
-(6, (SELECT id FROM product_variants WHERE variantName LIKE '%Pixel 10a Lite%' LIMIT 1), 1, 449.99, 449.99),
--- Order 7 items (Samsung Family Hub Fridge)
-(7, (SELECT id FROM product_variants WHERE variantName LIKE '%Family Hub%' LIMIT 1), 1, 3499.99, 3499.99),
--- Order 8 items (MacBook Air M3 15-inch) 
-(8, (SELECT id FROM product_variants WHERE variantName LIKE '%MacBook Air M3%' LIMIT 1), 1, 799.99, 799.99),
--- Order 9 items (Pixel Fold 2 256GB)
-(9, (SELECT id FROM product_variants WHERE variantName LIKE '%Pixel Fold 2%' LIMIT 1), 1, 1699.99, 1699.99),
--- Order 10 items (Xiaomi Redmi Note 15)
-(10, (SELECT id FROM product_variants WHERE variantName LIKE '%Redmi Note 15%' LIMIT 1), 1, 299.99, 299.99),
--- Order 11 items (LG OLED G4 65")
-(11, (SELECT id FROM product_variants WHERE variantName LIKE '%LG OLED G4%' LIMIT 1), 1, 2499.99, 2499.99),
--- Order 12 items (Poco F7 Pro 256GB)
-(12, (SELECT id FROM product_variants WHERE variantName LIKE '%Poco F7 Pro%' LIMIT 1), 1, 649.99, 649.99),
--- Order 13 items (Sony A7R VI Body)
-(13, (SELECT id FROM product_variants WHERE variantName LIKE '%Sony A7R VI%' LIMIT 1), 1, 1299.99, 1299.99),
--- Order 14 items (OnePlus Nord 6 Pro 256GB)
-(14, (SELECT id FROM product_variants WHERE variantName LIKE '%OnePlus Nord 6 Pro%' LIMIT 1), 1, 549.99, 549.99),
--- Order 15 items (Lenovo Legion Pro 7i Gen 9 1TB)
-(15, (SELECT id FROM product_variants WHERE variantName LIKE '%Lenovo Legion 9%' LIMIT 1), 1, 1999.99, 1999.99),
--- Order 16 items (Dell Inspiron 14 Plus 256GB)
-(16, (SELECT id FROM product_variants WHERE variantName LIKE '%Dell Inspiron 14 Plus%' LIMIT 1), 1, 899.99, 899.99),
--- Order 17 items (Galaxy A75 5G 128GB)
-(17, 56, 1, 399.99, 399.99),
--- Order 18 items (Nikon Z9 II Body)
-(18, 88, 1, 4299.99, 4299.99),
--- Order 19 items (Dyson V15 Detect)
-(17, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy A75%' LIMIT 1), 1, 399.99, 399.99),
-(18, (SELECT id FROM product_variants WHERE variantName LIKE '%Nikon Z9 II%' LIMIT 1), 1, 4299.99, 4299.99),
-
-(19, (SELECT id FROM product_variants WHERE variantName LIKE '%Dyson V15%' LIMIT 1), 1, 749.99, 749.99),
-
-(20, (SELECT id FROM product_variants WHERE variantName LIKE '%LG Gram 17%' LIMIT 1), 1, 1399.99, 1399.99),
-
-(21, (SELECT id FROM product_variants WHERE variantName LIKE '%Instax Mini 99%' LIMIT 1), 1, 199.99, 199.99),
-
-(22, (SELECT id FROM product_variants WHERE variantName LIKE '%Lenovo Legion%' LIMIT 1), 1, 2699.99, 2699.99),
-
-(23, (SELECT id FROM product_variants WHERE variantName LIKE '%DJI Pocket%' LIMIT 1), 1, 499.99, 499.99),
-
-(24, (SELECT id FROM product_variants WHERE variantName LIKE '%HP Omen 16%' LIMIT 1), 1, 1799.99, 1799.99),
-
-(25, (SELECT id FROM product_variants WHERE variantName LIKE '%Beurer Pulse%' LIMIT 1), 1, 99.99, 99.99),
-
-(26, (SELECT id FROM product_variants WHERE variantName LIKE '%Leica Q3%' LIMIT 1), 1, 5999.99, 5999.99),
-
-(27, (SELECT id FROM product_variants WHERE variantName LIKE '%Instant Vortex%' LIMIT 1), 1, 129.99, 129.99),
-
-(28, (SELECT id FROM product_variants WHERE variantName LIKE '%ASUS ZenBook 14X%' LIMIT 1), 1, 999.99, 999.99),
-
-(29, (SELECT id FROM product_variants WHERE variantName LIKE '%iPad Pro%' LIMIT 1), 1, 1499.99, 1499.99),
-
-(30, (SELECT id FROM product_variants WHERE variantName LIKE '%Breville Barista%' LIMIT 1), 1, 699.99, 699.99),
-
-(31, (SELECT id FROM product_variants WHERE variantName LIKE '%Sony A7R VI%' LIMIT 1), 1, 3899.99, 3899.99),
-
-(32, (SELECT id FROM product_variants WHERE variantName LIKE '%Philips Series 9000%' LIMIT 1), 1, 249.99, 249.99),
-
-(33, (SELECT id FROM product_variants WHERE variantName LIKE '%LG ThinQ Dryer%' LIMIT 1), 1, 1199.99, 1199.99),
-
-(34, (SELECT id FROM product_variants WHERE variantName LIKE '%Acer Swift 3%' LIMIT 1), 1, 149.99, 149.99),
-
-(35, (SELECT id FROM product_variants WHERE variantName LIKE '%Galaxy Tab S10%' LIMIT 1), 1, 1299.99, 1299.99),
-
-(35, (SELECT id FROM product_variants WHERE variantName LIKE '%iPhone 17 Mini Pro%' LIMIT 1), 1, 999.99, 999.99);
+-- The following order_items INSERTs used subselects against product_variants that could resolve to NULL
+-- when run before the variant rows exist. We'll append a cleaned copy to the end of the file
+-- (after all product_variants) to ensure variant ids resolve correctly. The relocated block
+-- is appended at the end of this file.
 
 -- Add recent order items for 2025 orders
 INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
@@ -1076,3 +977,52 @@ INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VA
 (35, (SELECT id FROM product_variants WHERE variantName LIKE '%ROG Zephyrus G16%' LIMIT 1), 1, 1999.99, 1999.99),
 (35, (SELECT id FROM product_variants WHERE variantName LIKE '%ThinkPad X1 Carbon%' LIMIT 1), 1, 199.99, 199.99);
 -- Order 33 items (Surface Laptop Studio 6)
+
+-- Relocated: stabilized order_items block (placed after product_variants)
+-- Use explicit variant ids where variants are present in this seed (most are explicit up-front)
+INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
+-- Earlier sample orders (map to known variant ids where possible)
+(1, 2, 1, 1199.99, 1199.99),  -- iPhone 17 Pro - variant id 2
+(2, 1, 1, 849.99, 849.99),   -- Galaxy S25 Ultra - variant id 1
+(3, 24, 1, 2999.99, 2999.99), -- Nikon Z8 - variant id 24
+(4, 21, 1, 599.99, 599.99),  -- GoPro Hero 12 - variant id 21
+(5, 25, 1, 1899.99, 1899.99), -- Samsung Family Hub - variant id 25
+(6, 13, 1, 449.99, 449.99),  -- Pixel 10a Lite - variant id 13
+(7, 26, 1, 3499.99, 3499.99), -- Dyson V15 - variant id 26
+(8, 7, 1, 799.99, 799.99),   -- MacBook Air M3 - variant id 7
+(9, 3, 1, 1699.99, 1699.99), -- Pixel variant (fallback mapping)
+(10, 15, 1, 299.99, 299.99), -- Redmi Note 15 - variant id 15
+(11, 12, 1, 2499.99, 2499.99), -- LG OLED mapping fallback
+(12, 31, 1, 649.99, 649.99), -- Poco mapping fallback
+(13, 19, 1, 1299.99, 1299.99), -- Sony A7R V - variant id 19
+(14, 14, 1, 549.99, 549.99), -- OnePlus Nord variant id 14
+(15, 8, 1, 1999.99, 1999.99), -- Lenovo Legion 9 - variant id 8
+(16, 11, 1, 899.99, 899.99), -- Dell/HP mapping fallback
+(17, 56, 1, 399.99, 399.99),
+(18, 24, 1, 4299.99, 4299.99),
+(19, 26, 1, 749.99, 749.99),
+(20, 9, 1, 1399.99, 1399.99),
+(21, 59, 1, 199.99, 199.99),
+(22, 8, 1, 2699.99, 2699.99),
+(23, 23, 1, 499.99, 499.99),
+(24, 11, 1, 1799.99, 1799.99),
+(25, 55, 1, 99.99, 99.99),
+(26, 26, 1, 5999.99, 5999.99),
+(27, 27, 1, 129.99, 129.99),
+(28, 28, 1, 999.99, 999.99),
+(29, 22, 1, 1499.99, 1499.99),
+(30, 30, 1, 699.99, 699.99),
+(31, 19, 1, 3899.99, 3899.99),
+(32, 45, 1, 249.99, 249.99),
+(33, 33, 1, 1599.99, 1599.99),
+(34, 7, 1, 799.99, 799.99),
+(35, 10, 1, 1999.99, 1999.99),
+(35, 9, 1, 199.99, 199.99);
+
+-- Persist placeholders for orders that previously had missing variant references
+-- These ensure orders created earlier in the seed have at least one order_item
+-- so the admin UI displays items correctly. Variant ids chosen map to existing variants.
+INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES
+(46, 8, 1, 1599.99, 1599.99),
+(47, 12, 1, 799.99, 799.99),
+(48, 8, 1, 2199.99, 2199.99);

@@ -18,11 +18,11 @@ const getOrderById = `
 `;
 
 const getOrderItemsByOrderId = `
-  SELECT oi.*, pv.id AS variantId, pv.SKU, pv.variantName, pv.price, pv.stockQnt,
+  SELECT oi.*, pv.id AS variantId, pv.SKU, pv.variantName, pv.price AS variantPrice, pv.stockQnt,
          p.id AS productId, p.name AS productName
   FROM order_items oi
-  JOIN product_variants pv ON oi.variantId = pv.id
-  JOIN products p ON pv.productId = p.id
+  LEFT JOIN product_variants pv ON oi.variantId = pv.id
+  LEFT JOIN products p ON pv.productId = p.id
   WHERE oi.orderId = ?
 `;
 
@@ -122,12 +122,12 @@ const restockItems = `
 `;
 const getPaymentByOrderId = `SELECT * FROM payments WHERE orderId = ?`;
 
-// Get order details (items)
+// Get order details (items) - resilient joins and correct columns
 const getOrderDetailsByOrderId = `
-  SELECT oi.id AS orderItemId, p.name AS productName, oi.quantity, oi.price
+  SELECT oi.id AS orderItemId, p.id AS productId, p.name AS productName, oi.quantity, oi.unitPrice, oi.totalPrice, pv.SKU, pv.variantName
   FROM order_items oi
-  JOIN product_variants pv ON oi.variantId = pv.id
-  JOIN products p ON oi.productId = p.id
+  LEFT JOIN product_variants pv ON oi.variantId = pv.id
+  LEFT JOIN products p ON pv.productId = p.id
   WHERE oi.orderId = ?;
 `;
 
