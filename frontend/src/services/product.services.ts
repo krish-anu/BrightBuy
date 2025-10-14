@@ -127,6 +127,25 @@ export const addProduct = async (productData: any) => {
   }
 }
 
+// Fetch a lightweight list of product names (deduped) for dropdowns.
+// Uses the existing getAllProducts endpoint and extracts distinct names.
+export const getProductNames = async (): Promise<string[]> => {
+  try {
+    const res = await getAllProducts();
+    const rows = res?.data || [];
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r && typeof r.name === 'string' && r.name.trim()) {
+        set.add(r.name.trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  } catch (err) {
+    console.error('Error fetching product names:', err);
+    return [];
+  }
+};
+
 export const getProductByID = async (id: string | number) => {
   const res = await axiosInstance.get(`/api/product/${id}`);
   return res.data; // your API likely returns { success, data }

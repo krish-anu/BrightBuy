@@ -87,6 +87,10 @@ const Inventory: React.FC = () => {
     _attributeValue: '' as string,
     _creatingAttribute: false,
     _newAttributeName: '' as string,
+    _productNames: [] as string[],
+    _useExistingProduct: true,
+    _loadingProductNames: false,
+    variantName: '' as string,
   });
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -445,8 +449,67 @@ const Inventory: React.FC = () => {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Name</label>
-                      <input type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                      <label className="block text-sm font-medium text-gray-700">Product</label>
+                      {newProductForm._useExistingProduct ? (
+                        <div className="mt-1 flex items-center space-x-2">
+                          <select
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm.name}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                            onFocus={async () => {
+                              if (!newProductForm._productNames.length && !newProductForm._loadingProductNames) {
+                                try {
+                                  setNewProductForm((p:any) => ({ ...p, _loadingProductNames: true }));
+                                  const { getProductNames } = await import('@/services/product.services');
+                                  const names = await getProductNames();
+                                  setNewProductForm((p:any) => ({ ...p, _productNames: names, _loadingProductNames: false }));
+                                } catch (err) {
+                                  console.error('Failed to load product names', err);
+                                  setNewProductForm((p:any) => ({ ...p, _loadingProductNames: false }));
+                                }
+                              }
+                            }}
+                          >
+                            <option value="">Select existing product</option>
+                            {newProductForm._productNames.map((n:string) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs bg-gray-100 rounded"
+                            onClick={() => setNewProductForm({ ...newProductForm, _useExistingProduct: false, name: '' })}
+                          >New</button>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center space-x-2">
+                          <input
+                            type="text"
+                            className="flex-1 px-3 py-2 border rounded"
+                            placeholder="Enter new product name"
+                            value={newProductForm.name}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs bg-gray-100 rounded"
+                            onClick={() => setNewProductForm({ ...newProductForm, _useExistingProduct: true })}
+                          >Existing</button>
+                        </div>
+                      )}
+                      {newProductForm._loadingProductNames && <p className="text-xs text-gray-500 mt-1">Loading product names...</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Variant Name (optional)</label>
+                      <input
+                        type="text"
+                        value={newProductForm.variantName}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, variantName: e.target.value })}
+                        placeholder="e.g. 128GB Midnight Blue"
+                        className="mt-1 block w-full px-3 py-2 border rounded"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">If left blank, variant name will be composed from product + attribute values.</p>
                     </div>
 
                     <div>
@@ -673,6 +736,8 @@ const Inventory: React.FC = () => {
                     <button onClick={async () => {
                       try {
                         const categoryIds: number[] = Array.isArray(newProductForm.categoryIds) ? newProductForm.categoryIds : [];
+                        // Backend currently auto-builds variantName from product name + attributes.
+                        // To support custom variantName we pass attributes as usual; after creation we could update variant if needed.
                         const productPayload = {
                           name: newProductForm.name,
                           description: newProductForm.description,
@@ -686,6 +751,16 @@ const Inventory: React.FC = () => {
                         // Create product + variant first
                         const createRes = await addProduct(productPayload);
                         const variantId = createRes?.variantId || (createRes?.data && createRes.data.variantId) || null;
+
+                        // If user provided an explicit variantName, update the variant (requires variant update endpoint)
+                        if (variantId && newProductForm.variantName && newProductForm.variantName.trim()) {
+                          try {
+                            const { updateVariant } = await import('@/services/variant.services');
+                            await updateVariant(variantId, { variantName: newProductForm.variantName.trim() });
+                          } catch (e) {
+                            console.warn('Failed to set custom variant name, using default generated one.', e);
+                          }
+                        }
 
                         // If image file provided and we have variantId, upload with entity=variant
                         if (newProductForm.imageFile && variantId) {
