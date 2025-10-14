@@ -23,7 +23,7 @@ const Orders: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'shipped' | 'assigned'>('all');
+  const [activeTab] = useState<'all' | 'shipped' | 'assigned'>('all');
   const [deliveryModeFilter, setDeliveryModeFilter] = useState<'all' | 'Store Pickup' | 'Standard Delivery'>('all');
   const [shippedOrders, setShippedOrders] = useState<Order[]>([]);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -577,34 +577,41 @@ const Orders: React.FC = () => {
                           <IconComponent iconName="Edit" size={16} />
                         </button>
                         { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
-                        <button
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Assign Delivery"
-                          onClick={async () => {
-                            // Guard client-side: ensure current token belongs to Admin or SuperAdmin
-                            const current = getCurrentUserFromToken();
-                            if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
-                              alert('You are not authorized to assign deliveries. Please login as Admin.');
-                              return;
-                            }
-                            // Open assign modal for this order
-                            try {
-                              setDeliveryToAssign({ orderId: order.id, deliveryId: order.deliveryId });
-                              setAssignModalOpen(true);
-                              // fetch delivery staff
-                              const staff = await getDeliveryStaff();
-                              setAvailableDeliveryStaff(staff || []);
-                            } catch (err: any) {
-                              console.error('Failed to fetch delivery staff', err);
-                              const status = err?.response?.status || err?.status;
-                              if (status === 401) alert('Unauthorized — please login');
-                              else if (status === 403) alert('Forbidden — you do not have permission to perform assignments');
-                              else alert('Failed to fetch delivery staff');
-                            }
-                          }}
-                        >
-                          <IconComponent iconName="Truck" size={16} />
-                        </button>
+                          // Only allow assignment when order status is Shipped
+                          (() => {
+                            const isShipped = (order.status || '').toString().toLowerCase() === 'shipped';
+                            return (
+                              <button
+                                className={`${isShipped ? 'text-purple-600 hover:text-purple-900' : 'text-gray-400 cursor-not-allowed'}`}
+                                title={isShipped ? 'Assign Delivery' : 'Assign Delivery (only available when order is Shipped)'}
+                                onClick={async () => {
+                                  if (!isShipped) return; // prevent action when not shipped
+                                  // Guard client-side: ensure current token belongs to Admin or SuperAdmin
+                                  const current = getCurrentUserFromToken();
+                                  if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
+                                    alert('You are not authorized to assign deliveries. Please login as Admin.');
+                                    return;
+                                  }
+                                  // Open assign modal for this order
+                                  try {
+                                    setDeliveryToAssign({ orderId: order.id, deliveryId: order.deliveryId });
+                                    setAssignModalOpen(true);
+                                    // fetch delivery staff
+                                    const staff = await getDeliveryStaff();
+                                    setAvailableDeliveryStaff(staff || []);
+                                  } catch (err: any) {
+                                    console.error('Failed to fetch delivery staff', err);
+                                    const status = err?.response?.status || err?.status;
+                                    if (status === 401) alert('Unauthorized — please login');
+                                    else if (status === 403) alert('Forbidden — you do not have permission to perform assignments');
+                                    else alert('Failed to fetch delivery staff');
+                                  }
+                                }}
+                              >
+                                <IconComponent iconName="Truck" size={16} />
+                              </button>
+                            );
+                          })()
                         )}
                       </div>
                     </td>
