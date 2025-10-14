@@ -1,6 +1,6 @@
 import ProductInfo from "@/components/Products/ProductInfo";
 import { useEffect, useState } from "react";
-import { getProductByID } from "@/services/variant.services";
+import { getProductByID } from "@/services/product.services";
 import { useParams } from "react-router-dom";
 
 export default function ProductDetailPage() {

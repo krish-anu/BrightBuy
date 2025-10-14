@@ -5,32 +5,18 @@ import { Dot } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ShoppingBagIcon, ShoppingCart } from "lucide-react";
-// import type SingleProduct from "@/types/Product";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { ProductDetail, Variant } from "@/types/ProductDetail";
+import {
+  checkStock,
+  findByOptions,
+  getAttributeValues,
+  getInitialOptions,
+  getUniqueAttributes,
+} from "@/utils/productVariantUtils";
 
 interface ProductPageProps {
-  product: Product;
-}
-
-export interface Attribute {
-  attributeID: string;
-  attributeName: string;
-  attributeValue: string;
-}
-export interface Variant {
-  id: string;
-  SKU: string;
-  price: number;
-  stockQnt: number;
-  image?: string;  
-  attributes: Attribute[];
-}
-export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  variants: Variant[];
-  categories: { id: number; name: string }[];
+  product: ProductDetail;
 }
 
 export default function ProductInfo({ product }: ProductPageProps) {
@@ -102,11 +88,18 @@ export default function ProductInfo({ product }: ProductPageProps) {
                     In Stock
                   </span>
                 </Badge>
+              ) : stockStatus === "low-stock" ? (
+                <Badge variant="outline" className="text-sm text-chart-2">
+                  <span>
+                    <Dot strokeWidth={3} size={16} className="inline-block" />
+                    Low Stock
+                  </span>
+                </Badge>
               ) : stockStatus === "out-of-stock" ? (
                 <Badge variant="outline" className="text-sm text-destructive">
                   <span>
                     <Dot strokeWidth={3} size={16} className="inline-block" />
-                    Low Stock
+                    Out of Stock
                   </span>
                 </Badge>
               ) : null}
@@ -114,11 +107,8 @@ export default function ProductInfo({ product }: ProductPageProps) {
             <div className="flex flex-row justify-between">
               <span className="text-sm text-muted-foreground">
                 Category:{" "}
-                <Badge
-                  variant="outline"
-                  className="text-sm text-muted-foreground"
-                >
-                  {product.categories?.[0].name ?? "Uncategorized"}
+                <Badge variant="outline" className="text-sm text-muted-foreground">
+                  {product.categories?.[0]?.name ?? "Uncategorized"}
                 </Badge>
               </span>
             </div>
@@ -164,6 +154,8 @@ export default function ProductInfo({ product }: ProductPageProps) {
             )}
           </div>
           <Separator />
+
+          {/* Show stock Quantity */}
           {stockStatus === "in-stock" ? (
             <span className="text-md text-muted-foreground">
               Available Stock:{" "}
@@ -172,12 +164,17 @@ export default function ProductInfo({ product }: ProductPageProps) {
               </span>
             </span>
           ) : null}
+
+          {/* Quantity Selector - To Do */}
+
+
+          {/* Action Buttons ( Buy Now / Add to Cart ) */}
           <div className="flex flex-row justify-start sm:gap-2 gap-6 text-md">
             {stockStatus === "not-available" ? null : (
               <Button
                 variant="order"
                 size="lg"
-                className="hover:bg-foreground  "
+                className="hover:bg-foreground bg-primary  "
               >
                 <ShoppingBagIcon className="inline-block mr-2" />{" "}
                 {stockStatus === "in-stock"
@@ -187,11 +184,11 @@ export default function ProductInfo({ product }: ProductPageProps) {
                     : null}
               </Button>
             )}
-            {stockStatus === "not-available" ? null : (
+            {stockStatus === "out-of-stock" ? null : (
               <Button
-                variant="order"
+                variant="order_outline"
                 size="lg"
-                className="bg-primary text-primary-foreground hover:bg-foreground  hover:text-background"
+                className="bg-primary-foreground text-secondary hover:bg-foreground  hover:text-background"
               >
                 {" "}
                 <ShoppingCart className="inline-block mr-2" /> Add to Cart
@@ -205,74 +202,4 @@ export default function ProductInfo({ product }: ProductPageProps) {
       <div>{product.description}</div>
     </div>
   );
-}
-
-function getUniqueAttributes(variants: Variant[]) {
-  const attributeNames = new Set<string>();
-  variants.forEach((variant) => {
-    variant.attributes.forEach((attr) => {
-      attributeNames.add(attr.attributeName);
-    });
-  });
-  return Array.from(attributeNames);
-}
-
-function getAttributeValues(
-  attributeNames: Set<string>,
-  variants: Variant[],
-): Record<string, string[]> {
-  const attributeValues: Record<string, Set<string>> = {};
-  attributeNames.forEach((name) => {
-    attributeValues[name] = new Set<string>();
-    variants.forEach((variant) => {
-      variant.attributes.forEach((attr) => {
-        if (attr.attributeName === name) {
-          attributeValues[name].add(attr.attributeValue);
-        }
-      });
-    });
-  });
-  // Convert sets to arrays
-  const result: Record<string, string[]> = {};
-  Object.keys(attributeValues).forEach((name) => {
-    result[name] = Array.from(attributeValues[name]);
-  });
-  return result;
-}
-
-function findByOptions(
-  variants: Variant[],
-  selectedOptions: Record<string, string>,
-): Variant | undefined {
-  if (Object.keys(selectedOptions).length === 0) return undefined;
-
-  for (const variant of variants) {
-    const match = variant.attributes.every(
-      (attr) => selectedOptions[attr.attributeName] === attr.attributeValue,  
-    );
-
-    if (match) {
-      return variant;
-    }
-  }
-  return undefined;
-}
-
-function getInitialOptions(variants: Variant[]): Record<string, string> {
-  const initialOptions: Record<string, string> = {};
-  if (variants.length > 0) {
-    variants[0].attributes.forEach((attr) => {
-      initialOptions[attr.attributeName] = attr.attributeValue;  
-    });
-  }
-  return initialOptions;
-}
-
-function checkStock(variant: Variant | undefined): string {
-  if (!variant) return "not-available";
-  else if (variant.stockQnt > 0) {  
-    return "in-stock";
-  } else {
-    return "out-of-stock";
-  }
 }
