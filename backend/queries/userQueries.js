@@ -35,6 +35,16 @@ const userQueries = {
   delete: `
     DELETE FROM users
     WHERE id = ?
+  `,
+  findUserById: `
+    SELECT name, email, phone, address
+    FROM users
+    WHERE id = ?
+  `,
+  updateProfile: `
+    UPDATE users
+    SET phone = ?, address = ?
+    WHERE id = ?
   `
 };
 

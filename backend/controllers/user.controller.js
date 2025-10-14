@@ -1,4 +1,4 @@
-const { query } = require('../config/db'); // your raw query helper
+const { query: runQuery } = require('../config/db'); // your raw query helper
 const ApiError = require('../utils/ApiError');
 const userQueries = require('../queries/userQueries');
 
@@ -98,6 +98,43 @@ const updateUserById = async (req, res, next) => {
   }
 };
 
+const getProfile = async (req, res, next) => {
+  try {
+    const [user] = await runQuery(userQueries.findUserById, [req.user.id]);
+    if (!user) {
+      throw new ApiError("User not found", 404);
+    }
+    res.status(200).json({
+      fullName: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: JSON.parse(user.address || '{}'), // Assuming address is stored as JSON
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateProfile = async (req, res, next) => {
+  try {
+    const { phone, address } = req.body;
+    const userId = req.user.id;
+
+    await runQuery(userQueries.updateProfile, [phone, JSON.stringify(address), userId]);
+
+    const [updatedUser] = await runQuery(userQueries.findUserById, [userId]);
+
+    res.status(200).json({
+      fullName: updatedUser.name,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      address: JSON.parse(updatedUser.address || '{}'),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Optional: Delete user
 const deleteUser = async (req, res, next) => {
   try {
@@ -117,5 +154,7 @@ module.exports = {
   getAllUsers,
   getDeliveryStaff,
   updateUserById,
+  getProfile,
+  updateProfile,
   deleteUser
 };

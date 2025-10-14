@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { RoleProvider } from "../../contexts/RoleContext";
+import UserPrivateRoute from "./UserPrivateRoute";
+
 
 // Admin Components
 import PrivateRoute from "../components/Admin/PrivateRoute";
@@ -21,6 +23,7 @@ import CartPage from "@/pages/User/CartPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 import UserLogin from "@/pages/Authpage/UserLogin";
+import UserProfile from "../pages/Profile/UserProfile";
 
 function App() {
   return (
@@ -35,6 +38,9 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:id" element={<ProductDetailPage />} />
+            <Route element={<UserPrivateRoute />}>
+              <Route path="profile" element={<UserProfile />} />
+            </Route>
           </Route>
 
           {/* ========== Admin Routes ========== */}
