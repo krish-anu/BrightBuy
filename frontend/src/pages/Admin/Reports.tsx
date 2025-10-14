@@ -30,6 +30,7 @@ const Reports: React.FC = () => {
   const [reportsData, setReportsData] = useState<ReportsData | null>(null);
   const [inventoryStats, setInventoryStats] = useState<any>(null);
   const [quarterlySales, setQuarterlySales] = useState<any>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [topProducts, setTopProducts] = useState<any>(null);
   const [customerSummaries, setCustomerSummaries] = useState<any[]>([]);
   const [upcomingDeliveries, setUpcomingDeliveries] = useState<any[]>([]);
@@ -47,7 +48,7 @@ const Reports: React.FC = () => {
       ]);
       // Fetch additional reports in parallel
       const [qs, tp, cs, ud] = await Promise.all([
-        getQuarterlySales(new Date().getFullYear()),
+        getQuarterlySales(selectedYear),
         getTopProducts(),
         getCustomerSummaries(),
         getUpcomingDeliveryEstimates()
@@ -76,10 +77,11 @@ const Reports: React.FC = () => {
     }
   };
 
-  // Load data on component mount
+  // Load data on component mount and when selectedYear changes
   useEffect(() => {
     loadReportsData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
 
   if (loading) {
     return (
@@ -344,7 +346,24 @@ const Reports: React.FC = () => {
             {/* Each report as its own main box */}
             <div className="col-span-1">
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quarterly Sales ({quarterlySales?.year || new Date().getFullYear()})</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Quarterly Sales ({quarterlySales?.year || selectedYear})</h3>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm text-gray-600">Year</label>
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                        className="border rounded-md p-1 text-sm"
+                      >
+                        {(() => {
+                          const current = new Date().getFullYear();
+                          const years = [] as number[];
+                          for (let i = 0; i < 6; i++) years.push(current - i);
+                          return years.map(y => <option key={y} value={y}>{y}</option>);
+                        })()}
+                      </select>
+                    </div>
+                  </div>
                 <ul className="space-y-2 text-sm">
                   {quarterlySales && Array.isArray(quarterlySales.quarters) && quarterlySales.quarters.length > 0 ? (
                     quarterlySales.quarters.map((q: any) => (

@@ -514,8 +514,30 @@ const getStats = async (req, res, next) => {
 const getQuarterlySales = async (req, res, next) => {
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
+    console.log(`Fetching quarterly sales for year=${year}`);
     const rows = await query(orderQueries.quarterlySalesByYear, [year]);
-    res.status(200).json({ success: true, data: { year, quarters: rows } });
+    console.log('Quarterly sales raw rows:', rows);
+
+    // If DB returned no rows, return a consistent four-quarter object with zeros
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.warn(`No quarterly sales rows found for year=${year}, returning zeroed quarters`);
+      const defaultQuarters = [
+        { quarter: 'Q1', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q2', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q3', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q4', totalOrders: 0, totalSales: 0 }
+      ];
+      return res.status(200).json({ success: true, data: { year, quarters: defaultQuarters } });
+    }
+
+    // Normalize numeric fields
+    const quarters = rows.map(r => ({
+      quarter: String(r.quarter),
+      totalOrders: Number(r.totalOrders) || 0,
+      totalSales: Number(r.totalSales) || 0
+    }));
+
+    res.status(200).json({ success: true, data: { year, quarters } });
   } catch (err) { next(err); }
 }
 
@@ -525,9 +547,46 @@ const getTopSellingProducts = async (req, res, next) => {
     const { startDate, endDate, limit } = req.query;
     const s = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     const e = endDate || new Date().toISOString().split('T')[0];
-    const l = Number(limit) || 10;
-    const rows = await query(orderQueries.topSellingProductsBetween, [s, e, l]);
-    res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products: rows } });
+    let l = Number(limit) || 10;
+    if (l < 5) l = 5; // enforce minimum requested limit
+
+    console.log('Top products query params:', { startDate: s, endDate: e, limit: l });
+
+    // First try the limited query. If it returns fewer than requested items
+    // (possible if there aren't many products with sales), fall back to the
+    // no-limit query and slice/pad to ensure we return at least 5 items.
+    const limitedRows = await query(orderQueries.topSellingProductsBetween, [s, e, l]);
+
+    let products = limitedRows || [];
+
+    // If DB returned fewer than the enforced minimum, fetch full ranked list and take top l
+    if (products.length < 5) {
+      console.log('Limited query returned fewer than 5 items, fetching full list as fallback');
+      const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
+      // Take top `l` from the full list
+      products = (allRows || []).slice(0, l);
+
+      // If still fewer than 5 overall (very small catalog), attempt to pad with products
+      // that have zero sales by fetching products and excluding those already present.
+      if (products.length < 5) {
+        const needed = 5 - products.length;
+        console.log(`Padding results with ${needed} additional products with zero sales`);
+        // Fetch products ordered by name to have deterministic padding
+        const allProducts = await query(`SELECT id AS productId, name AS productName FROM products ORDER BY name ASC`);
+        const existingIds = new Set(products.map(p => p.productId));
+        for (const p of allProducts) {
+          if (products.length >= 5) break;
+          if (!existingIds.has(p.productId)) {
+            products.push({ productId: p.productId, productName: p.productName, totalSold: 0 });
+          }
+        }
+      }
+    }
+
+    // Ensure we don't return more than requested limit
+    products = products.slice(0, l);
+
+    res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products } });
   } catch (err) { next(err); }
 }
 

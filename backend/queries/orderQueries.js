@@ -142,33 +142,53 @@ const getOrderStatusCounts = `
 `;
 
 // 4. Quarterly sales for a given year (use orderDate if present, otherwise createdAt)
+// Use a derived table to avoid ONLY_FULL_GROUP_BY issues on strict MySQL modes.
 const quarterlySalesByYear = `
-  SELECT 
-    CONCAT('Q', QUARTER(d)) AS quarter,
-    YEAR(d) AS year,
-    COUNT(*) AS totalOrders,
-    SUM(totalPrice) AS totalSales
+  SELECT CONCAT('Q', t.q) AS quarter, t.y AS year, COUNT(*) AS totalOrders, SUM(t.totalPrice) AS totalSales
   FROM (
-    SELECT COALESCE(orderDate, createdAt) AS d, totalPrice, status
+    SELECT YEAR(COALESCE(orderDate, createdAt)) AS y,
+           QUARTER(COALESCE(orderDate, createdAt)) AS q,
+           totalPrice
     FROM orders
-  ) AS sub
-  WHERE YEAR(d) = ? AND status != 'Cancelled'
-  GROUP BY YEAR(d), QUARTER(d)
-  ORDER BY QUARTER(d);
+    WHERE YEAR(COALESCE(orderDate, createdAt)) = ?
+      AND status != 'Cancelled'
+  ) t
+  GROUP BY t.y, t.q
+  ORDER BY t.q;
 `;
 
 // 5. Top selling products in a given period (startDate, endDate, limit)
 // Use LEFT JOIN so products with zero sales still appear (totalSold = 0)
 const topSellingProductsBetween = `
-  SELECT p.id AS productId, p.name AS productName, SUM(oi.quantity) AS totalSold
-  FROM order_items oi
-  JOIN orders o ON oi.orderId = o.id
-  JOIN products p ON oi.productId = p.id
-  WHERE COALESCE(o.orderDate, o.createdAt) BETWEEN ? AND ?
-    AND o.status != 'Cancelled'
-  GROUP BY p.id, p.name
-  ORDER BY totalSold DESC
-  LIMIT CAST(? AS UNSIGNED);
+  SELECT p.id AS productId, p.name AS productName, COALESCE(s.totalSold, 0) AS totalSold
+  FROM products p
+  LEFT JOIN (
+    SELECT pv.productId AS productId, SUM(oi.quantity) AS totalSold
+    FROM order_items oi
+    JOIN product_variants pv ON oi.variantId = pv.id
+    JOIN orders o ON oi.orderId = o.id
+    WHERE COALESCE(o.orderDate, o.createdAt) BETWEEN ? AND ?
+      AND o.status != 'Cancelled'
+    GROUP BY pv.productId
+  ) s ON s.productId = p.id
+  ORDER BY totalSold DESC, p.name ASC
+  LIMIT ?;
+`;
+
+// Same as above but without LIMIT — useful when caller wants the full ranked list
+const topSellingProductsBetweenNoLimit = `
+  SELECT p.id AS productId, p.name AS productName, COALESCE(s.totalSold, 0) AS totalSold
+  FROM products p
+  LEFT JOIN (
+    SELECT pv.productId AS productId, SUM(oi.quantity) AS totalSold
+    FROM order_items oi
+    JOIN product_variants pv ON oi.variantId = pv.id
+    JOIN orders o ON oi.orderId = o.id
+    WHERE COALESCE(o.orderDate, o.createdAt) BETWEEN ? AND ?
+      AND o.status != 'Cancelled'
+    GROUP BY pv.productId
+  ) s ON s.productId = p.id
+  ORDER BY totalSold DESC, p.name ASC;
 `;
 
 // 6. Customer-wise order summary and payment status

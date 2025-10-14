@@ -174,10 +174,40 @@ export const getQuarterlySales = async (year?: number) => {
     const params: any = {};
     if (year) params.year = year;
     const response = await axiosInstance.get('/api/order/reports/quarterly', { params });
-    return response.data.data;
+    const data = response.data.data || { year: year || new Date().getFullYear(), quarters: [] };
+
+    // Ensure we always return four quarters (Q1..Q4). If backend returned none
+    // (e.g. no orders for that year), provide zeros so the UI can render consistently.
+    const defaultQuarters = [
+      { quarter: 'Q1', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q2', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q3', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q4', totalOrders: 0, totalSales: 0 }
+    ];
+
+    if (!Array.isArray(data.quarters) || data.quarters.length === 0) {
+      return { year: data.year || year || new Date().getFullYear(), quarters: defaultQuarters };
+    }
+
+    // Normalize quarter objects (ensure numeric fields exist)
+    const quarters = defaultQuarters.map(d => {
+      const found = data.quarters.find((q: any) => String(q.quarter).toUpperCase() === d.quarter);
+      return found ? {
+        quarter: String(found.quarter),
+        totalOrders: Number(found.totalOrders) || 0,
+        totalSales: Number(found.totalSales) || 0
+      } : d;
+    });
+
+    return { year: data.year || year || new Date().getFullYear(), quarters };
   } catch (error) {
     console.error('Error fetching quarterly sales:', error);
-    return { year: year || new Date().getFullYear(), quarters: [] };
+    return { year: year || new Date().getFullYear(), quarters: [
+      { quarter: 'Q1', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q2', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q3', totalOrders: 0, totalSales: 0 },
+      { quarter: 'Q4', totalOrders: 0, totalSales: 0 }
+    ] };
   }
 }
 
