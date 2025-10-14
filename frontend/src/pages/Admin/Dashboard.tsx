@@ -65,9 +65,7 @@ const IconComponent: React.FC<IconComponentProps> = ({
   size = 24,
   color = "currentColor",
 }) => {
-  const Icon = LucideIcons[iconName] as React.FC<
-    React.SVGProps<SVGSVGElement>
-  >;
+  const Icon = LucideIcons[iconName] as React.FC<React.SVGProps<SVGSVGElement>>;
   return Icon ? (
     <Icon width={size} height={size} color={color} />
   ) : (
@@ -120,7 +118,7 @@ const Dashboard: React.FC = () => {
   const [totOrder, setTotOrders] = React.useState<number>(0);
   const [totLowStock, setTotLowStock] = React.useState<number>(0);
   const [salesOverTime, setSalesOverTime] = React.useState<MonthlySalesChart[]>(
-    []
+    [],
   );
   const [categoryData, setCategoryData] = React.useState<CategoryChart[]>([]);
   const [orderStatusOverview, setOrderStatusOverview] = React.useState<OrderStatusOverview>({

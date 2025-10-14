@@ -22,12 +22,16 @@ export const createCategory = async (name: string, parentId: number | null = nul
 };
 export const addProductsToCategory = async (categoryId: number, productIds: number[]) => {
   try {
-    const response = await axiosInstance.post(`api/category/addProductsCategory`, {
-      categoryId,
-      productIds,
-    });
+    const response = await axiosInstance.post(
+      `api/category/addProductsCategory`,
+      {
+        categoryId,
+        productIds,
+      },
+    );
     return response.data;
   } catch (error) {
     console.error("Error adding products to category:", error);
     throw error;
-  }}
+  }
+};

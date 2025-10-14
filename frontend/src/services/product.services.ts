@@ -127,6 +127,11 @@ export const addProduct = async (productData: any) => {
   }
 }
 
+export const getProductByID = async (id: string | number) => {
+  const res = await axiosInstance.get(`/api/product/${id}`);
+  return res.data; // your API likely returns { success, data }
+};
+
 // Brands
 export const getBrands = async (): Promise<{ id: number; name: string }[]> => {
   try {

@@ -16,7 +16,7 @@ interface AuthContextType {
   user: User | null;
   login: (
     email: string,
-    password: string
+    password: string,
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -58,47 +58,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Login function
-const login = async (email: string, password: string) => {
-  setIsLoading(true);
-  try {
-    const foundUser = await loginUser(email, password);
-    // console.log("foundUser", foundUser);
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const foundUser = await loginUser(email, password);
+      // console.log("foundUser", foundUser);
 
-    if (foundUser?.success) {
-      const backendUser = foundUser.user;
+      if (foundUser?.success) {
+        const backendUser = foundUser.user;
 
-      // Map backend response into our User type
-      const userWithoutPassword: User = {
-        id: backendUser.id ?? 0,         // if backend didn’t send, give default
-        username: backendUser.username ?? backendUser.email.split("@")[0],
-        name: backendUser.name ?? "Unknown",
-        email: backendUser.email,
-        role: backendUser.role,
-      };
+        // Map backend response into our User type
+        const userWithoutPassword: User = {
+          id: backendUser.id ?? 0, // if backend didn’t send, give default
+          username: backendUser.username ?? backendUser.email.split("@")[0],
+          name: backendUser.name ?? "Unknown",
+          email: backendUser.email,
+          role: backendUser.role,
+        };
 
-      setUser(userWithoutPassword);
-      Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-        expires: 7,
-      });
+        setUser(userWithoutPassword);
+        Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
+          expires: 7,
+        });
 
-      // console.log("User logged in:", userWithoutPassword);
+        // console.log("User logged in:", userWithoutPassword);
 
       // NOTE: navigation is handled by the calling page (login forms)
 
-      return { success: true, user: userWithoutPassword };
-    } else {
-      return {
-        success: false,
-        error: foundUser?.error || "Invalid username or password",
-      };
+        return { success: true, user: userWithoutPassword };
+      } else {
+        return {
+          success: false,
+          error: foundUser?.error || "Invalid username or password",
+        };
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      return { success: false, error: "Something went wrong" };
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error("Login error:", error);
-    return { success: false, error: "Something went wrong" };
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // Logout function
   const logout = () => {

@@ -12,7 +12,10 @@ interface IconComponentProps {
   size?: number;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+}) => {
   const Icon = LucideIcons[iconName] as React.ComponentType<LucideProps>;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
@@ -219,11 +222,12 @@ const Orders: React.FC = () => {
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString();
 
   // Safely stringify possible object fields (addresses, names) returned as JSON
   const stringifyField = (v: any) => {
@@ -333,7 +337,7 @@ const Orders: React.FC = () => {
               placeholder="Search by Order ID or Customer..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <IconComponent iconName="Search" size={16} />
@@ -343,7 +347,7 @@ const Orders: React.FC = () => {
           <select
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">All Statuses</option>
             <option value="assigned">Assigned</option>
