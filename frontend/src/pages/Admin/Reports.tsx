@@ -11,7 +11,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { getReportsData, getInventoryStats, getQuarterlySales, getTopProducts, getCustomerSummaries, getUpcomingDeliveryEstimates, getTopSellingProduct } from '../../services/reports.services';
+import { getReportsData, getInventoryStats, getQuarterlySales, getTopProducts, getUpcomingDeliveryEstimates, getTopSellingProduct } from '../../services/reports.services';
 import type { ReportsData } from '../../services/reports.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
@@ -32,7 +32,6 @@ const Reports: React.FC = () => {
   const [quarterlySales, setQuarterlySales] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [topProducts, setTopProducts] = useState<any>(null);
-  const [customerSummaries, setCustomerSummaries] = useState<any[]>([]);
   const [upcomingDeliveries, setUpcomingDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +46,9 @@ const Reports: React.FC = () => {
         getInventoryStats()
       ]);
       // Fetch additional reports in parallel
-      const [qs, tp, cs, ud] = await Promise.all([
+      const [qs, tp, ud] = await Promise.all([
         getQuarterlySales(selectedYear),
         getTopProducts(),
-        getCustomerSummaries(),
         getUpcomingDeliveryEstimates()
       ]);
       // Fallback: if backend didn't return top products, compute top product client-side
@@ -66,8 +64,9 @@ const Reports: React.FC = () => {
       setReportsData(reports);
       setInventoryStats(inventory);
       setQuarterlySales(qs);
-      setTopProducts(topProductsFallback);
-      setCustomerSummaries(cs || []);
+  setTopProducts(topProductsFallback);
+  // customer summaries intentionally not used in UI yet
+  // setCustomerSummaries(cs || []);
       setUpcomingDeliveries(ud || []);
     } catch (err) {
       console.error('Error loading reports data:', err);
@@ -343,9 +342,10 @@ const Reports: React.FC = () => {
             </div>
           </div>
 
-            {/* Each report as its own main box */}
-            <div className="col-span-1">
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            {/* Each report as its own main box - wrapped in a grid so col/span classes work */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div>
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">Quarterly Sales ({quarterlySales?.year || selectedYear})</h3>
                     <div className="flex items-center space-x-2">
@@ -364,92 +364,44 @@ const Reports: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                <ul className="space-y-2 text-sm">
-                  {quarterlySales && Array.isArray(quarterlySales.quarters) && quarterlySales.quarters.length > 0 ? (
-                    quarterlySales.quarters.map((q: any) => (
-                      <li key={q.quarter} className="flex justify-between">
-                        <span>{q.quarter}</span>
-                        <span className="font-medium">LKR {Number(q.totalSales || 0).toLocaleString()}</span>
-                      </li>
-                    ))
-                  ) : (
-                    <div className="text-gray-500">No data available for quarterly sales</div>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <div className="col-span-1">
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Products (Period)</h3>
-                <ol className="list-decimal list-inside text-sm space-y-1">
-                  {topProducts && Array.isArray(topProducts.products) && topProducts.products.length > 0 ? (
-                    topProducts.products.map((p: any) => (
-                      <li key={p.productId} className="flex justify-between">
-                        <span>{p.productName}</span>
-                        <span className="text-sm text-gray-600">{p.totalSold} units</span>
-                      </li>
-                    ))
-                  ) : (
-                    <div className="text-gray-500">No top product data available</div>
-                  )}
-                </ol>
-              </div>
-            </div>
-
-            <div className="col-span-1">
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Deliveries</h3>
-                <div className="text-sm space-y-2">
-                  {upcomingDeliveries && upcomingDeliveries.length > 0 ? (
-                    upcomingDeliveries.slice(0,12).map((o: any) => (
-                      <div key={o.orderId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <div>
-                          <div className="font-medium">Order #{o.orderId}</div>
-                          <div className="text-xs text-gray-600">{o.customerName} — Est: {o.estimatedDeliveryDate ? new Date(o.estimatedDeliveryDate).toLocaleDateString() : 'TBD'}</div>
-                        </div>
-                        <div className="text-sm text-gray-700">{o.orderStatus}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-gray-500">No upcoming deliveries</div>
-                  )}
+                  <ul className="space-y-2 text-sm">
+                    {quarterlySales && Array.isArray(quarterlySales.quarters) && quarterlySales.quarters.length > 0 ? (
+                      quarterlySales.quarters.map((q: any) => (
+                        <li key={q.quarter} className="flex justify-between">
+                          <span>{q.quarter}</span>
+                          <span className="font-medium">LKR {Number(q.totalSales || 0).toLocaleString()}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <div className="text-gray-500">No data available for quarterly sales</div>
+                    )}
+                  </ul>
                 </div>
               </div>
+
+              <div>
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Products (Period)</h3>
+                  <ol className="list-decimal list-inside text-sm space-y-1">
+                    {topProducts && Array.isArray(topProducts.products) && topProducts.products.length > 0 ? (
+                      topProducts.products.map((p: any) => (
+                        <li key={p.productId} className="flex justify-between">
+                          <span>{p.productName}</span>
+                          <span className="text-sm text-gray-600">{p.totalSold} units</span>
+                        </li>
+                      ))
+                    ) : (
+                      <div className="text-gray-500">No top product data available</div>
+                    )}
+                  </ol>
+                </div>
+              </div>
+
+              
             </div>
 
             {/* Customer Summaries Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Order Summaries</h3>
-              {customerSummaries && customerSummaries.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-xs text-gray-500 uppercase">
-                      <tr>
-                        <th className="px-2 py-2">Customer</th>
-                        <th className="px-2 py-2">Email</th>
-                        <th className="px-2 py-2">Orders</th>
-                        <th className="px-2 py-2">Total Spent</th>
-                        <th className="px-2 py-2">Last Order</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customerSummaries.map((c: any) => (
-                        <tr key={c.customerId} className="border-t">
-                          <td className="px-2 py-2">{c.customerName}</td>
-                          <td className="px-2 py-2">{c.customerEmail}</td>
-                          <td className="px-2 py-2">{c.totalOrders}</td>
-                          <td className="px-2 py-2">LKR {Number(c.totalSpent || 0).toLocaleString()}</td>
-                          <td className="px-2 py-2">{c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : 'N/A'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-gray-500">No customer summaries available</div>
-              )}
-            </div>
+            
         </div>
 
         {/* Order Status Breakdown */}
@@ -475,6 +427,26 @@ const Reports: React.FC = () => {
                 {reportsData && reportsData.orderStatusOverview ? reportsData.orderStatusOverview.Delivered || 0 : 0}
               </span>
             </div>
+            <div className="md:col-span-2">
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Deliveries</h3>
+                  <div className="text-sm space-y-2">
+                    {upcomingDeliveries && upcomingDeliveries.length > 0 ? (
+                      upcomingDeliveries.slice(0,12).map((o: any) => (
+                        <div key={o.orderId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <div>
+                            <div className="font-medium">Order #{o.orderId}</div>
+                            <div className="text-xs text-gray-600">{o.customerName} — Est: {o.estimatedDeliveryDate ? new Date(o.estimatedDeliveryDate).toLocaleDateString() : 'TBD'}</div>
+                          </div>
+                          <div className="text-sm text-gray-700">{o.orderStatus}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-gray-500">No upcoming deliveries</div>
+                    )}
+                  </div>
+                </div>
+              </div>
           </div>
         </div>
       </div>
