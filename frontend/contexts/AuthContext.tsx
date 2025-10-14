@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
-import { loginUser } from "../src/services/auth.services";
+import { loginUser, LOCAL_STORAGE__TOKEN, getCurrentUserFromToken } from "../src/services/auth.services";
 
 // Types
 interface User {
@@ -22,6 +22,7 @@ interface AuthContextType {
   isAuthenticated: () => boolean;
   hasRole: (roles: string[]) => boolean;
   isLoading: boolean;
+  authReady: boolean; // explicitly signals hydration finished
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,10 +41,12 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // true while performing network login/logout
+  const [authReady, setAuthReady] = useState(false); // becomes true after initial hydration
 
   // Check for existing user session on app load
   useEffect(() => {
+    // Rehydrate from cookie first (legacy) or from token if available
     const savedUser = Cookies.get("brightbuy_user");
     if (savedUser) {
       try {
@@ -53,9 +56,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error("Error parsing saved user:", error);
         Cookies.remove("brightbuy_user");
       }
+    } else {
+      // If no cookie user, attempt deriving from JWT in localStorage
+      const payload = getCurrentUserFromToken();
+      if (payload && payload.exp) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload.exp > nowSec) {
+          // Build minimal user object (requires backend to include email/role in token — we have id, role only)
+          setUser({
+            id: payload.id,
+            username: payload.id?.toString() || 'user',
+            name: 'User',
+            email: payload.email || 'unknown@local',
+            role: payload.role
+          });
+        }
+      }
     }
     setIsLoading(false);
+    setAuthReady(true);
   }, []);
+
+  // Track auto logout timer
+  useEffect(() => {
+  if (!user) return;
+    const token = localStorage.getItem(LOCAL_STORAGE__TOKEN);
+    if (!token) return;
+    const parts = token.split('.')
+    if (parts.length !== 3) return;
+    try {
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp) {
+        const msRemaining = payload.exp * 1000 - Date.now();
+        if (msRemaining > 0) {
+          const timeout = setTimeout(() => {
+            logout();
+          }, msRemaining);
+          return () => clearTimeout(timeout);
+        }
+      }
+    } catch {}
+  }, [user]);
 
   // Login function
   const login = async (email: string, password: string) => {
@@ -77,14 +118,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         setUser(userWithoutPassword);
+        // Persist in cookie (short lifetime) and let token carry session (10m)
         Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-          expires: 7,
+          // 10 minutes expressed as fraction of a day
+          expires: 10 / (60 * 24),
         });
 
         // console.log("User logged in:", userWithoutPassword);
 
       // NOTE: navigation is handled by the calling page (login forms)
 
+        // Attempt redirect to last path (handled outside typically, but we can emit event or set window location here if needed)
+        const lastPath = sessionStorage.getItem('brightbuy_last_path');
+        if (lastPath) {
+          sessionStorage.removeItem('brightbuy_last_path');
+          // Defer navigation responsibility to caller; optionally we could expose lastPath via context.
+        }
         return { success: true, user: userWithoutPassword };
       } else {
         return {
@@ -118,6 +167,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     hasRole,
     isLoading,
+    authReady,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
