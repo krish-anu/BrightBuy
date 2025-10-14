@@ -417,20 +417,16 @@ const Reports: React.FC = () => {
                         <th className="py-2 pr-4 text-right">Orders</th>
                         <th className="py-2 pr-4 text-right">Total Spent</th>
                         <th className="py-2 pr-4">Last Order</th>
-                        <th className="py-2 pr-4">Payment Statuses</th>
+                        <th className="py-2 pr-4">Payment Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {customerSummaries.slice(0, 10).map((c: any) => {
-                        const statusesRaw = (c.paymentStatuses ?? '').toString();
-                        const statuses: string[] = Array.from(new Set<string>(
-                          statusesRaw.split(',').map((s: string) => s.trim()).filter(Boolean)
-                        ));
-                        const badgeClass = (s: string) => {
-                          const v = s.toLowerCase();
-                          if (v === 'paid' || v === 'succeeded') return 'bg-green-100 text-green-700 border-green-200';
-                          if (v === 'pending' || v === 'requires_payment_method') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-                          if (v === 'cancelled' || v === 'canceled' || v === 'failed') return 'bg-red-100 text-red-700 border-red-200';
+                        const s = (c.aggPaymentStatus || '').toString();
+                        const badgeClass = (v: string) => {
+                          const t = v.toLowerCase();
+                          if (t === 'paid') return 'bg-green-100 text-green-700 border-green-200';
+                          if (t === 'pending') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
                           return 'bg-gray-100 text-gray-700 border-gray-200';
                         };
                         return (
@@ -441,15 +437,7 @@ const Reports: React.FC = () => {
                             <td className="py-2 pr-4 text-right">LKR {Number(c.totalSpent || 0).toLocaleString()}</td>
                             <td className="py-2 pr-4 text-gray-700">{c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : '—'}</td>
                             <td className="py-2 pr-4">
-                              <div className="flex flex-wrap gap-1">
-                                {statuses.length > 0 ? (
-                                  statuses.map((s: string, idx: number) => (
-                                    <span key={idx} className={`px-2 py-0.5 rounded-full border text-xs ${badgeClass(s)}`}>{s}</span>
-                                  ))
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-full border text-xs bg-gray-100 text-gray-700 border-gray-200">Unknown</span>
-                                )}
-                              </div>
+                              <span className={`px-2 py-0.5 rounded-full border text-xs ${badgeClass(s || 'Pending')}`}>{s || 'Pending'}</span>
                             </td>
                           </tr>
                         );

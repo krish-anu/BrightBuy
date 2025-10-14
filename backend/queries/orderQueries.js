@@ -204,7 +204,13 @@ const customerOrderSummary = `
     COUNT(o.id) AS totalOrders,
     COALESCE(SUM(o.totalPrice), 0) AS totalSpent,
     MAX(COALESCE(o.orderDate, o.createdAt)) AS lastOrderDate,
-    GROUP_CONCAT(DISTINCT p.status ORDER BY p.status SEPARATOR ',') AS paymentStatuses
+    GROUP_CONCAT(DISTINCT p.status ORDER BY p.status SEPARATOR ',') AS paymentStatuses,
+    CASE 
+      WHEN COUNT(o.id) > 0 
+           AND SUM(CASE WHEN p.status = 'Paid' THEN 1 ELSE 0 END) = COUNT(o.id)
+        THEN 'Paid'
+      ELSE 'Pending'
+    END AS aggPaymentStatus
   FROM users u
   LEFT JOIN orders o 
     ON u.id = o.userId 
@@ -213,6 +219,7 @@ const customerOrderSummary = `
     ON o.id = p.orderId
   WHERE u.role = 'Customer'
   GROUP BY u.id, u.name, u.email
+  HAVING COUNT(o.id) > 0
   ORDER BY totalSpent DESC
   LIMIT 10;
 `;
