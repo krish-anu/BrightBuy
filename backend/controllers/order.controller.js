@@ -13,7 +13,27 @@ const stripe = require('stripe')(STRIPE_SECRET_KEY);
 const getOrders = async (req, res, next) => {
   try {
     const rows = await query(orderQueries.getAllOrders);
-    res.status(200).json({ success: true, data: rows });
+    
+    // Transform the data to include customer object and fetch order items
+    const ordersWithCustomersAndItems = await Promise.all(rows.map(async (row) => {
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      
+      // Fetch order items for each order
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [orderData.id]);
+      
+      return {
+        ...orderData,
+        customer: customerId ? {
+          id: customerId,
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone
+        } : null,
+        items: orderItems
+      };
+    }));
+    
+    res.status(200).json({ success: true, data: ordersWithCustomersAndItems });
   } catch (err) { next(err); }
 };
 
@@ -24,8 +44,23 @@ const getOrder = async (req, res, next) => {
     if (!orders.length) throw new ApiError('Order not found', 404);
     if (req.user.role === 'Customer' && orders[0].userId !== req.user.id)
       throw new ApiError('Forbidden access', 403)
+    
     const orderItems = await query(orderQueries.getOrderItemsByOrderId, [req.params.id]);
-    res.status(200).json({ success: true, data: { ...orders[0], items: orderItems } });
+    
+    // Transform the order data to include customer object
+    const { customerId, customerName, customerEmail, customerPhone, ...orderData } = orders[0];
+    const orderWithCustomer = {
+      ...orderData,
+      customer: customerId ? {
+        id: customerId,
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone
+      } : null,
+      items: orderItems
+    };
+    
+    res.status(200).json({ success: true, data: orderWithCustomer });
   } catch (err) { next(err); }
 };
 
@@ -52,7 +87,6 @@ const addOrder = async (req, res, next) => {
     }
 
     const address = deliveryAddress || null;
-
     const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
       await calculateOrderDetails(items, deliveryMode, address, req.user, connection);
 
@@ -184,24 +218,16 @@ const cancelOrder = async (req, res, next) => {
 // Get category-wise orders
 const getCategoryWiseOrders = async (req, res, next) => {
   try {
+    console.log("Fetching category wise orders...");
     const rows = await query(orderQueries.getCategoryWiseOrders);
+    console.log("Category wise orders raw result:", rows);
 
-    const categoryOrders = {};
-    let totalOrders = 0;
-    for (const row of rows) {
-      const parent = row.parentId;
-      const child = row.categoryId;
-      const count = parseInt(row.orderCount);
-      if (parent !== null) {
-        if (!categoryOrders[parent]) categoryOrders[parent] = { category: 'Parent', totalOrders: 0, subcategories: {} };
-        categoryOrders[parent].totalOrders += count;
-        categoryOrders[parent].subcategories[child] = { categoryName: row.categoryName, order: count };
-      }
-      totalOrders += count;
-    }
-
-    res.status(200).json({ success: true, data: { categoryOrders, totalOrders } });
-  } catch (err) { next(err); }
+    // Return the raw data directly - the frontend expects an array of category objects
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { 
+    console.error("Error in getCategoryWiseOrders:", err);
+    next(err); 
+  }
 };
 
 // Get total revenue
@@ -237,10 +263,69 @@ const getOrderStatus = async (req, res, next) => {
 
     if (order.deliveryMode === 'Standard Delivery') {
       result.deliveryAddress = order.deliveryAddress;
-      result.estimatedDeliveryDate = order.estimatedDeliveryDate;
+      // Compute estimated delivery date: prefer orderDate else createdAt, add 3 days
+      const base = order.orderDate || order.createdAt;
+      try {
+        const d = new Date(base);
+        d.setDate(d.getDate() + 3);
+        result.estimatedDeliveryDate = d.toISOString();
+      } catch (e) {
+        result.estimatedDeliveryDate = null;
+      }
     }
 
     res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get orders assigned to the authenticated delivery/warehouse staff
+const getAssignedOrders = async (req, res, next) => {
+  try {
+    const role = (req.user.role || '').toString().toLowerCase();
+    let rows = [];
+
+    // If WarehouseStaff should see the same orders as Admin, fetch all orders for them
+    if (role === 'warehousestaff' || role === 'warehouse') {
+      rows = await query(orderQueries.getAllOrders);
+    } else {
+      const staffId = req.user.id;
+      rows = await query(orderQueries.getOrdersAssignedToStaff, [staffId]);
+    }
+
+    // Transform the data to include order items for each order
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+    res.status(200).json({ success: true, data: ordersWithItems });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin/SuperAdmin: Get orders with status 'Shipped' so admin can assign delivery staff
+const getShippedOrders = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getShippedOrders);
+
+    const ordersWithItems = await Promise.all(rows.map(async (row) => {
+      const orderItems = await query(orderQueries.getOrderItemsByOrderId, [row.id]);
+      const { customerId, customerName, customerEmail, customerPhone, ...orderData } = row;
+      return {
+        ...orderData,
+        customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+        items: orderItems
+      };
+    }));
+
+    res.status(200).json({ success: true, data: ordersWithItems });
   } catch (err) {
     next(err);
   }
@@ -262,7 +347,11 @@ const updateOrderStatus = async (req, res, next) => {
 
     if (!orderRows.length) throw new ApiError('Order not found', 404);
     const order = orderRows[0];
-    const { status } = req.body;
+  const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+  let { status } = req.body;
+  if (!status) throw new ApiError('Status is required', 400);
+  // Normalize status to Title Case (e.g., 'shipped' -> 'Shipped') to avoid casing issues
+  status = String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase();
 
     // Validate transition
     const isValid = await isValidUpdate(status, order.status);
@@ -307,8 +396,12 @@ const updateOrderStatus = async (req, res, next) => {
       }
       
     }
-    if (status === 'Delivered' && order.paymentMethod === 'Card') {
-      if (order.deliveryId && order.deliveryStaffId !== req.user.id) {
+    // --- Case: Delivered ---
+    else if (status === 'Delivered') {
+      // Only allow delivery staff to mark delivered when there's a delivery record
+      // Admins and SuperAdmins can also update delivery status
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
         throw new ApiError('Forbidden access', 403);
       }
       await connection.query(
@@ -322,14 +415,49 @@ const updateOrderStatus = async (req, res, next) => {
         );
       }
     }
+    // --- Case: Simple status updates (Confirmed, Pending) ---
+    else if (['Confirmed', 'Pending'].includes(status)) {
+      await connection.query(
+        `UPDATE orders SET status = ? WHERE id = ?`,
+        [status, order.id]
+      );
+    }
     else {
+      // For any other status not explicitly handled above (e.g., Cancelled),
+      // prevent non-assigned delivery staff from updating delivery-specific orders.
+      // Admins and SuperAdmins may bypass this restriction.
+      if (order.deliveryId && userRole !== 'admin' && userRole !== 'superadmin' && order.deliveryStaffId !== req.user.id) {
+        console.warn(`updateOrderStatus forbidden: requester=${req.user.id} role=${req.user.role} deliveryStaffId=${order.deliveryStaffId} orderId=${order.id}`);
+        throw new ApiError('Forbidden access', 403);
+      }
       throw new ApiError("Invalid update", 400);
     }
 
 
-    // Commit transaction
-    await connection.commit();
-    res.status(200).json({ success: true, message: 'Order status updated' });
+  // Commit transaction
+  await connection.commit();
+
+  // Fetch and return updated order details so frontend can update state
+  // Select order with joined user fields to construct customer object (same shape as getOrder/getOrders)
+  const [updatedRows] = await connection.query(
+    `SELECT o.*, u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
+     FROM orders o
+     LEFT JOIN users u ON o.userId = u.id
+     WHERE o.id = ?`,
+    [order.id]
+  );
+  const updatedOrderRow = updatedRows[0];
+  const [orderItems] = await connection.query(orderQueries.getOrderItemsByOrderId, [order.id]);
+
+  // Build response object matching getOrder/getOrders shape
+  const { customerId, customerName, customerEmail, customerPhone, ...orderData } = updatedOrderRow;
+  const updatedOrder = {
+    ...orderData,
+    customer: customerId ? { id: customerId, name: customerName, email: customerEmail, phone: customerPhone } : null,
+    items: orderItems
+  };
+
+  res.status(200).json({ success: true, data: updatedOrder });
   } catch (error) {
     await connection.rollback();
     next(error);
@@ -346,8 +474,124 @@ const getTotalOrders = async (req, res, next) => {
     next(err);
   }
 }
+const getStats = async (req, res, next) => {  
+  try {
+    const [totalOrders] = await query(orderQueries.getTotalOrders);
+    const [totalRevenue] = await query(orderQueries.getTotalRevenue);
+    const [categoryWiseOrders] = await query(orderQueries.getCategoryWiseOrders);
+    const orderStatusCounts = await query(orderQueries.getOrderStatusCounts);
 
+    // Process order status counts to ensure all statuses are included
+    const statusOverview = {
+      Pending: 0,
+      Confirmed: 0,
+      Shipped: 0,
+      Delivered: 0,
+      Cancelled: 0
+    };
 
+    // Fill in the actual counts from database
+    orderStatusCounts.forEach(row => {
+      if (statusOverview.hasOwnProperty(row.status)) {
+        statusOverview[row.status] = row.count;
+      }
+    });
+
+    const stats = {
+      totalOrders: totalOrders?.totalOrders ?? 0,
+      totalRevenue: totalRevenue?.totalRevenue ?? 0,
+      categoryWiseOrders: categoryWiseOrders ?? [],
+      orderStatusOverview: statusOverview
+    };
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Quarterly sales for a given year
+const getQuarterlySales = async (req, res, next) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    console.log(`Fetching quarterly sales for year=${year}`);
+    const rows = await query(orderQueries.quarterlySalesByYear, [year]);
+    console.log('Quarterly sales raw rows:', rows);
+
+    // If DB returned no rows, return a consistent four-quarter object with zeros
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.warn(`No quarterly sales rows found for year=${year}, returning zeroed quarters`);
+      const defaultQuarters = [
+        { quarter: 'Q1', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q2', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q3', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q4', totalOrders: 0, totalSales: 0 }
+      ];
+      return res.status(200).json({ success: true, data: { year, quarters: defaultQuarters } });
+    }
+
+    // Normalize numeric fields
+    const quarters = rows.map(r => ({
+      quarter: String(r.quarter),
+      totalOrders: Number(r.totalOrders) || 0,
+      totalSales: Number(r.totalSales) || 0
+    }));
+
+    res.status(200).json({ success: true, data: { year, quarters } });
+  } catch (err) { next(err); }
+}
+
+// Top selling products in a period
+const getTopSellingProducts = async (req, res, next) => {
+  try {
+    const { startDate, endDate, limit } = req.query;
+    const s = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    const e = endDate || new Date().toISOString().split('T')[0];
+    let l = Number(limit) || 10;
+    if (l < 5) l = 5; // enforce minimum requested limit
+
+    console.log('Top products query params:', { startDate: s, endDate: e, limit: l });
+
+    // Always use the no-limit query (avoids LIMIT parameter issues on some MySQL setups)
+    const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
+    let products = (allRows || []).slice(0, l);
+
+    // If still fewer than 5 overall (very small catalog), attempt to pad with products
+    // that have zero sales by fetching products and excluding those already present.
+    if (products.length < 5) {
+      const needed = 5 - products.length;
+      console.log(`Padding results with ${needed} additional products with zero sales`);
+      const allProducts = await query(`SELECT id AS productId, name AS productName FROM products ORDER BY name ASC`);
+      const existingIds = new Set(products.map(p => p.productId));
+      for (const p of allProducts) {
+        if (products.length >= 5) break;
+        if (!existingIds.has(p.productId)) {
+          products.push({ productId: p.productId, productName: p.productName, totalSold: 0 });
+        }
+      }
+    }
+
+    // Cap to requested limit
+    products = products.slice(0, l);
+
+    res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products } });
+  } catch (err) { next(err); }
+}
+
+// Customer-wise order summary and payment status
+const getCustomerOrderSummary = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.customerOrderSummary);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+// Upcoming orders with delivery time estimates
+const getUpcomingDeliveryEstimates = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getUpcomingOrdersWithEstimates);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
 
 module.exports = {
   getOrders,
@@ -359,5 +603,13 @@ module.exports = {
   getTotalRevenue,
   getOrderStatus,
   updateOrderStatus,
-  getTotalOrders
+  getAssignedOrders,
+  getShippedOrders,
+  getTotalOrders,
+  getStats,
+  // New report endpoints
+  getQuarterlySales,
+  getTopSellingProducts,
+  getCustomerOrderSummary,
+  getUpcomingDeliveryEstimates
 };

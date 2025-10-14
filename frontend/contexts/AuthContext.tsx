@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Cookies from "js-cookie";
-import { loginUser } from "../src/services/auth.services";
-import { useNavigate } from "react-router-dom";
+import { loginUser, LOCAL_STORAGE__TOKEN, getCurrentUserFromToken } from "../src/services/auth.services";
 
 // Types
 interface User {
@@ -17,12 +16,13 @@ interface AuthContextType {
   user: User | null;
   login: (
     email: string,
-    password: string
+    password: string,
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
   hasRole: (roles: string[]) => boolean;
   isLoading: boolean;
+  authReady: boolean; // explicitly signals hydration finished
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,11 +41,12 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true); // true while performing network login/logout
+  const [authReady, setAuthReady] = useState(false); // becomes true after initial hydration
 
   // Check for existing user session on app load
   useEffect(() => {
+    // Rehydrate from cookie first (legacy) or from token if available
     const savedUser = Cookies.get("brightbuy_user");
     if (savedUser) {
       try {
@@ -55,63 +56,98 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error("Error parsing saved user:", error);
         Cookies.remove("brightbuy_user");
       }
+    } else {
+      // If no cookie user, attempt deriving from JWT in localStorage
+      const payload = getCurrentUserFromToken();
+      if (payload && payload.exp) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload.exp > nowSec) {
+          // Build minimal user object (requires backend to include email/role in token — we have id, role only)
+          setUser({
+            id: payload.id,
+            username: payload.id?.toString() || 'user',
+            name: 'User',
+            email: payload.email || 'unknown@local',
+            role: payload.role
+          });
+        }
+      }
     }
     setIsLoading(false);
+    setAuthReady(true);
   }, []);
 
-  // Login function
-const login = async (email: string, password: string) => {
-  setIsLoading(true);
-  try {
-    const foundUser = await loginUser(email, password);
-    // console.log("foundUser", foundUser);
-
-    if (foundUser?.success) {
-      const backendUser = foundUser.user;
-
-      // Map backend response into our User type
-      const userWithoutPassword: User = {
-        id: backendUser.id ?? 0,         // if backend didn’t send, give default
-        username: backendUser.username ?? backendUser.email.split("@")[0],
-        name: backendUser.name ?? "Unknown",
-        email: backendUser.email,
-        role: backendUser.role,
-      };
-
-      setUser(userWithoutPassword);
-      Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
-        expires: 7,
-      });
-
-      // console.log("User logged in:", userWithoutPassword);
-
-      // Redirect based on role
-      if (userWithoutPassword.role === "SuperAdmin") {
-        navigate("/superadmin");
-      } else if (userWithoutPassword.role === "Admin") {
-        navigate("/admin");
-      } else if (userWithoutPassword.role === "WarehouseStaff") {
-        navigate("/admin/inventory");
-      } else if (userWithoutPassword.role === "DeliveryStaff") {
-        navigate("/admin/deliveries");
-      } else {
-        navigate("/shop");
+  // Track auto logout timer
+  useEffect(() => {
+  if (!user) return;
+    const token = localStorage.getItem(LOCAL_STORAGE__TOKEN);
+    if (!token) return;
+    const parts = token.split('.')
+    if (parts.length !== 3) return;
+    try {
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp) {
+        const msRemaining = payload.exp * 1000 - Date.now();
+        if (msRemaining > 0) {
+          const timeout = setTimeout(() => {
+            logout();
+          }, msRemaining);
+          return () => clearTimeout(timeout);
+        }
       }
+    } catch {}
+  }, [user]);
 
-      return { success: true, user: userWithoutPassword };
-    } else {
-      return {
-        success: false,
-        error: foundUser?.error || "Invalid username or password",
-      };
+  // Login function
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const foundUser = await loginUser(email, password);
+      // console.log("foundUser", foundUser);
+
+      if (foundUser?.success) {
+        const backendUser = foundUser.user;
+
+        // Map backend response into our User type
+        const userWithoutPassword: User = {
+          id: backendUser.id ?? 0, // if backend didn’t send, give default
+          username: backendUser.username ?? backendUser.email.split("@")[0],
+          name: backendUser.name ?? "Unknown",
+          email: backendUser.email,
+          role: backendUser.role,
+        };
+
+        setUser(userWithoutPassword);
+        // Persist in cookie (short lifetime) and let token carry session (10m)
+        Cookies.set("brightbuy_user", JSON.stringify(userWithoutPassword), {
+          // 10 minutes expressed as fraction of a day
+          expires: 10 / (60 * 24),
+        });
+
+        // console.log("User logged in:", userWithoutPassword);
+
+      // NOTE: navigation is handled by the calling page (login forms)
+
+        // Attempt redirect to last path (handled outside typically, but we can emit event or set window location here if needed)
+        const lastPath = sessionStorage.getItem('brightbuy_last_path');
+        if (lastPath) {
+          sessionStorage.removeItem('brightbuy_last_path');
+          // Defer navigation responsibility to caller; optionally we could expose lastPath via context.
+        }
+        return { success: true, user: userWithoutPassword };
+      } else {
+        return {
+          success: false,
+          error: foundUser?.error || "Invalid username or password",
+        };
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      return { success: false, error: "Something went wrong" };
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error("Login error:", error);
-    return { success: false, error: "Something went wrong" };
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // Logout function
   const logout = () => {
@@ -131,6 +167,7 @@ const login = async (email: string, password: string) => {
     isAuthenticated,
     hasRole,
     isLoading,
+    authReady,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

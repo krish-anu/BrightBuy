@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
+import axiosInstance from '../../axiosConfig';
+import { useNavigate } from 'react-router-dom';
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -7,10 +9,19 @@ interface IconComponentProps {
   className?: string;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20, className }) => {
-  const Icon =
-    LucideIcons[iconName] as React.ComponentType<LucideIcons.LucideProps> | undefined;
-  return Icon ? <Icon size={size} className={className} /> : <LucideIcons.Circle size={size} />;
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+  className,
+}) => {
+  const Icon = LucideIcons[iconName] as
+    | React.ComponentType<LucideIcons.LucideProps>
+    | undefined;
+  return Icon ? (
+    <Icon size={size} className={className} />
+  ) : (
+    <LucideIcons.Circle size={size} />
+  );
 };
 
 const UserSignup: React.FC = () => {
@@ -20,6 +31,12 @@ const UserSignup: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  // Determine if this signup is for admin creation (show role dropdown)
+  const isAdminSignup = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('admin') === 'true' || window.location.pathname.toLowerCase().includes('/admin'));
+  const [role, setRole] = useState<string>(isAdminSignup ? 'Admin' : 'Customer');
+
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -35,8 +52,23 @@ const UserSignup: React.FC = () => {
       return;
     }
 
-    // Just show an alert for demo
-    alert(`Signup Success!\nName: ${name}\nEmail: ${email}`);
+    // Call backend register endpoint
+    (async () => {
+      try {
+        const payload: any = { name, email, password, role };
+        const res = await axiosInstance.post('/api/auth/register', payload);
+        if (res.status === 201) {
+          // redirect to login page; carry admin query if present
+          const loginUrl = isAdminSignup ? '/login?admin=true' : '/login';
+          navigate(loginUrl);
+        } else {
+          setError(res.data?.message || 'Registration failed');
+        }
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || 'Registration failed';
+        setError(String(msg));
+      }
+    })();
   };
 
   return (
@@ -48,16 +80,22 @@ const UserSignup: React.FC = () => {
             <IconComponent iconName="UserPlus" size={28} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center text-gray-900">Create Account</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-900">
+          Create Account
+        </h2>
         <p className="mt-1 text-center text-gray-500 text-sm">
-          Join <span className="font-semibold">BrightBuy</span> today and start shopping
+          Join <span className="font-semibold">BrightBuy</span> today and start
+          shopping
         </p>
 
         {/* Form */}
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           {/* Full Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
               Full Name
             </label>
             <div className="relative mt-1">
@@ -76,7 +114,10 @@ const UserSignup: React.FC = () => {
 
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
               Email Address
             </label>
             <div className="relative mt-1">
@@ -95,7 +136,10 @@ const UserSignup: React.FC = () => {
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700"
+            >
               Password
             </label>
             <div className="relative mt-1">
@@ -114,14 +158,20 @@ const UserSignup: React.FC = () => {
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                <IconComponent iconName={showPassword ? "EyeOff" : "Eye"} size={18} />
+                <IconComponent
+                  iconName={showPassword ? "EyeOff" : "Eye"}
+                  size={18}
+                />
               </button>
             </div>
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700"
+            >
               Confirm Password
             </label>
             <div className="relative mt-1">
@@ -146,6 +196,26 @@ const UserSignup: React.FC = () => {
             </div>
           )}
 
+          {/* Role selection for admin signup */}
+          {isAdminSignup && (
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                Role
+              </label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="Admin">Admin</option>
+                <option value="SuperAdmin">SuperAdmin</option>
+                <option value="WarehouseStaff">WarehouseStaff</option>
+                <option value="DeliveryStaff">DeliveryStaff</option>
+              </select>
+            </div>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
@@ -159,7 +229,10 @@ const UserSignup: React.FC = () => {
         {/* Login link */}
         <p className="mt-5 text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <a href="/userlogin" className="text-primary hover:underline font-medium">
+          <a
+            href="/userlogin"
+            className="text-primary hover:underline font-medium"
+          >
             Sign in
           </a>
         </p>

@@ -17,8 +17,13 @@ interface RouteItem {
   icon: LucideIconName;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
-  const Icon = LucideIcons[iconName] as React.ComponentType<LucideIcons.LucideProps>| undefined;
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+}) => {
+  const Icon = LucideIcons[iconName] as
+    | React.ComponentType<LucideIcons.LucideProps>
+    | undefined;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
 
@@ -39,7 +44,11 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
 
   const routes: RouteItem[] = getCurrentUserRoutes() as RouteItem[];
- 
+  // const isSuperAdmin = user?.role === 'SuperAdmin';
+
+  // Delivery assignment summary state (SuperAdmin only)
+  // Removed Assigned Deliveries summary section for SuperAdmin
+
   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
 
@@ -101,13 +110,15 @@ const Sidebar: React.FC = () => {
             <div className="text-sm text-gray-300">
               <p className="font-medium">{user.name}</p>
               <p className="text-xs text-gray-400">{user.email}</p>
-              <p className="text-xs text-blue-400 mt-1">{getCurrentRoleName()}</p>
+              <p className="text-xs text-blue-400 mt-1">
+                {getCurrentRoleName()}
+              </p>
             </div>
           </div>
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {routes.map((route) => {
             const isActive = location.pathname === route.path;
             return (
@@ -132,6 +143,8 @@ const Sidebar: React.FC = () => {
               </Link>
             );
           })}
+
+          {/* Removed Assigned Deliveries section for SuperAdmin */}
         </nav>
 
         {/* Footer */}

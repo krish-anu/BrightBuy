@@ -371,6 +371,31 @@ const getPopularVariants = async (req, res, next) => {
   }
 };
 
+// Set or update variant image URL
+const setVariantImage = async (req, res, next) => {
+  const connection = await pool.getConnection();
+  try {
+    const { imageURL } = req.body;
+    const variantId = req.params.id;
+
+    await connection.beginTransaction();
+
+    const [variantRows] = await connection.query(variantQueries.getVariantById, [variantId]);
+    if (!variantRows.length) throw new ApiError("Variant not found", 404);
+
+    await connection.query(productQueries.updateVariantImage, [imageURL || null, variantId]);
+
+    await connection.commit();
+
+    res.status(200).json({ success: true, message: "Variant image updated", data: { id: variantId, imageURL: imageURL || null } });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    next(error);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 module.exports = {
   getVariants,
   getVariant,
@@ -384,4 +409,5 @@ module.exports = {
   getPopularVariants,
   addVariantAttributes,
   getTotalLowStockVariants,
+  setVariantImage,
 };

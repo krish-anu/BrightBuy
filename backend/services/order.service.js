@@ -3,18 +3,31 @@ const ApiError = require('../utils/ApiError');
 const { updateStock, } = require('../services/variant.service')
 
 const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
-  const orderId = await createOrder(userId, deliveryMode, JSON.stringify(finalAddress), deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection);
+  // Insert address if provided (Standard Delivery) and capture id
+  let deliveryAddressId = null;
+  if (deliveryMode === 'Standard Delivery' && finalAddress && typeof finalAddress === 'object') {
+    const line1 = finalAddress.line1 || '';
+    const line2 = finalAddress.line2 || null;
+    const city = finalAddress.city || '';
+    const postalCode = finalAddress.postalCode || null;
+    if (line1 && city) {
+      const addrRes = await connection.query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
+      const r = Array.isArray(addrRes) ? addrRes[0] : addrRes;
+      deliveryAddressId = r.insertId || r?.insertId;
+    }
+  }
+  const orderId = await createOrder(userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, connection);
   await addOrderItems(orderId, items, connection);
   return getOrderDetails(orderId, connection);
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod,connection) => {
+const createOrder = async (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod,connection) => {
   const status = paymentMethod === 'CashOnDelivery' ? 'Confirmed' : 'Pending';
   const sql = `
-    INSERT INTO orders (userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
-  const values = [userId, deliveryMode, deliveryAddress, estimatedDeliveryDate, totalPrice, deliveryCharge, paymentMethod, status];
+  const values = [userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status];
   const [result] = await connection.query(sql, values);
   return result.insertId;
 };
@@ -58,9 +71,11 @@ const getOrderDetails = async (orderId, connection) => {
 
   const order = orders[0];
   const [items] = await connection.query(`
-    SELECT oi.*, pv.variantName, pv.SKU, pv.price, pv.stockQnt
+    SELECT oi.*, pv.variantName, pv.SKU, pv.price AS variantPrice, pv.stockQnt,
+           p.id AS productId, p.name AS productName
     FROM order_items oi
-    JOIN product_variants pv ON oi.variantId = pv.id
+    LEFT JOIN product_variants pv ON oi.variantId = pv.id
+    LEFT JOIN products p ON pv.productId = p.id
     WHERE oi.orderId = ?
   `, [orderId]);
 
@@ -80,11 +95,15 @@ const isValidUpdate = async (newStatus, currStatus) => {
   };
 
   if (!(newStatus in validStatus)) {
-    throw new ApiError('Invalid status', 400);
+    throw new ApiError(`Invalid status: ${newStatus}`, 400);
+  }
+
+  if (!(currStatus in validStatus)) {
+    throw new ApiError(`Invalid current status in DB: ${currStatus}`, 500);
   }
 
   if (validStatus[newStatus] <= validStatus[currStatus]) {
-    throw new ApiError('Invalid update', 400);
+    throw new ApiError(`Invalid update from ${currStatus} to ${newStatus}`, 400);
   }
 
   return true;

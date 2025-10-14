@@ -7,7 +7,7 @@ const ApiError = require('../utils/ApiError');
 // Register user
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, role, address, phone, cityId } = req.body;
+  const { name, email, password, role, address, phone, cityId } = req.body;
 
     // Check if user already exists
     const existingUsers = await query(userQueries.getByEmail, [email]);
@@ -18,16 +18,30 @@ const registerUser = async (req, res, next) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
+    // Insert address row if provided
+    let addressId = null;
+    if (address && typeof address === 'object' && (address.line1 || address.city)) {
+      const line1 = address.line1 || '';
+      const line2 = address.line2 || null;
+      const city = address.city || '';
+      const postalCode = address.postalCode || null;
+      if (line1 && city) {
+        const addrRes = await query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
+        addressId = addrRes.insertId || addrRes[0]?.insertId;
+      }
+    }
+
+    const assignedRole = role || 'Customer';
+    const autoApproved = ['Customer', 'SuperAdmin'].includes(assignedRole) ? 1 : 0;
     await query(userQueries.insert, [
       name,
       email,
       hashedPassword,
-      role || 'customer',
-      false, // role_accepted default
-      address || null,
+      assignedRole,
+      autoApproved,
       phone || null,
       cityId || null,
+      addressId
     ]);
 
     res.status(201).json({ message: 'User registered successfully' });
@@ -49,19 +63,24 @@ const loginUser = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const user = rows[0];
+  const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Require approval for non-customer roles (except SuperAdmin which is inherently approved)
+    if (user.role !== 'Customer' && user.role !== 'SuperAdmin' && !user.role_accepted) {
+      return res.status(403).json({ message: 'Account pending approval by SuperAdmin' });
+    }
+
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '10m' } // session valid for 10 minutes
     );
 
-    res.status(200).json({ token, role: user.role, email: user.email });
+  res.status(200).json({ token, role: user.role, email: user.email, roleAccepted: !!user.role_accepted });
   } catch (err) {
     next(err);
   }
