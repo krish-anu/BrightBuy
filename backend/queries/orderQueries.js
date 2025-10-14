@@ -266,6 +266,7 @@ module.exports = {
   // New report queries
   quarterlySalesByYear,
   topSellingProductsBetween,
+  topSellingProductsBetweenNoLimit,
   customerOrderSummary,
   getUpcomingOrdersWithEstimates
 };

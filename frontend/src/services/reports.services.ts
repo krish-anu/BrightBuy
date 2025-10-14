@@ -217,7 +217,41 @@ export const getTopProducts = async (startDate?: string, endDate?: string, limit
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     const response = await axiosInstance.get('/api/order/reports/top-products', { params });
-    return response.data.data;
+    const data = response.data?.data || { startDate, endDate, limit, products: [] };
+    let products: any[] = Array.isArray(data.products) ? [...data.products] : [];
+
+    // Ensure at least 5 products are returned for UI consistency
+    if (products.length < 5) {
+      try {
+        // Prefer paginated endpoint to avoid fetching too much
+        const prodResp = await axiosInstance.get('/api/product/paginated?page=1&limit=50');
+        const allProducts: any[] = prodResp.data?.data || [];
+        const existingIds = new Set(products.map(p => p.productId));
+        for (const p of allProducts) {
+          if (products.length >= 5) break;
+          if (!existingIds.has(p.id)) {
+            products.push({ productId: p.id, productName: p.name, totalSold: 0 });
+          }
+        }
+      } catch (padErr) {
+        console.warn('Padding top products failed, falling back to /api/product', padErr);
+        try {
+          const prodResp = await axiosInstance.get('/api/product');
+          const allProducts: any[] = prodResp.data?.data || prodResp.data || [];
+          const existingIds = new Set(products.map(p => p.productId));
+          for (const p of allProducts) {
+            if (products.length >= 5) break;
+            if (!existingIds.has(p.id)) {
+              products.push({ productId: p.id, productName: p.name, totalSold: 0 });
+            }
+          }
+        } catch (padErr2) {
+          console.warn('Fallback padding from /api/product also failed', padErr2);
+        }
+      }
+    }
+
+    return { startDate: data.startDate || startDate, endDate: data.endDate || endDate, limit: data.limit || limit, products };
   } catch (error) {
     console.error('Error fetching top products:', error);
     return { startDate, endDate, limit, products: [] };

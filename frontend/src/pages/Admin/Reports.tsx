@@ -49,7 +49,7 @@ const Reports: React.FC = () => {
       // Fetch additional reports in parallel
       const [qs, tp, ud, cs] = await Promise.all([
         getQuarterlySales(selectedYear),
-        getTopProducts(),
+        getTopProducts(undefined, undefined, 10),
         getUpcomingDeliveryEstimates(),
         getCustomerSummaries()
       ]);
@@ -58,7 +58,7 @@ const Reports: React.FC = () => {
       if (!topProductsFallback || !Array.isArray(topProductsFallback.products) || topProductsFallback.products.length === 0) {
         try {
           const clientTop = await getTopSellingProduct();
-          topProductsFallback = { products: [{ productId: 'client-side', productName: clientTop.name, totalSold: clientTop.sales }] };
+          topProductsFallback = { startDate: undefined, endDate: undefined, limit: 10, products: [{ productId: 'client-side', productName: clientTop.name, totalSold: clientTop.sales }] };
         } catch (e) {
           console.warn('Client-side top product calculation failed', e);
         }
@@ -385,7 +385,7 @@ const Reports: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Products (Period)</h3>
                   <ol className="list-decimal list-inside text-sm space-y-1">
                     {topProducts && Array.isArray(topProducts.products) && topProducts.products.length > 0 ? (
-                      topProducts.products.map((p: any) => (
+                      topProducts.products.slice(0, Math.max(5, topProducts.products.length)).map((p: any) => (
                         <li key={p.productId} className="flex justify-between">
                           <span>{p.productName}</span>
                           <span className="text-sm text-gray-600">{p.totalSold} units</span>
