@@ -21,6 +21,9 @@ import CartPage from "@/pages/User/CartPage";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 import UserLogin from "@/pages/Authpage/UserLogin";
+import OrderPayment from "@/pages/User/Order/OrderPayment";
+import OrderSuccess from "@/pages/User/Order/OrderSuccess";
+import OrderConfirm from "@/pages/User/Order/OrderConfirm";
 
 function App() {
   return (
@@ -35,6 +38,12 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:id" element={<ProductDetailPage />} />
+            <Route path="products/:productID" element={<ProductDetailPage />} />
+            <Route path="order">
+              <Route path="confirm" element={<OrderConfirm />} />
+              <Route path="success" element={<OrderSuccess />} />
+              <Route path="payment" element={<OrderPayment />} />
+            </Route>
           </Route>
 
           {/* ========== Admin Routes ========== */}
