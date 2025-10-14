@@ -552,38 +552,26 @@ const getTopSellingProducts = async (req, res, next) => {
 
     console.log('Top products query params:', { startDate: s, endDate: e, limit: l });
 
-    // First try the limited query. If it returns fewer than requested items
-    // (possible if there aren't many products with sales), fall back to the
-    // no-limit query and slice/pad to ensure we return at least 5 items.
-    const limitedRows = await query(orderQueries.topSellingProductsBetween, [s, e, l]);
+    // Always use the no-limit query (avoids LIMIT parameter issues on some MySQL setups)
+    const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
+    let products = (allRows || []).slice(0, l);
 
-    let products = limitedRows || [];
-
-    // If DB returned fewer than the enforced minimum, fetch full ranked list and take top l
+    // If still fewer than 5 overall (very small catalog), attempt to pad with products
+    // that have zero sales by fetching products and excluding those already present.
     if (products.length < 5) {
-      console.log('Limited query returned fewer than 5 items, fetching full list as fallback');
-      const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
-      // Take top `l` from the full list
-      products = (allRows || []).slice(0, l);
-
-      // If still fewer than 5 overall (very small catalog), attempt to pad with products
-      // that have zero sales by fetching products and excluding those already present.
-      if (products.length < 5) {
-        const needed = 5 - products.length;
-        console.log(`Padding results with ${needed} additional products with zero sales`);
-        // Fetch products ordered by name to have deterministic padding
-        const allProducts = await query(`SELECT id AS productId, name AS productName FROM products ORDER BY name ASC`);
-        const existingIds = new Set(products.map(p => p.productId));
-        for (const p of allProducts) {
-          if (products.length >= 5) break;
-          if (!existingIds.has(p.productId)) {
-            products.push({ productId: p.productId, productName: p.productName, totalSold: 0 });
-          }
+      const needed = 5 - products.length;
+      console.log(`Padding results with ${needed} additional products with zero sales`);
+      const allProducts = await query(`SELECT id AS productId, name AS productName FROM products ORDER BY name ASC`);
+      const existingIds = new Set(products.map(p => p.productId));
+      for (const p of allProducts) {
+        if (products.length >= 5) break;
+        if (!existingIds.has(p.productId)) {
+          products.push({ productId: p.productId, productName: p.productName, totalSold: 0 });
         }
       }
     }
 
-    // Ensure we don't return more than requested limit
+    // Cap to requested limit
     products = products.slice(0, l);
 
     res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products } });
