@@ -1,5 +1,18 @@
 import axiosInstance from "@/axiosConfig";
 
+// Fetch top product directly from backend aggregation endpoint (declared early so usable in getReportsData)
+export const getDBTopProduct = async () => {
+  try {
+    const resp = await getTopProducts(undefined, undefined, 1); // backend enforces minimum 5 internally
+    const first = resp.products && resp.products.length > 0 ? resp.products[0] : null;
+    if (!first) return { name: 'No sales data', sales: 0 };
+    return { name: first.productName, sales: Number(first.totalSold) || 0 };
+  } catch (err) {
+    console.warn('DB top product fetch failed, will fallback to client calc', err);
+    return { name: 'No sales data', sales: 0 };
+  }
+};
+
 // TypeScript interfaces for reports
 export interface ReportsData {
   totalRevenue: number;
@@ -44,8 +57,16 @@ export const getReportsData = async (): Promise<ReportsData> => {
       categoryWiseOrders
     });
 
-    // Get top product from all orders (we'll calculate this from existing data)
-    const topProduct = await getTopSellingProduct();
+      // Prefer DB-derived top product (aggregated in backend) with fallback to client-side calculation
+      let topProduct = await getDBTopProduct();
+      if (!topProduct || topProduct.sales === 0) {
+        try {
+          const fallback = await getTopSellingProduct();
+          if (fallback && fallback.sales > 0) topProduct = fallback;
+        } catch (e) {
+          // swallow fallback errors
+        }
+      }
 
     return {
       totalRevenue: Number(totalRevenue) || 0,
@@ -119,6 +140,8 @@ export const getCategoryWiseOrders = async () => {
 
 // Get top selling product (we'll need to create this endpoint or calculate from existing data)
 export const getTopSellingProduct = async () => {
+
+// Fetch top product directly from backend aggregation endpoint
   try {
     // For now, we'll get all orders and calculate the top product client-side
     // In production, this should be a dedicated backend endpoint
