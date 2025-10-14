@@ -152,3 +152,42 @@ export const createBrand = async (name: string) => {
     throw err;
   }
 };
+
+// ---------------- Attributes ----------------
+export interface Attribute {
+  id: number;
+  name: string;
+}
+
+export const getAttributes = async (): Promise<Attribute[]> => {
+  try {
+    const resp = await axiosInstance.get('/api/attribute');
+    return resp.data?.data || [];
+  } catch (err) {
+    console.error('Error fetching attributes:', err);
+    return [];
+  }
+};
+
+export const createAttribute = async (name: string): Promise<Attribute | null> => {
+  try {
+    if (!name.trim()) return null;
+    const resp = await axiosInstance.post('/api/attribute', { name: name.trim() });
+    if (resp.data && resp.data.success) {
+      const rows = resp.data.data;
+      // backend returns an array of attributes just inserted (per controller code)
+      if (Array.isArray(rows) && rows.length > 0) return rows[0];
+      return rows || null;
+    }
+    return null;
+  } catch (err:any) {
+    if (err?.response?.status === 409) {
+      // attribute exists - refetch list to get id
+      const list = await getAttributes();
+      const found = list.find(a => a.name.toLowerCase() === name.toLowerCase());
+      return found || null;
+    }
+    console.error('Error creating attribute:', err);
+    return null;
+  }
+};

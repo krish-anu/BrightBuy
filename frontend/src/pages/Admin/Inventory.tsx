@@ -82,6 +82,11 @@ const Inventory: React.FC = () => {
     attributes: [] as any[],
     imageFile: null as File | null,
     _brands: [] as { id: number; name: string }[],
+    _allAttributes: [] as { id: number; name: string }[],
+    _selectedAttributeId: '' as string | number,
+    _attributeValue: '' as string,
+    _creatingAttribute: false,
+    _newAttributeName: '' as string,
   });
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -538,6 +543,124 @@ const Inventory: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Attributes Selection */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">Attributes</label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex flex-col md:flex-row md:items-center md:space-x-2 space-y-2 md:space-y-0">
+                          <select
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm._selectedAttributeId}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, _selectedAttributeId: e.target.value })}
+                            onFocus={async () => {
+                              // lazy load attributes when user first focuses
+                              if (!newProductForm._allAttributes || newProductForm._allAttributes.length === 0) {
+                                const { getAttributes } = await import('@/services/product.services');
+                                const attrs = await getAttributes();
+                                setNewProductForm((prev: any) => ({ ...prev, _allAttributes: attrs }));
+                              }
+                            }}
+                          >
+                            <option value="">Select attribute</option>
+                            {Array.isArray(newProductForm._allAttributes) && newProductForm._allAttributes.map((a: any) => (
+                              <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder={'Value (e.g. 16GB, 6.5" Display)'}
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm._attributeValue}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProductForm({ ...newProductForm, _attributeValue: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                            onClick={() => {
+                              const attrId = newProductForm._selectedAttributeId;
+                              const val = (newProductForm._attributeValue || '').trim();
+                              if (!attrId || !val) return;
+                              // prevent duplicate attribute id entries
+                              if (newProductForm.attributes.some((a: any) => a.id == attrId)) return;
+                              setNewProductForm({
+                                ...newProductForm,
+                                attributes: [...newProductForm.attributes, { id: Number(attrId), value: val }],
+                                _selectedAttributeId: '',
+                                _attributeValue: ''
+                              });
+                            }}
+                          >Add</button>
+                          <button
+                            type="button"
+                            className="px-3 py-2 bg-gray-100 text-gray-800 rounded text-sm"
+                            onClick={() => setNewProductForm({ ...newProductForm, _creatingAttribute: !newProductForm._creatingAttribute })}
+                          >{newProductForm._creatingAttribute ? 'Cancel' : 'New Attribute'}</button>
+                        </div>
+
+                        {newProductForm._creatingAttribute && (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              placeholder="New attribute name (e.g. RAM)"
+                              className="flex-1 px-3 py-2 border rounded"
+                              value={newProductForm._newAttributeName}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, _newAttributeName: e.target.value })}
+                            />
+                            <button
+                              type="button"
+                              className="px-3 py-2 bg-green-600 text-white rounded text-sm"
+                              onClick={async () => {
+                                const raw = (newProductForm._newAttributeName || '').trim();
+                                if (!raw) return;
+                                try {
+                                  const { createAttribute, getAttributes } = await import('@/services/product.services');
+                                  const created = await createAttribute(raw);
+                                  const list = await getAttributes();
+                                  setNewProductForm((prev: any) => ({
+                                    ...prev,
+                                    _allAttributes: list,
+                                    _creatingAttribute: false,
+                                    _newAttributeName: '',
+                                    _selectedAttributeId: created ? created.id : prev._selectedAttributeId
+                                  }));
+                                } catch (e) {
+                                  console.error('Failed to create attribute', e);
+                                  alert('Failed to create attribute');
+                                }
+                              }}
+                            >Save</button>
+                          </div>
+                        )}
+
+                        {/* Selected Attributes List */}
+                        {Array.isArray(newProductForm.attributes) && newProductForm.attributes.length > 0 && (
+                          <div className="border rounded p-2 bg-gray-50">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Selected Attributes</p>
+                            <ul className="space-y-1 max-h-40 overflow-y-auto text-sm">
+                              {newProductForm.attributes.map((a: any, idx: number) => {
+                                const name = (newProductForm._allAttributes.find((x: any) => x.id === a.id) || {}).name || `Attribute ${a.id}`;
+                                return (
+                                  <li key={a.id} className="flex justify-between items-center bg-white border rounded px-2 py-1">
+                                    <span className="mr-2 truncate">{name}: <span className="text-gray-600">{a.value}</span></span>
+                                    <button
+                                      type="button"
+                                      className="text-red-600 hover:text-red-800 text-xs"
+                                      onClick={() => {
+                                        setNewProductForm({
+                                          ...newProductForm,
+                                          attributes: newProductForm.attributes.filter((_: any, i: number) => i !== idx)
+                                        });
+                                      }}
+                                    >Remove</button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Image</label>
                       <input type="file" accept="image/*" onChange={(e) => setNewProductForm({ ...newProductForm, imageFile: e.target.files?.[0] || null })} className="mt-1 block w-full" />
@@ -557,7 +680,7 @@ const Inventory: React.FC = () => {
                           price: Number(newProductForm.price),
                           stockQnt: Number(newProductForm.stockQnt),
                           categoryIds,
-                          attributes: [],
+                          attributes: Array.isArray(newProductForm.attributes) ? newProductForm.attributes : [],
                         };
 
                         // Create product + variant first
