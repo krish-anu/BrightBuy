@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import * as LucideIcons from "lucide-react";
 import type { LucideProps } from "lucide-react";
-import { getAllUsers, updateUser, deleteUser } from "../../services/user.services";
+import { getAllUsers, updateUser, deleteUser, approveUser } from "../../services/user.services";
+import { useAuth } from "../../../contexts/AuthContext";
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -21,6 +22,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  role_accepted?: number | boolean;
   phone?: string;
   address?: any;
   cityId?: number;
@@ -57,6 +59,10 @@ const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("");
   const [users, setUsers] = useState<User[]>([]);
+  const { user: authUser } = useAuth();
+  const isSuperAdmin = authUser?.role === 'SuperAdmin';
+  // Pending requests: anyone (any role except SuperAdmin) whose role_accepted == 0
+  const pendingRequests = isSuperAdmin ? users.filter(u => u.role !== 'SuperAdmin' && !u.role_accepted) : [];
   
   // Modal states
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -225,7 +231,9 @@ const UserManagement: React.FC = () => {
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole =
       filterRole === "" || normalizeRole(user.role) === filterRole;
-    return matchesSearch && matchesRole;
+    // Non-superadmin: ensure only approved users (should already be filtered server-side, but double-guard)
+    const approvedCheck = isSuperAdmin || user.role_accepted || user.role === 'Customer' || user.role === 'SuperAdmin';
+    return matchesSearch && matchesRole && approvedCheck;
   });
 
   const getRoleColor = (role: string) => {
@@ -250,11 +258,24 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600 mt-2">
-          Manage system users and their roles
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            User Management
+            {isSuperAdmin && pendingRequests.length > 0 && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">
+                {pendingRequests.length} Pending Approval
+              </span>
+            )}
+          </h1>
+          <p className="text-gray-600 mt-2">Manage system users and their roles</p>
+        </div>
+        {isSuperAdmin && pendingRequests.length > 0 && (
+          <div className="bg-white border border-yellow-200 rounded-md px-4 py-3 flex items-center text-sm text-yellow-800 shadow-sm">
+            <IconComponent iconName="Info" size={16} />
+            <span className="ml-2">There {pendingRequests.length === 1 ? 'is' : 'are'} {pendingRequests.length} pending {pendingRequests.length === 1 ? 'request' : 'requests'} awaiting approval.</span>
+          </div>
+        )}
       </div>
 
       {/* Search & Filter */}
@@ -300,9 +321,10 @@ const UserManagement: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Role
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                {isSuperAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
                 </th>
@@ -334,14 +356,27 @@ const UserManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(
-                        user.role,
-                      )}`}
-                    >
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
                       {displayRole(user.role)}
                     </span>
                   </td>
+                  {isSuperAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {user.role === 'SuperAdmin' ? (
+                        <span className="text-xs text-gray-400">N/A</span>
+                      ) : user.role_accepted ? (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                          <IconComponent iconName="CheckCircle2" size={14} />
+                          <span className="ml-1">Approved</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                          <IconComponent iconName="Clock" size={14} />
+                          <span className="ml-1">Pending</span>
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {user.phone || "N/A"}
                   </td>
@@ -350,6 +385,23 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="flex justify-center space-x-3">
+                      {isSuperAdmin && !user.role_accepted && user.role !== 'SuperAdmin' && (
+                        <button
+                          className="text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 p-1 rounded transition-colors duration-200"
+                          title="Approve User"
+                          onClick={async () => {
+                            try {
+                              await approveUser(user.id);
+                              // Update local state
+                              setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role_accepted: 1 } : u));
+                            } catch (e) {
+                              alert('Failed to approve user');
+                            }
+                          }}
+                        >
+                          <IconComponent iconName="BadgeCheck" size={16} />
+                        </button>
+                      )}
                       <button 
                         className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 p-1 rounded transition-colors duration-200" 
                         title="View User Details"
@@ -379,6 +431,46 @@ const UserManagement: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {isSuperAdmin && (
+        <div className="mt-10">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <IconComponent iconName="Clock" size={22} /> Pending Approval Requests
+            {pendingRequests.length > 0 && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">
+                {pendingRequests.length}
+              </span>
+            )}
+          </h2>
+          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            {pendingRequests.length === 0 ? (
+              <p className="text-sm text-gray-500">No pending approval requests.</p>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {pendingRequests.map(pr => (
+                  <li key={pr.id} className="py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                        <IconComponent iconName="User" size={16} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{pr.name} <span className="text-gray-400">• {displayRole(pr.role)}</span></p>
+                        <p className="text-xs text-gray-500">{pr.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                      onClick={async () => { await approveUser(pr.id); setUsers(prev => prev.map(u => u.id === pr.id ? { ...u, role_accepted: 1 } : u)); }}
+                    >
+                      <IconComponent iconName="BadgeCheck" size={14} /> Approve
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* User Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6">

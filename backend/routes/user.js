@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/auth.middleware");
 const authorizeRoles = require("../middlewares/role.middleware");
+const { approveUser, getPendingUsers } = require("../controllers/user.controller");
 const { getAllUsers, updateUserById, deleteUser, getDeliveryStaff } = require("../controllers/user.controller");
 
 // ===================== SUPER ADMIN ROUTES =====================
@@ -87,14 +88,18 @@ const { getAllUsers, updateUserById, deleteUser, getDeliveryStaff } = require(".
 //   }
 // );
 
-router.get("/", getAllUsers);
+// Secure listing routes
+router.get("/", verifyToken, getAllUsers);
+router.get('/pending', verifyToken, authorizeRoles('SuperAdmin'), getPendingUsers);
 
 // Admin: get list of delivery staff for assignment
 const ROLES = require("../roles");
 router.get('/delivery-staff', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), getDeliveryStaff);
+// Must be authenticated to list users
 
 // Admin routes for user management
-router.put("/:id", updateUserById);
-router.delete("/:id", deleteUser);
+router.put("/:id", verifyToken, updateUserById);
+router.delete("/:id", verifyToken, deleteUser);
+router.patch('/:id/approve', verifyToken, authorizeRoles('SuperAdmin'), approveUser);
 
 module.exports = router;

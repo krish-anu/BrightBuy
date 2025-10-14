@@ -52,7 +52,8 @@ const UserLogin: React.FC = () => {
         const wantsAdmin = from && from.startsWith('/admin');
 
         if (returnedRole === 'SuperAdmin') {
-          navigate('/superadmin', { replace: true });
+          // SuperAdmin uses the same /admin dashboard route
+          navigate('/admin', { replace: true });
           return;
         }
         if (returnedRole === 'Admin') {

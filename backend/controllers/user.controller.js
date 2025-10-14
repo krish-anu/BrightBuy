@@ -58,14 +58,43 @@ const updateUserInfo = async (req, res, next) => {
   }
 };
 
-// Get all users
+// Get all users (SuperAdmin sees all; others only approved)
 const getAllUsers = async (req, res, next) => {
   try {
-    const rows = await query(userQueries.getAll);
+    let rows;
+    const requesterRole = req.user?.role;
+    if (requesterRole === 'SuperAdmin') {
+      rows = await query(userQueries.getAll);
+    } else {
+      rows = await query(userQueries.getAllApproved);
+    }
     res.status(200).json({ success: true, data: rows });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
+};
+
+// Approve user (SuperAdmin only)
+const approveUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rows = await query(userQueries.getById, [id]);
+    if (rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    if (rows[0].role === 'SuperAdmin') return res.status(400).json({ message: 'Cannot change SuperAdmin approval' });
+    await query(`UPDATE users SET role_accepted = 1 WHERE id = ?`, [id]);
+    const updated = await query(userQueries.getById, [id]);
+    res.status(200).json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+};
+
+// List pending users (role_accepted=0) for SuperAdmin
+const getPendingUsers = async (req, res, next) => {
+  try {
+    const requesterRole = req.user?.role;
+    if (requesterRole !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const rows = await query(userQueries.getPendingStaff);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
 };
 
 // Get only delivery staff users (for admin assignment UI)
@@ -149,5 +178,7 @@ module.exports = {
   getAllUsers,
   getDeliveryStaff,
   updateUserById,
-  deleteUser
+  deleteUser,
+  approveUser
+  , getPendingUsers
 };

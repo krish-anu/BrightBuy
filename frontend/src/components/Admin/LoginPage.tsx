@@ -45,7 +45,8 @@ const LoginPage: React.FC = () => {
         const role = result.user?.role || user?.role;
 
         if (role === "SuperAdmin") {
-          navigate("/superadmin");
+          // Redirect SuperAdmin to the shared admin dashboard
+          navigate("/admin");
         } else if (role === "Admin") {
           navigate("/admin");
         } else if (role === "WarehouseStaff") {

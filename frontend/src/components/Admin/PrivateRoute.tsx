@@ -29,7 +29,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
   if (roles && user && !roles.includes(user.role)) {
     switch (currentRole) {
       case "SuperAdmin":
-        return <Navigate to="/superadmin" replace />;
+        // SuperAdmin should land on the unified admin dashboard
+        return <Navigate to="/admin" replace />;
       case "Admin":
         return <Navigate to="/admin" replace />;
       case "WarehouseStaff":

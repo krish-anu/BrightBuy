@@ -31,12 +31,14 @@ const registerUser = async (req, res, next) => {
       }
     }
 
+    const assignedRole = role || 'Customer';
+    const autoApproved = ['Customer', 'SuperAdmin'].includes(assignedRole) ? 1 : 0;
     await query(userQueries.insert, [
       name,
       email,
       hashedPassword,
-      role || 'Customer',
-      false,
+      assignedRole,
+      autoApproved,
       phone || null,
       cityId || null,
       addressId
@@ -61,10 +63,15 @@ const loginUser = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const user = rows[0];
+  const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Require approval for non-customer roles (except SuperAdmin which is inherently approved)
+    if (user.role !== 'Customer' && user.role !== 'SuperAdmin' && !user.role_accepted) {
+      return res.status(403).json({ message: 'Account pending approval by SuperAdmin' });
     }
 
     const token = jwt.sign(
@@ -73,7 +80,7 @@ const loginUser = async (req, res, next) => {
       { expiresIn: '10m' } // session valid for 10 minutes
     );
 
-    res.status(200).json({ token, role: user.role, email: user.email });
+  res.status(200).json({ token, role: user.role, email: user.email, roleAccepted: !!user.role_accepted });
   } catch (err) {
     next(err);
   }
