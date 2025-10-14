@@ -840,7 +840,7 @@ const Inventory: React.FC = () => {
                           <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2">
                             <button onClick={() => openViewModal(p)} className="text-gray-700 hover:text-gray-900" title="View"><IconComponent iconName="Eye" size={16} /></button>
                             <button onClick={() => handleEditVariant(p)} disabled={p.isDefaultVariant} className={`text-blue-600 hover:text-blue-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Edit"><IconComponent iconName="Edit" size={16} /></button>
-                            <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button>
+                            {/* <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button> */}
                             <button onClick={() => handleDeleteVariant(p)} disabled={p.isDefaultVariant} className={`text-red-600 hover:text-red-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Delete"><IconComponent iconName="Trash2" size={16} /></button>
                           </div></td>
                         </tr>
