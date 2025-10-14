@@ -58,9 +58,11 @@ const getOrderDetails = async (orderId, connection) => {
 
   const order = orders[0];
   const [items] = await connection.query(`
-    SELECT oi.*, pv.variantName, pv.SKU, pv.price, pv.stockQnt
+    SELECT oi.*, pv.variantName, pv.SKU, pv.price AS variantPrice, pv.stockQnt,
+           p.id AS productId, p.name AS productName
     FROM order_items oi
-    JOIN product_variants pv ON oi.variantId = pv.id
+    LEFT JOIN product_variants pv ON oi.variantId = pv.id
+    LEFT JOIN products p ON pv.productId = p.id
     WHERE oi.orderId = ?
   `, [orderId]);
 
