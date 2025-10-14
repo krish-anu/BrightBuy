@@ -252,7 +252,9 @@ const UserManagement: React.FC = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600 mt-2">Manage system users and their roles</p>
+        <p className="text-gray-600 mt-2">
+          Manage system users and their roles
+        </p>
       </div>
 
       {/* Search & Filter */}
@@ -334,7 +336,7 @@ const UserManagement: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(
-                        user.role
+                        user.role,
                       )}`}
                     >
                       {displayRole(user.role)}
