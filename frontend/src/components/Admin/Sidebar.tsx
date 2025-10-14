@@ -44,6 +44,10 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
 
   const routes: RouteItem[] = getCurrentUserRoutes() as RouteItem[];
+  // const isSuperAdmin = user?.role === 'SuperAdmin';
+
+  // Delivery assignment summary state (SuperAdmin only)
+  // Removed Assigned Deliveries summary section for SuperAdmin
 
   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
@@ -114,7 +118,7 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {routes.map((route) => {
             const isActive = location.pathname === route.path;
             return (
@@ -139,6 +143,8 @@ const Sidebar: React.FC = () => {
               </Link>
             );
           })}
+
+          {/* Removed Assigned Deliveries section for SuperAdmin */}
         </nav>
 
         {/* Footer */}

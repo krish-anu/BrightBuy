@@ -1,4 +1,4 @@
-const { assignDeliveryStaff, updateDeliveryStatus, addCODPayment, getDeliveries } = require('../controllers/delivery.controller');
+const { assignDeliveryStaff, updateDeliveryStatus, addCODPayment, getDeliveries, getDeliveryStaffAssignmentSummary } = require('../controllers/delivery.controller');
 const verifyToken = require('../middlewares/auth.middleware');
 const authorizeRoles = require("../middlewares/role.middleware");
 const ROLES = require('../roles');
@@ -14,6 +14,9 @@ router.patch('/:id/assignStaff',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUP
 
 // Update delivery status (delivery staff can update only their assigned deliveries)
 router.patch('/:id/status', verifyToken, authorizeRoles(ROLES.DELIVERY, ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/delivery.controller').updateDeliveryStatusController)
+
+// SuperAdmin: delivery staff assignment summary
+router.get('/assignment/summary', verifyToken, authorizeRoles(ROLES.SUPERADMIN), getDeliveryStaffAssignmentSummary);
 
 module.exports = router;
 

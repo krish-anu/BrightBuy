@@ -12,6 +12,7 @@ interface Delivery {
   estimatedDelivery?: string; // <-- optional
   deliveredAt?: string;
   orderTotal?: number;
+  staffName?: string;
 }
 
 
@@ -125,6 +126,7 @@ const AssignedDeliveries: React.FC = () => {
             estimatedDelivery: r.estimatedDelivery || r.estimatedDeliveryDate || undefined,
             deliveredAt: r.deliveryDate || undefined,
             orderTotal: safeNumber(r.orderTotal ?? r.totalPrice ?? 0),
+            staffName: r.staffName || undefined,
           }));
           if (mounted) setDeliveriesList(rows);
         } else {
@@ -201,6 +203,9 @@ const AssignedDeliveries: React.FC = () => {
                   <p className="text-sm text-gray-500">
                     Order: {delivery.orderId}
                   </p>
+                  {delivery.staffName && (
+                    <p className="text-sm text-gray-500">Assigned To: {delivery.staffName}</p>
+                  )}
                 </div>
                 <span
                   className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(delivery.status)}`}

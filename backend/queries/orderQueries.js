@@ -141,6 +141,17 @@ const getOrderStatusCounts = `
   GROUP BY status
 `;
 
+// Delivery staff assignment summary (active deliveries not delivered/cancelled)
+const getDeliveryStaffAssignmentSummary = `
+  SELECT u.id AS staffId, u.name AS staffName, u.email AS staffEmail,
+         COUNT(CASE WHEN d.status NOT IN ('Delivered','Cancelled') OR d.status IS NULL THEN d.id END) AS assignedDeliveries
+  FROM users u
+  LEFT JOIN deliveries d ON d.staffId = u.id
+  WHERE u.role = 'DeliveryStaff'
+  GROUP BY u.id, u.name, u.email
+  ORDER BY assignedDeliveries DESC, u.name ASC;
+`;
+
 // 4. Quarterly sales for a given year (use orderDate if present, otherwise createdAt)
 // Use a derived table to avoid ONLY_FULL_GROUP_BY issues on strict MySQL modes.
 const quarterlySalesByYear = `
@@ -268,5 +279,6 @@ module.exports = {
   topSellingProductsBetween,
   topSellingProductsBetweenNoLimit,
   customerOrderSummary,
-  getUpcomingOrdersWithEstimates
+  getUpcomingOrdersWithEstimates,
+  getDeliveryStaffAssignmentSummary
 };

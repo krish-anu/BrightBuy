@@ -61,8 +61,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         { path: "/admin/inventory", label: "Inventory", icon: "Package" },
         { path: "/admin/orders", label: "Orders", icon: "ShoppingCart" },
         { path: "/admin/reports", label: "Reports", icon: "BarChart3" },
-        { path: "/admin/deliveries", label: "Assigned Deliveries", icon: "Truck" },
-        { path: "/admin/delivery-status", label: "Update Status", icon: "RefreshCw" },
+        // Removed Assigned Deliveries and Update Status from SuperAdmin sidebar
       ],
     },
     Admin: {
