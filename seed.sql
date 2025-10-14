@@ -439,12 +439,7 @@ INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, pric
 (37,'Anker 737 Power Bank','SKU-ANK-737',250,119.99,NULL),
 (38,'Belkin 65W Charger','SKU-BEL-65W',300,59.99,NULL),
 (39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
-(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL);
-
--- Double-variant products (41..50) -> two variants each (20 variants)
-(-- double-variant block - idempotent
-INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
-(41,'Baseus 100W - Single Port','SKU-BAS-100-1',160,79.99,NULL),
+(40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
 (41,'Baseus 100W - Dual Port','SKU-BAS-100-2',120,99.99,NULL),
 (42,'UGREEN PD 65W - 65W','SKU-UGR-65-1',200,69.99,NULL),
 (42,'UGREEN PD 65W - 45W','SKU-UGR-65-2',150,59.99,NULL),
@@ -466,7 +461,7 @@ INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, pric
 (50,'Ring Spotlight Cam - Battery','SKU-RING-SP-2',80,229.99,NULL);
 
 -- Insert product_categories mappings (cycle categories 1..10 across products)
-(INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
+INSERT IGNORE INTO product_categories (productId, categoryId, createdAt, updatedAt) VALUES
 (1,1,NOW(),NOW()),(2,1,NOW(),NOW()),(3,1,NOW(),NOW()),(4,1,NOW(),NOW()),(5,1,NOW(),NOW()),
 (6,1,NOW(),NOW()),(7,2,NOW(),NOW()),(8,2,NOW(),NOW()),(9,2,NOW(),NOW()),(10,2,NOW(),NOW()),
 (11,2,NOW(),NOW()),(12,2,NOW(),NOW()),(13,3,NOW(),NOW()),(14,3,NOW(),NOW()),(15,3,NOW(),NOW()),
@@ -554,9 +549,9 @@ VALUES
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Storage'), '256GB'),
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Display'), '14"'),
 ((SELECT id FROM product_variants WHERE SKU='SKU-ACR-SW3-256'), (SELECT id FROM variant_attributes WHERE name='Color'), 'Gray');
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (38,'Belkin 65W Charger','SKU-BEL-65',300,59.99,NULL),
-(39,'Mophie MagSafe 3 - Black','SKU-MOP-MS3',150,69.99,NULL),
+(39,'Mophie MagSafe 4 - Black','SKU-MOP-MS4',150,69.99,NULL),
 (40,'RavPower 120W','SKU-RAV-120',180,129.99,NULL),
 (41,'Baseus 100W','SKU-BAS-100',160,79.99,NULL),
 (42,'UGREEN PD 65W','SKU-UGR-65',200,69.99,NULL),
@@ -640,7 +635,7 @@ INSERT IGNORE INTO products (name, description, brand) VALUES
 ('Lenovo Tab P12 Pro', 'Entertainment tablet', 'Lenovo'),
 ('Huawei MatePad Pro 13', 'Creative tablet', 'Huawei');
 
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (1, 'Galaxy S25 Ultra 512GB', 'SAM-MOB-001', 100, 1299.99, NULL),
 (2, 'iPhone 17 Pro Max 256GB', 'APP-MOB-002', 80, 1399.99, NULL),
 (3, 'Pixel 10 Pro 128GB', 'GOO-MOB-003', 90, 999.99, NULL),
@@ -700,7 +695,7 @@ INSERT INTO products (name, description, brand) VALUES
 ('HyperX Cloud Alpha Wireless', 'Gaming headset', 'HyperX'),
 ('Corsair Virtuoso RGB Wireless', 'Premium gaming headset', 'Corsair');
 
-INSERT INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
+INSERT IGNORE INTO product_variants (productId, variantName, SKU, stockQnt, price, imageURL) VALUES
 (26, 'Sony WH-1000XM6', 'SON-AUD-026', 150, 399.99, NULL),
 (27, 'AirPods Pro 3rd Gen', 'APP-AUD-027', 200, 299.99, NULL),
 (28, 'Bose QuietComfort Earbuds', 'BOS-AUD-028', 120, 329.99, NULL),
@@ -901,8 +896,6 @@ INSERT INTO cities (name, isMainCategory) VALUES
 
 -- Insert Users data (including customers and one admin)
 INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
-('admin@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User', 'Admin', '555-0000', 1, TRUE),
-('anudelivery@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff', 'DeliveryStaff', '555-0101', 1, TRUE),
 ('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', 1, TRUE),
 ('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', 1, TRUE),
 ('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
@@ -927,65 +920,53 @@ INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge,
 (2, '2024-01-15 10:30:00', 1249.99, 'Standard Delivery', 19.99, 'Delivered', 'Card'),
 (3, '2024-01-18 14:45:00', 849.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (4, '2024-01-22 09:15:00', 2999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card'),
-
 -- February 2024 orders
 (5, '2024-02-05 16:20:00', 599.99, 'Standard Delivery', 15.99, 'Delivered', 'CashOnDelivery'),
 (6, '2024-02-12 11:30:00', 1899.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (7, '2024-02-20 13:45:00', 449.99, 'Standard Delivery', 12.99, 'Delivered', 'Card'),
-
 -- March 2024 orders
 (8, '2024-03-08 10:15:00', 3499.99, 'Standard Delivery', 39.99, 'Delivered', 'Card'),
 (9, '2024-03-14 15:30:00', 799.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 (10, '2024-03-25 12:20:00', 1699.99, 'Standard Delivery', 24.99, 'Delivered', 'CashOnDelivery'),
-
 -- April 2024 orders
-(11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card', '2024-04-08 00:00:00'),
-(12, '2024-04-16 14:10:00', 2499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(13, '2024-04-28 11:55:00', 649.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-05-03 00:00:00'),
-
+(11, '2024-04-03 09:45:00', 299.99, 'Standard Delivery', 9.99, 'Delivered', 'Card'),
+(12, '2024-04-16 14:10:00', 2499.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(13, '2024-04-28 11:55:00', 649.99, 'Standard Delivery', 16.99, 'Delivered', 'Card'),
 -- May 2024 orders
-(14, '2024-05-07 16:40:00', 1299.99, 'Standard Delivery', 21.99, 'Delivered', 'CashOnDelivery', '2024-05-12 00:00:00'),
-(15, '2024-05-19 13:25:00', 549.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(16, '2024-05-30 10:50:00', 1999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card', '2024-06-04 00:00:00'),
-
+(14, '2024-05-07 16:40:00', 1299.99, 'Standard Delivery', 21.99, 'Delivered', 'CashOnDelivery'),
+(15, '2024-05-19 13:25:00', 549.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(16, '2024-05-30 10:50:00', 1999.99, 'Standard Delivery', 29.99, 'Delivered', 'Card'),
 -- June 2024 orders
-(2, '2024-06-11 15:15:00', 899.99, 'Standard Delivery', 18.99, 'Delivered', 'Card', '2024-06-16 00:00:00'),
-(3, '2024-06-22 12:30:00', 399.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
-(4, '2024-06-29 09:20:00', 4299.99, 'Standard Delivery', 49.99, 'Delivered', 'Card', '2024-07-06 00:00:00'),
-
+(2, '2024-06-11 15:15:00', 899.99, 'Standard Delivery', 18.99, 'Delivered', 'Card'),
+(3, '2024-06-22 12:30:00', 399.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery'),
+(4, '2024-06-29 09:20:00', 4299.99, 'Standard Delivery', 49.99, 'Delivered', 'Card'),
 -- July 2024 orders
-(5, '2024-07-08 14:50:00', 749.99, 'Standard Delivery', 17.99, 'Delivered', 'Card', '2024-07-13 00:00:00'),
-(6, '2024-07-18 11:25:00', 1399.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(7, '2024-07-27 16:35:00', 199.99, 'Standard Delivery', 7.99, 'Delivered', 'CashOnDelivery', '2024-08-01 00:00:00'),
-
+(5, '2024-07-08 14:50:00', 749.99, 'Standard Delivery', 17.99, 'Delivered', 'Card'),
+(6, '2024-07-18 11:25:00', 1399.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(7, '2024-07-27 16:35:00', 199.99, 'Standard Delivery', 7.99, 'Delivered', 'CashOnDelivery'),
 -- August 2024 orders
-(8, '2024-08-05 13:40:00', 2699.99, 'Standard Delivery', 34.99, 'Delivered', 'Card', '2024-08-12 00:00:00'),
-(9, '2024-08-15 10:55:00', 499.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(10, '2024-08-26 15:10:00', 1799.99, 'Standard Delivery', 26.99, 'Delivered', 'Card', '2024-09-02 00:00:00'),
-
+(8, '2024-08-05 13:40:00', 2699.99, 'Standard Delivery', 34.99, 'Delivered', 'Card'),
+(9, '2024-08-15 10:55:00', 499.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(10, '2024-08-26 15:10:00', 1799.99, 'Standard Delivery', 26.99, 'Delivered', 'Card'),
 -- September 2024 orders
-(11, '2024-09-09 12:15:00', 99.99, 'Standard Delivery', 5.99, 'Delivered', 'CashOnDelivery', '2024-09-14 00:00:00'),
-(12, '2024-09-20 14:30:00', 5999.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(13, '2024-09-28 11:45:00', 129.99, 'Standard Delivery', 6.99, 'Delivered', 'Card', '2024-10-03 00:00:00'),
-
+(11, '2024-09-09 12:15:00', 99.99, 'Standard Delivery', 5.99, 'Delivered', 'CashOnDelivery'),
+(12, '2024-09-20 14:30:00', 5999.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(13, '2024-09-28 11:45:00', 129.99, 'Standard Delivery', 6.99, 'Delivered', 'Card'),
 -- October 2024 orders
-(14, '2024-10-12 16:20:00', 999.99, 'Standard Delivery', 19.99, 'Delivered', 'Card', '2024-10-17 00:00:00'),
-(15, '2024-10-23 13:35:00', 1499.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery', NULL),
-(16, '2024-10-30 10:40:00', 699.99, 'Standard Delivery', 16.99, 'Delivered', 'Card', '2024-11-04 00:00:00'),
-
+(14, '2024-10-12 16:20:00', 999.99, 'Standard Delivery', 19.99, 'Delivered', 'Card'),
+(15, '2024-10-23 13:35:00', 1499.99, 'Store Pickup', 0.00, 'Delivered', 'CashOnDelivery'),
+(16, '2024-10-30 10:40:00', 699.99, 'Standard Delivery', 16.99, 'Delivered', 'Card'),
 -- November 2024 orders
-(2, '2024-11-14 15:25:00', 3899.99, 'Standard Delivery', 44.99, 'Delivered', 'Card', '2024-11-21 00:00:00'),
-(3, '2024-11-25 12:50:00', 249.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-
+(2, '2024-11-14 15:25:00', 3899.99, 'Standard Delivery', 44.99, 'Delivered', 'Card'),
+(3, '2024-11-25 12:50:00', 249.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
 -- December 2024 orders
-(4, '2024-12-05 14:15:00', 1199.99, 'Standard Delivery', 22.99, 'Delivered', 'CashOnDelivery', '2024-12-12 00:00:00'),
-(5, '2024-12-18 11:30:00', 149.99, 'Store Pickup', 0.00, 'Delivered', 'Card', NULL),
-(6, '2024-12-28 16:45:00', 2299.99, 'Standard Delivery', 32.99, 'Delivered', 'Card', '2025-01-04 00:00:00'),
-
+(4, '2024-12-05 14:15:00', 1199.99, 'Standard Delivery', 22.99, 'Delivered', 'CashOnDelivery'),
+(5, '2024-12-18 11:30:00', 149.99, 'Store Pickup', 0.00, 'Delivered', 'Card'),
+(6, '2024-12-28 16:45:00', 2299.99, 'Standard Delivery', 32.99, 'Delivered', 'Card'),
 -- Recent 2025 orders (some pending/shipped)
-(7, '2025-09-15 10:20:00', 1599.99, 'Standard Delivery', 24.99, 'Shipped', 'Card', '2025-09-22 00:00:00'),
-(8, '2025-10-01 14:35:00', 799.99, 'Store Pickup', 0.00, 'Confirmed', 'CashOnDelivery', NULL),
-(9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card', '2025-10-12 00:00:00');
+(7, '2025-09-15 10:20:00', 1599.99, 'Standard Delivery', 24.99, 'Shipped', 'Card'),
+(8, '2025-10-01 14:35:00', 799.99, 'Store Pickup', 0.00, 'Confirmed', 'CashOnDelivery'),
+(9, '2025-10-05 12:40:00', 2199.99, 'Standard Delivery', 31.99, 'Pending', 'Card');
 
 -- Insert Order Items for the orders
 
