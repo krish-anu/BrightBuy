@@ -55,6 +55,27 @@ const userQueries = {
   delete: `
     DELETE FROM users
     WHERE id = ?
+  `,
+  findUserById: `
+    SELECT name, email, phone, address
+    FROM users
+    WHERE id = ?
+  `,
+  updateProfile: `
+    UPDATE users
+    SET phone = ?, address = ?
+    WHERE id = ?
+  `
+  ,
+  getPasswordById: `
+    SELECT id, password
+    FROM users
+    WHERE id = ?
+  `,
+  updatePassword: `
+    UPDATE users
+    SET password = ?
+    WHERE id = ?
   `
 };
 

@@ -2,6 +2,16 @@ const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/auth.middleware");
 const authorizeRoles = require("../middlewares/role.middleware");
+const { getAllUsers, updateUserById, deleteUser, getDeliveryStaff, getProfile, updateProfile, changePassword } = require("../controllers/user.controller");
+
+// Route to get the logged-in user's profile
+router.get("/profile", verifyToken, getProfile);
+
+// Route to update the logged-in user's profile
+router.patch("/profile", verifyToken, updateProfile);
+
+// Route to change password
+router.post('/change-password', verifyToken, changePassword);
 const { approveUser, getPendingUsers } = require("../controllers/user.controller");
 const { getAllUsers, updateUserById, deleteUser, getDeliveryStaff } = require("../controllers/user.controller");
 

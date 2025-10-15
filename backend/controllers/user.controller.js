@@ -159,6 +159,115 @@ const updateUserById = async (req, res, next) => {
   }
 };
 
+const getProfile = async (req, res, next) => {
+  try {
+    const rows = await query(userQueries.findUserById, [req.user.id]);
+    const user = rows && rows.length ? rows[0] : null;
+    if (!user) {
+      throw new ApiError("User not found", 404);
+    }
+
+    // Address may be stored as JSON string or as an object depending on DB config.
+    let address = {};
+    try {
+      if (user.address === null || user.address === undefined) {
+        address = {};
+      } else if (typeof user.address === 'string') {
+        address = user.address ? JSON.parse(user.address) : {};
+      } else if (typeof user.address === 'object') {
+        address = user.address;
+      } else {
+        address = {};
+      }
+    } catch (e) {
+      // If parsing fails, fall back to empty address and log for debugging
+      console.error('Failed to parse user.address for user id', req.user.id, e);
+      address = {};
+    }
+
+    res.status(200).json({
+      fullName: user.name,
+      email: user.email,
+      phone: user.phone,
+      address,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateProfile = async (req, res, next) => {
+  try {
+    const { phone, address } = req.body;
+    const userId = req.user.id;
+
+    // Ensure address is stored as a string in DB (JSON)
+    const addressString = address && typeof address === 'object' ? JSON.stringify(address) : (address || null);
+
+    await query(userQueries.updateProfile, [phone, addressString, userId]);
+
+    const rows = await query(userQueries.findUserById, [userId]);
+    const updatedUser = rows && rows.length ? rows[0] : null;
+
+    if (!updatedUser) throw new ApiError('User not found after update', 404);
+
+    // Safe parse like in getProfile
+    let updatedAddress = {};
+    try {
+      if (updatedUser.address === null || updatedUser.address === undefined) {
+        updatedAddress = {};
+      } else if (typeof updatedUser.address === 'string') {
+        updatedAddress = updatedUser.address ? JSON.parse(updatedUser.address) : {};
+      } else if (typeof updatedUser.address === 'object') {
+        updatedAddress = updatedUser.address;
+      } else {
+        updatedAddress = {};
+      }
+    } catch (e) {
+      console.error('Failed to parse updatedUser.address for user id', userId, e);
+      updatedAddress = {};
+    }
+
+    res.status(200).json({
+      fullName: updatedUser.name,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      address: updatedAddress,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Change password
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'currentPassword and newPassword are required' });
+    }
+
+    // Fetch existing hashed password
+    const rows = await query(userQueries.getPasswordById, [userId]);
+    if (!rows || rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const user = rows[0];
+    const bcrypt = require('bcryptjs');
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await query(userQueries.updatePassword, [hashed, userId]);
+
+    res.status(200).json({ message: 'Password changed successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Optional: Delete user
 const deleteUser = async (req, res, next) => {
   try {
@@ -178,6 +287,10 @@ module.exports = {
   getAllUsers,
   getDeliveryStaff,
   updateUserById,
+  getProfile,
+  updateProfile,
+  changePassword,
+  deleteUser
   deleteUser,
   approveUser
   , getPendingUsers
