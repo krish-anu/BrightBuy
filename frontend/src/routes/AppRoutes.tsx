@@ -38,6 +38,10 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:productID" element={<ProductDetailPage />} />
+            {/* Protected user profile route */}
+            
+              <Route path="profile" element={<UserProfile />} />
+            
           </Route>
 
           {/* ========== Admin Routes ========== */}

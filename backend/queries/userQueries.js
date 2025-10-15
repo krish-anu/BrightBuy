@@ -57,13 +57,21 @@ const userQueries = {
     WHERE id = ?
   `,
   findUserById: `
-    SELECT name, email, phone, address
-    FROM users
-    WHERE id = ?
+    SELECT u.name,
+           u.email,
+           u.phone,
+           u.addressId,
+           a.line1 AS addressLine1,
+           a.line2 AS addressLine2,
+           a.city AS addressCity,
+           a.postalCode AS addressPostalCode
+    FROM users u
+    LEFT JOIN addresses a ON u.addressId = a.id
+    WHERE u.id = ?
   `,
   updateProfile: `
     UPDATE users
-    SET phone = ?, address = ?
+    SET phone = ?, addressId = ?
     WHERE id = ?
   `
   ,
