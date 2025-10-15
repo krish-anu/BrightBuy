@@ -13,6 +13,13 @@ const getUserDeliveryInfo = async (req, res, next) => {
   }
 };
 
+// helper to normalize string-ish inputs; empty strings -> null
+const _sanitizeStr = (v) => {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+};
+
 // Update user info
 const updateUserInfo = async (req, res, next) => {
   try {
@@ -31,30 +38,42 @@ const updateUserInfo = async (req, res, next) => {
 
     const user = rows[0];
 
-    // Address: if provided as object with line1/city create or update an address row
+    // Address: upsert if provided; allow partial updates (preserve unspecified values)
     let addressId = user.addressId || null;
-    if (
-      address &&
-      typeof address === "object" &&
-      (address.line1 || address.city)
-    ) {
-      const line1 = address.line1 || "";
-      const line2 = address.line2 || null;
-      const city = address.city || "";
-      const postalCode = address.postalCode || null;
-      if (!line1 || !city)
-        throw new ApiError("Address line1 and city required", 400);
+    if (address && typeof address === "object") {
+      const sLine1 = _sanitizeStr(address.line1);
+      const sLine2 = _sanitizeStr(address.line2);
+      const sCity = _sanitizeStr(address.city);
+      const sPostal = _sanitizeStr(address.postalCode);
+
       if (addressId) {
+        // fetch current to preserve unspecified fields
+        const currentRows = await query(
+          `SELECT line1, line2, city, postalCode FROM addresses WHERE id = ?`,
+          [addressId]
+        );
+        const current = currentRows && currentRows.length ? currentRows[0] : {};
+        const newLine1 = sLine1 !== null ? sLine1 : current.line1 || null;
+        const newLine2 = sLine2 !== null ? sLine2 : current.line2 || null;
+        const newCity = sCity !== null ? sCity : current.city || null;
+        const newPostal = sPostal !== null ? sPostal : current.postalCode || null;
         await query(
           `UPDATE addresses SET line1=?, line2=?, city=?, postalCode=? WHERE id=?`,
-          [line1, line2, city, postalCode, addressId]
+          [newLine1, newLine2, newCity, newPostal, addressId]
         );
       } else {
-        const result = await query(
-          `INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`,
-          [line1, line2, city, postalCode]
-        );
-        addressId = result.insertId || result[0]?.insertId; // depending on driver shape
+        // insert only if any address field provided, and require required columns
+        const hasAny = [sLine1, sLine2, sCity, sPostal].some((v) => v !== null);
+        if (hasAny) {
+          if (!sLine1 || !sCity) {
+            throw new ApiError("Address line1 and city are required", 400);
+          }
+          const result = await query(
+            `INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`,
+            [sLine1, sLine2, sCity, sPostal]
+          );
+          addressId = result.insertId || result[0]?.insertId; // depending on driver shape
+        }
       }
     }
 
@@ -149,30 +168,40 @@ const updateUserById = async (req, res, next) => {
     const user = rows[0];
 
     // Properly handle undefined values by converting them to existing values or null
-    // Handle address
+    // Handle address (allow partial updates)
     let addressId = user.addressId || null;
-    if (
-      address &&
-      typeof address === "object" &&
-      (address.line1 || address.city)
-    ) {
-      const line1 = address.line1 || "";
-      const line2 = address.line2 || null;
-      const city = address.city || "";
-      const postalCode = address.postalCode || null;
-      if (!line1 || !city)
-        throw new ApiError("Address line1 and city required", 400);
+    if (address && typeof address === "object") {
+      const sLine1 = _sanitizeStr(address.line1);
+      const sLine2 = _sanitizeStr(address.line2);
+      const sCity = _sanitizeStr(address.city);
+      const sPostal = _sanitizeStr(address.postalCode);
+
       if (addressId) {
+        const currentRows = await query(
+          `SELECT line1, line2, city, postalCode FROM addresses WHERE id = ?`,
+          [addressId]
+        );
+        const current = currentRows && currentRows.length ? currentRows[0] : {};
+        const newLine1 = sLine1 !== null ? sLine1 : current.line1 || null;
+        const newLine2 = sLine2 !== null ? sLine2 : current.line2 || null;
+        const newCity = sCity !== null ? sCity : current.city || null;
+        const newPostal = sPostal !== null ? sPostal : current.postalCode || null;
         await query(
           `UPDATE addresses SET line1=?, line2=?, city=?, postalCode=? WHERE id=?`,
-          [line1, line2, city, postalCode, addressId]
+          [newLine1, newLine2, newCity, newPostal, addressId]
         );
       } else {
-        const result = await query(
-          `INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`,
-          [line1, line2, city, postalCode]
-        );
-        addressId = result.insertId || result[0]?.insertId;
+        const hasAny = [sLine1, sLine2, sCity, sPostal].some((v) => v !== null);
+        if (hasAny) {
+          if (!sLine1 || !sCity) {
+            throw new ApiError("Address line1 and city are required", 400);
+          }
+          const result = await query(
+            `INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`,
+            [sLine1, sLine2, sCity, sPostal]
+          );
+          addressId = result.insertId || result[0]?.insertId;
+        }
       }
     }
 
@@ -225,7 +254,7 @@ const getProfile = async (req, res, next) => {
 
 const updateProfile = async (req, res, next) => {
   try {
-    const { phone, address } = req.body;
+  const { phone, address } = req.body;
     const userId = req.user.id;
 
     // Fetch current user to get existing addressId
@@ -237,21 +266,35 @@ const updateProfile = async (req, res, next) => {
     let addressId = existing.addressId || null;
 
     if (address && typeof address === "object") {
-      const line1 = address.line1 || "";
-      const line2 = address.line2 || null;
-      const city = address.city || "";
-      const postalCode = address.postalCode || null;
+      const sLine1 = _sanitizeStr(address.line1);
+      const sLine2 = _sanitizeStr(address.line2);
+      const sCity = _sanitizeStr(address.city);
+      const sPostal = _sanitizeStr(address.postalCode);
 
-      if (line1 && city) {
-        if (addressId) {
-          await query(
-            `UPDATE addresses SET line1=?, line2=?, city=?, postalCode=? WHERE id=?`,
-            [line1, line2, city, postalCode, addressId]
-          );
-        } else {
+      if (addressId) {
+        // preserve unspecified values
+        const currentRows = await query(
+          `SELECT line1, line2, city, postalCode FROM addresses WHERE id = ?`,
+          [addressId]
+        );
+        const current = currentRows && currentRows.length ? currentRows[0] : {};
+        const newLine1 = sLine1 !== null ? sLine1 : current.line1 || null;
+        const newLine2 = sLine2 !== null ? sLine2 : current.line2 || null;
+        const newCity = sCity !== null ? sCity : current.city || null;
+        const newPostal = sPostal !== null ? sPostal : current.postalCode || null;
+        await query(
+          `UPDATE addresses SET line1=?, line2=?, city=?, postalCode=? WHERE id=?`,
+          [newLine1, newLine2, newCity, newPostal, addressId]
+        );
+      } else {
+        const hasAny = [sLine1, sLine2, sCity, sPostal].some((v) => v !== null);
+        if (hasAny) {
+          if (!sLine1 || !sCity) {
+            throw new ApiError("Address line1 and city are required", 400);
+          }
           const result = await query(
             `INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`,
-            [line1, line2, city, postalCode]
+            [sLine1, sLine2, sCity, sPostal]
           );
           addressId = result.insertId || result[0]?.insertId;
         }

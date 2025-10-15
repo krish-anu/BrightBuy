@@ -73,7 +73,12 @@ export default function UserProfile() {
       setPostalCode(data.address?.postalCode || "");
       setCity(data.address?.city || "");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to load profile");
+      setError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to load profile"
+      );
     } finally {
       setLoading(false);
     }
@@ -113,7 +118,12 @@ export default function UserProfile() {
       setPostalCode(updated.address?.postalCode || "");
       setCity(updated.address?.city || "");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to save profile");
+      setError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to save profile"
+      );
     } finally {
       setSaving(false);
       // clear success after a short time
@@ -416,7 +426,12 @@ export default function UserProfile() {
                   setNewPassword('');
                   setConfirmPassword('');
                 } catch (err: any) {
-                  setError(err.response?.data?.message || err.message || 'Failed to change password');
+                  setError(
+                    err?.response?.data?.message ||
+                    err?.response?.data?.error ||
+                    err?.message ||
+                    'Failed to change password'
+                  );
                 } finally {
                   setChangingPassword(false);
                   setTimeout(() => setSuccess(null), 3500);
