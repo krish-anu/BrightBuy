@@ -2,7 +2,7 @@
 const createPayment = async (userId, orderId, totalPrice, deliveryCharge, paymentMethod,connection, paymentIntentId = null) => {
   const amount = parseFloat(totalPrice) + parseFloat(deliveryCharge);
   const status = paymentIntentId ? 'Paid' : 'Pending';
-  if (paymentMethod === 'CashOnDelivery') paymentMethod = 'COD';
+  // Preserve 'CashOnDelivery' to match DB ENUM; do not change to 'COD'
 
   const sql = `
     INSERT INTO payments
