@@ -44,7 +44,6 @@ CREATE INDEX idx_product_categories_categoryId ON product_categories (categoryId
 CREATE INDEX idx_categories_parentId ON categories (parentId);
 
 CREATE INDEX idx_users_role ON users (role);
-CREATE INDEX idx_users_cityId ON users (cityId);
 CREATE INDEX idx_users_addressId ON users (addressId);
 
 CREATE INDEX idx_orders_userId ON orders (userId);
@@ -78,9 +77,6 @@ ALTER TABLE order_items
 ALTER TABLE users
   ADD CONSTRAINT fk_users_address
     FOREIGN KEY (addressId) REFERENCES addresses(id)
-    ON UPDATE CASCADE ON DELETE SET NULL,
-  ADD CONSTRAINT fk_users_city
-    FOREIGN KEY (cityId) REFERENCES cities(id)
     ON UPDATE CASCADE ON DELETE SET NULL;
 
 ALTER TABLE categories

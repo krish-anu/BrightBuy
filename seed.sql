@@ -94,7 +94,6 @@ CREATE TABLE IF NOT EXISTS users (
 	role_accepted TINYINT(1) DEFAULT 0,
 	phone VARCHAR(32) DEFAULT NULL,
 	addressId INT DEFAULT NULL,
-	cityId INT DEFAULT NULL,
 	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	KEY (addressId)
@@ -329,12 +328,12 @@ INSERT IGNORE INTO addresses (id, line1, line2, city, postalCode) VALUES
 (4,'101 Sunset Blvd',NULL,'Houston','77001'),
 (5,'202 Liberty Rd',NULL,'Philadelphia','19019');
 
-INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_accepted, addressId) VALUES
-(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',1,TRUE,1),
-(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',1,TRUE,2),
-(3,'john@customer.com','password123','John Doe','Customer','1234567890',2,TRUE,3),
-(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE,4),
-(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE,5);
+INSERT IGNORE INTO users (id, email, password, name, role, phone, role_accepted, addressId) VALUES
+(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',TRUE,1),
+(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',TRUE,2),
+(3,'john@customer.com','password123','John Doe','Customer','1234567890',TRUE,3),
+(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',TRUE,4),
+(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',TRUE,5);
    
 
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES

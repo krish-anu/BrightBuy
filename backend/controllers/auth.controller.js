@@ -7,7 +7,7 @@ const ApiError = require('../utils/ApiError');
 // Register user
 const registerUser = async (req, res, next) => {
   try {
-  const { name, email, password, role, address, phone, cityId } = req.body;
+  const { name, email, password, role, address, phone } = req.body;
 
     // Check if user already exists
     const existingUsers = await query(userQueries.getByEmail, [email]);
@@ -40,7 +40,6 @@ const registerUser = async (req, res, next) => {
       assignedRole,
       autoApproved,
       phone || null,
-      cityId || null,
       addressId
     ]);
 

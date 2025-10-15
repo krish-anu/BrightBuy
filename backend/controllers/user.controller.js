@@ -23,8 +23,7 @@ const updateUserInfo = async (req, res, next) => {
       role,
       role_accepted,
       address,
-      phone,
-      cityId,
+  phone,
     } = req.body;
 
     const rows = await query(userQueries.getById, [req.user.id]);
@@ -66,7 +65,6 @@ const updateUserInfo = async (req, res, next) => {
       role || user.role,
       role_accepted !== undefined ? role_accepted : user.role_accepted,
       phone || user.phone,
-      cityId || user.cityId,
       addressId,
       req.user.id,
     ]);
@@ -184,7 +182,6 @@ const updateUserById = async (req, res, next) => {
       role !== undefined ? role : user.role,
       user.role_accepted,
       phone !== undefined ? phone || null : user.phone,
-      user.cityId,
       addressId,
       id,
     ];
