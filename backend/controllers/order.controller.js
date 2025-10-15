@@ -121,7 +121,7 @@ const addOrder = async (req, res, next) => {
         payment_method_types: ['card'],
         line_items: orderedItems.map(item => ({
           price_data: {
-            currency: 'lkr',
+            currency: 'usd',
             product_data: { name: item.productName },
             unit_amount: Math.round(item.price * 100)
           },

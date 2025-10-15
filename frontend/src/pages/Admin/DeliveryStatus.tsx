@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAssignedDeliveries, updateDeliveryStatusForStaff } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
@@ -202,7 +203,7 @@ const DeliveryStatus: React.FC = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <IconComponent iconName="DollarSign" size={14} />
-                          <span>${(delivery as any).orderTotal ? Number((delivery as any).orderTotal).toFixed(2) : '0.00'}</span>
+                          <span>{formatCurrencyUSD((delivery as any).orderTotal ?? 0)}</span>
                         </div>
                       </div>
                     </div>

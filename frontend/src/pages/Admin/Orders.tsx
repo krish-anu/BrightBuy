@@ -6,6 +6,7 @@ import { getCurrentUserFromToken } from '../../services/auth.services';
 import type { Order } from '../../services/order.services';
 import * as LucideIcons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 
 interface IconComponentProps {
   iconName: keyof typeof LucideIcons;
@@ -294,13 +295,12 @@ const Orders: React.FC = () => {
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">Total Revenue</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    ${orders.length > 0 
+                    {formatCurrencyUSD(orders.length > 0 
                       ? orders.reduce((sum, order) => {
                           const price = Number(order.totalPrice) || 0;
                           return sum + price;
-                        }, 0).toFixed(2)
-                      : '0.00'
-                    }
+                        }, 0)
+                      : 0)}
                   </p>
                 </div>
               </div>
@@ -545,7 +545,7 @@ const Orders: React.FC = () => {
                       {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${(Number(order.totalPrice) || 0).toFixed(2)}
+                      {formatCurrencyUSD(Number(order.totalPrice) || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor((order.status || 'pending').toLowerCase())}`}>
@@ -727,7 +727,7 @@ const Orders: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Total</label>
-                <p className="mt-1 text-sm text-gray-900">${(Number(selectedOrder.totalPrice) || 0).toFixed(2)}</p>
+                <p className="mt-1 text-sm text-gray-900">{formatCurrencyUSD(Number(selectedOrder.totalPrice) || 0)}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Status</label>

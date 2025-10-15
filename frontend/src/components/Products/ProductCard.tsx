@@ -2,6 +2,7 @@ import { Card, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import type Product from "@/types/Product";
+import { formatCurrencyUSD } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ShoppingBag } from "lucide-react";
 
@@ -23,7 +24,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <CardTitle className="pt-4 text-lg">{product.name}</CardTitle>
         {/* <CardDescription className="text-md">{product.description}</CardDescription> */}
         <span className="text-md md:text-lg font-bold text-secondary">
-          LKR {product.ProductVariants[0]?.price ?? 0}
+          {formatCurrencyUSD(product.ProductVariants[0]?.price ?? 0)}
         </span>
       </CardContent>
       <CardFooter className="flex justify- px-0">

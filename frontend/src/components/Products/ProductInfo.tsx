@@ -14,6 +14,7 @@ import {
   getInitialOptions,
   getUniqueAttributes,
 } from "@/utils/productVariantUtils";
+import { formatCurrencyUSD } from "@/lib/utils";
 
 interface ProductPageProps {
   product: ProductDetail;
@@ -72,7 +73,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
                 Selected combination is not available
               </span>
             ) : (
-              <span className="">LKR {displayVariant?.price}</span>
+              <span className="">{formatCurrencyUSD(displayVariant?.price ?? 0)}</span>
             )}
           </div>
           <Separator />
