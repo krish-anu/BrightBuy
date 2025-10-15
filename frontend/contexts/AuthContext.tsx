@@ -63,11 +63,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const nowSec = Math.floor(Date.now() / 1000);
         if (payload.exp > nowSec) {
           // Build minimal user object (requires backend to include email/role in token — we have id, role only)
+          const emailFromPayload = (payload as any).email || 'unknown@local';
+          const usernameFromPayload = (payload as any).username || emailFromPayload.split('@')[0] || (payload.id?.toString() || 'user');
+          const nameFromPayload = (payload as any).name || usernameFromPayload || 'User';
           setUser({
             id: payload.id,
-            username: payload.id?.toString() || 'user',
-            name: 'User',
-            email: payload.email || 'unknown@local',
+            username: usernameFromPayload,
+            name: nameFromPayload,
+            email: emailFromPayload,
             role: payload.role
           });
         }
@@ -108,12 +111,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (foundUser?.success) {
         const backendUser = foundUser.user;
 
-        // Map backend response into our User type
+        // Map backend response into our User type (prefer real name; fall back to email prefix)
+        const emailStr: string = backendUser.email || "unknown@local";
+        const nameStr: string = backendUser.name || emailStr.split("@")[0] || "User";
+        const usernameStr: string = backendUser.username || emailStr.split("@")[0] || "user";
+
         const userWithoutPassword: User = {
           id: backendUser.id ?? 0, // if backend didn’t send, give default
-          username: backendUser.username ?? backendUser.email.split("@")[0],
-          name: backendUser.name ?? "Unknown",
-          email: backendUser.email,
+          username: usernameStr,
+          name: nameStr,
+          email: emailStr,
           role: backendUser.role,
         };
 

@@ -80,7 +80,7 @@ const loginUser = async (req, res, next) => {
       { expiresIn: '10m' } // session valid for 10 minutes
     );
 
-  res.status(200).json({ token, role: user.role, email: user.email, roleAccepted: !!user.role_accepted });
+  res.status(200).json({ token, role: user.role, email: user.email, name: user.name, id: user.id, roleAccepted: !!user.role_accepted });
   } catch (err) {
     next(err);
   }
