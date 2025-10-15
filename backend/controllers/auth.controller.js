@@ -62,8 +62,21 @@ const loginUser = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-  const user = rows[0];
-    const isMatch = await bcrypt.compare(password, user.password);
+    const user = rows[0];
+    const stored = user.password || '';
+    const looksHashed = typeof stored === 'string' && stored.startsWith('$2');
+    let isMatch = false;
+    if (looksHashed) {
+      isMatch = await bcrypt.compare(password, stored);
+    } else {
+      // legacy plaintext path
+      isMatch = password === stored;
+      if (isMatch) {
+        // migrate to bcrypt
+        const migratedHash = await bcrypt.hash(password, 10);
+        await query(userQueries.updatePassword, [migratedHash, user.id]);
+      }
+    }
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }

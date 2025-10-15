@@ -294,7 +294,7 @@ const changePassword = async (req, res, next) => {
         .json({ message: "currentPassword and newPassword are required" });
     }
 
-    // Fetch existing hashed password
+    // Fetch existing password (may be hashed or legacy plaintext)
     const rows = await query(userQueries.getPasswordById, [userId]);
     if (!rows || rows.length === 0)
       return res.status(404).json({ message: "User not found" });
@@ -302,10 +302,25 @@ const changePassword = async (req, res, next) => {
     const user = rows[0];
     const bcrypt = require("bcryptjs");
 
-    const match = await bcrypt.compare(currentPassword, user.password);
-    if (!match)
-      return res.status(401).json({ message: "Current password is incorrect" });
+    const stored = user.password || "";
+    const looksHashed = typeof stored === "string" && stored.startsWith("$2");
 
+    let valid = false;
+    if (looksHashed) {
+      // Normal path: bcrypt compare
+      valid = await bcrypt.compare(currentPassword, stored);
+    } else {
+      // Legacy path: stored as plaintext — compare directly, then migrate to bcrypt
+      valid = currentPassword === stored;
+    }
+
+    if (!valid) {
+      return res
+        .status(401)
+        .json({ message: "Current password is incorrect" });
+    }
+
+    // Always store new password hashed
     const hashed = await bcrypt.hash(newPassword, 10);
     await query(userQueries.updatePassword, [hashed, userId]);
 
