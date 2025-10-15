@@ -134,6 +134,8 @@ SELECT
     pv.variantName,
     pv.price,
     pv.stockQnt,
+    pv.SKU,
+    pv.imageURL,
     JSON_ARRAYAGG(JSON_OBJECT(
         'attributeId', va.id,
         'attributeName', va.name,
@@ -184,6 +186,13 @@ const insertProductCategory = `
 INSERT IGNORE INTO product_categories (productId, categoryId) VALUES (?, ?)
 `;
 
+const getCategoriesByProduct = `
+SELECT c.id, c.name
+FROM categories c
+JOIN product_categories pc ON pc.categoryId = c.id
+WHERE pc.productId = ?
+`;
+
 module.exports = {
   getAllProducts,
   getAllProductsPaginated,
@@ -203,5 +212,6 @@ module.exports = {
   getAttributeById,
   insertVariantOption,
   getPopularProducts,
-  insertProductCategory
+  insertProductCategory,
+  getCategoriesByProduct
 };

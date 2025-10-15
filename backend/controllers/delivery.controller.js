@@ -1,6 +1,7 @@
 const ApiError = require('../utils/ApiError');
 const {query, pool} = require('../config/db');
 const deliveryQueries = require('../queries/deliveryQueries');
+const orderQueries = require('../queries/orderQueries');
 
 const getDeliveries = async (req, res, next) => {
   try {
@@ -15,17 +16,41 @@ const getDeliveries = async (req, res, next) => {
 // Get deliveries assigned to the currently authenticated delivery staff
 const getAssignedDeliveriesForStaff = async (req, res, next) => {
   try {
-    const staffId = req.user.id;
-    // Return delivery with order total, delivery address and customer phone so frontend can render without extra calls
-    const rows = await query(
-      `SELECT d.*, o.id AS orderId, o.totalPrice AS orderTotal, o.deliveryAddress AS deliveryAddress, o.estimatedDeliveryDate AS estimatedDelivery, o.status AS orderStatus, u.phone AS customerPhone
-       FROM deliveries d
-       JOIN orders o ON d.orderId = o.id
-       LEFT JOIN users u ON o.userId = u.id
-       WHERE d.staffId = ?
-       ORDER BY d.createdAt DESC`,
-      [staffId]
-    );
+    const { id: userId, role } = req.user;
+    // Normalize address using addresses table (orders now store deliveryAddressId)
+    // Build a human readable address string; fallback to 'Store Pickup' if no address
+    const baseSelect = `
+      SELECT 
+        d.*, 
+        o.id AS orderId, 
+        o.totalPrice AS orderTotal, 
+        COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.city, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
+        DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, 
+        o.status AS orderStatus, 
+        cust.phone AS customerPhone,
+        staff.name AS staffName
+      FROM deliveries d
+      JOIN orders o ON d.orderId = o.id
+      LEFT JOIN addresses a ON o.deliveryAddressId = a.id
+      LEFT JOIN users cust ON o.userId = cust.id
+      LEFT JOIN users staff ON d.staffId = staff.id
+    `;
+
+    let sql = baseSelect;
+    const params = [];
+    const where = [];
+    if (role === 'DeliveryStaff') {
+      where.push('d.staffId = ?');
+      params.push(userId);
+    }
+    // Only show assigned deliveries for this endpoint
+    where.push("d.status = 'Assigned'");
+    if (where.length) {
+      sql += `WHERE ${where.join(' AND ')}\n`;
+    }
+    sql += `ORDER BY d.createdAt DESC`;
+
+    const rows = await query(sql, params);
     res.status(200).json({ success: true, data: rows });
   } catch (error) {
     next(error);
@@ -135,9 +160,23 @@ const assignDeliveryStaff = async (req, res, next) => {
   }
 }
 
+// SuperAdmin delivery staff assignment summary
+const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const rows = await query(orderQueries.getDeliveryStaffAssignmentSummary);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   assignDeliveryStaff,
   getDeliveries, 
   getAssignedDeliveriesForStaff,
-  updateDeliveryStatusController
+  updateDeliveryStatusController,
+  getDeliveryStaffAssignmentSummary
 };

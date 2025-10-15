@@ -127,6 +127,30 @@ export const addProduct = async (productData: any) => {
   }
 }
 
+// Fetch a lightweight list of product names (deduped) for dropdowns.
+// Uses the existing getAllProducts endpoint and extracts distinct names.
+export const getProductNames = async (): Promise<string[]> => {
+  try {
+    const res = await getAllProducts();
+    const rows = res?.data || [];
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r && typeof r.name === 'string' && r.name.trim()) {
+        set.add(r.name.trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  } catch (err) {
+    console.error('Error fetching product names:', err);
+    return [];
+  }
+};
+
+export const getProductByID = async (id: string | number) => {
+  const res = await axiosInstance.get(`/api/product/${id}`);
+  return res.data; // your API likely returns { success, data }
+};
+
 // Brands
 export const getBrands = async (): Promise<{ id: number; name: string }[]> => {
   try {
@@ -145,5 +169,44 @@ export const createBrand = async (name: string) => {
   } catch (err) {
     console.error('Error creating brand:', err);
     throw err;
+  }
+};
+
+// ---------------- Attributes ----------------
+export interface Attribute {
+  id: number;
+  name: string;
+}
+
+export const getAttributes = async (): Promise<Attribute[]> => {
+  try {
+    const resp = await axiosInstance.get('/api/attribute');
+    return resp.data?.data || [];
+  } catch (err) {
+    console.error('Error fetching attributes:', err);
+    return [];
+  }
+};
+
+export const createAttribute = async (name: string): Promise<Attribute | null> => {
+  try {
+    if (!name.trim()) return null;
+    const resp = await axiosInstance.post('/api/attribute', { name: name.trim() });
+    if (resp.data && resp.data.success) {
+      const rows = resp.data.data;
+      // backend returns an array of attributes just inserted (per controller code)
+      if (Array.isArray(rows) && rows.length > 0) return rows[0];
+      return rows || null;
+    }
+    return null;
+  } catch (err:any) {
+    if (err?.response?.status === 409) {
+      // attribute exists - refetch list to get id
+      const list = await getAttributes();
+      const found = list.find(a => a.name.toLowerCase() === name.toLowerCase());
+      return found || null;
+    }
+    console.error('Error creating attribute:', err);
+    return null;
   }
 };

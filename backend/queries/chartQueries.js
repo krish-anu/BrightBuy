@@ -47,8 +47,8 @@ const topProductsLastMonth = `
       AND o.status != 'Cancelled'
     GROUP BY p.id, p.name
     ORDER BY totalSold DESC
-    LIMIT 5;
-  `;
+    LIMIT 5;`;
+  
 
 // 3. Get sales by category for the last month
 const salesByCategoryLastMonth = `

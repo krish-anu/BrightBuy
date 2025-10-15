@@ -34,3 +34,14 @@ export const updateDeliveryStatusForStaff = async (deliveryId: number, status: '
     return { success: false, error: errMsg };
   }
 };
+
+export const getDeliveryAssignmentSummary = async () => {
+  try {
+    const response = await axiosInstance.get('/api/delivery/assignment/summary');
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error('Error fetching delivery assignment summary:', error);
+    const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch assignment summary';
+    return { success: false, error: errMsg };
+  }
+};

@@ -40,3 +40,13 @@ export const getDeliveryStaff = async () => {
         throw error;
     }
 };
+
+export const approveUser = async (userId: number) => {
+    try {
+        const response = await axiosInstance.patch(`/api/users/${userId}/approve`);
+        return response.data;
+    } catch (error) {
+        console.error('Error approving user:', error);
+        throw error;
+    }
+};

@@ -9,12 +9,19 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, authReady } = useAuth();
   const { currentRole } = useRole();
   const location = useLocation();
 
-  // Not logged in → go to login
+  // While auth hydrating, don't redirect yet
+  if (!authReady) {
+    return <div className="w-full flex items-center justify-center py-10 text-gray-500 text-sm">Authorizing...</div>;
+  }
+
+  // Not logged in → go to login (after hydration only)
   if (!isAuthenticated()) {
+    // store last attempted path for post-login redirect
+    try { sessionStorage.setItem('brightbuy_last_path', location.pathname + location.search); } catch {}
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -22,7 +29,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
   if (roles && user && !roles.includes(user.role)) {
     switch (currentRole) {
       case "SuperAdmin":
-        return <Navigate to="/superadmin" replace />;
+        // SuperAdmin should land on the unified admin dashboard
+        return <Navigate to="/admin" replace />;
       case "Admin":
         return <Navigate to="/admin" replace />;
       case "WarehouseStaff":

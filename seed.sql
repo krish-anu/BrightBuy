@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS cities (
 	isMainCategory TINYINT(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Addresses (new normalized table replacing users.address JSON and orders.deliveryAddress JSON)
+CREATE TABLE IF NOT EXISTS addresses (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  line1 VARCHAR(255) NOT NULL,
+  line2 VARCHAR(255) DEFAULT NULL,
+  city VARCHAR(120) NOT NULL,
+  postalCode VARCHAR(32) DEFAULT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS users (
 	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	name VARCHAR(200) NOT NULL,
@@ -82,10 +93,11 @@ CREATE TABLE IF NOT EXISTS users (
 	password VARCHAR(255) NOT NULL,
 	role_accepted TINYINT(1) DEFAULT 0,
 	phone VARCHAR(32) DEFAULT NULL,
-	address JSON DEFAULT NULL,
+	addressId INT DEFAULT NULL,
 	cityId INT DEFAULT NULL,
 	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	KEY (addressId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -94,12 +106,13 @@ CREATE TABLE IF NOT EXISTS orders (
 	orderDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	totalPrice DECIMAL(10,2) NOT NULL,
 	deliveryMode ENUM('Store Pickup','Standard Delivery') NOT NULL,
-	deliveryAddress JSON DEFAULT NULL,
+	deliveryAddressId INT DEFAULT NULL,
 	deliveryCharge DECIMAL(10,2) NOT NULL DEFAULT '0.00',
 	status ENUM('Pending','Confirmed','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
 	paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
 	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	KEY (deliveryAddressId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -308,12 +321,20 @@ INSERT IGNORE INTO product_variant_options (variantId, attributeId, value) VALUE
 INSERT IGNORE INTO cities (id, name, isMainCategory) VALUES
 (1,'New York',TRUE),(2,'Los Angeles',TRUE),(3,'Chicago',TRUE),(4,'Houston',TRUE),(5,'Philadelphia',TRUE),(6,'Phoenix',TRUE),(7,'San Antonio',TRUE),(8,'San Diego',TRUE),(9,'Dallas',TRUE),(10,'San Jose',TRUE);
 
-INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_accepted) VALUES
-(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',1,TRUE),
-(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',1,TRUE),
-(3,'john@customer.com','password123','John Doe','Customer','1234567890',2,TRUE),
-(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE),
-(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE);
+-- Seed addresses for users (idempotent)
+INSERT IGNORE INTO addresses (id, line1, line2, city, postalCode) VALUES
+(1,'123 Main St',NULL,'New York','10001'),
+(2,'456 Market Ave','Apt 5','Los Angeles','90001'),
+(3,'789 Lake Shore Dr',NULL,'Chicago','60601'),
+(4,'101 Sunset Blvd',NULL,'Houston','77001'),
+(5,'202 Liberty Rd',NULL,'Philadelphia','19019');
+
+INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_accepted, addressId) VALUES
+(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',1,TRUE,1),
+(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',1,TRUE,2),
+(3,'john@customer.com','password123','John Doe','Customer','1234567890',2,TRUE,3),
+(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE,4),
+(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE,5);
    
 
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
@@ -728,15 +749,22 @@ INSERT IGNORE INTO users (id, name, email, role, password, phone) VALUES
 (6, 'David Brown', 'david@customer.com', 'Customer', 'password123', '5551122334');
 
 -- Sample orders with category distribution
-INSERT IGNORE INTO orders (id, userId, deliveryMode, deliveryAddress, totalPrice, deliveryCharge, paymentMethod, status) VALUES
-(1, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 1299.99, 15.00, 'Card', 'Delivered'),
+-- Legacy JSON deliveryAddress replaced with normalized addresses + deliveryAddressId
+-- Additional address rows (avoid id collisions with earlier seeded addresses 1..5)
+INSERT IGNORE INTO addresses (id, line1, line2, city, postalCode) VALUES
+(101,'123 Main St',NULL,'City','12345'),
+(102,'456 Oak Ave',NULL,'City','67890'),
+(103,'789 Pine St',NULL,'City','11111');
+
+INSERT IGNORE INTO orders (id, userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status) VALUES
+(1, 2, 'Standard Delivery', 101, 1299.99, 15.00, 'Card', 'Delivered'),
 (2, 3, 'Store Pickup', NULL, 299.99, 0.00, 'Card', 'Confirmed'),
-(3, 4, 'Standard Delivery', '{"street": "456 Oak Ave", "city": "City", "state": "State", "zipCode": "67890"}', 399.99, 10.00, 'CashOnDelivery', 'Shipped'),
-(4, 5, 'Standard Delivery', '{"street": "789 Pine St", "city": "City", "state": "State", "zipCode": "11111"}', 199.99, 20.00, 'Card', 'Confirmed'),
+(3, 4, 'Standard Delivery', 102, 399.99, 10.00, 'CashOnDelivery', 'Shipped'),
+(4, 5, 'Standard Delivery', 103, 199.99, 20.00, 'Card', 'Confirmed'),
 (5, 6, 'Store Pickup', NULL, 249.99, 0.00, 'Card', 'Pending'),
-(6, 2, 'Standard Delivery', '{"street": "123 Main St", "city": "City", "state": "State", "zipCode": "12345"}', 599.99, 15.00, 'Card', 'Delivered'),
+(6, 2, 'Standard Delivery', 101, 599.99, 15.00, 'Card', 'Delivered'),
 (7, 3, 'Store Pickup', NULL, 899.99, 0.00, 'Card', 'Delivered'),
-(8, 4, 'Standard Delivery', '{"street": "456 Oak Ave", "city": "City", "state": "State", "zipCode": "67890"}', 349.99, 15.00, 'CashOnDelivery', 'Shipped');
+(8, 4, 'Standard Delivery', 102, 349.99, 15.00, 'CashOnDelivery', 'Shipped');
 
 -- Sample order items using valid variant IDs from our products
 INSERT IGNORE INTO order_items (id, orderId, variantId, quantity, unitPrice, totalPrice) VALUES

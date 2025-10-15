@@ -55,13 +55,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     SuperAdmin: {
       name: "Super Admin",
       routes: [
-        { path: "/superadmin", label: "Overview", icon: "LayoutDashboard" },
-        {
-          path: "/superadmin/settings",
-          label: "System Settings",
-          icon: "Settings",
-        },
-        { path: "/superadmin/logs", label: "System Logs", icon: "FileText" },
+        // Provide access to all admin-related routes using unified /admin paths
+        { path: "/admin", label: "Dashboard", icon: "LayoutDashboard" },
+        { path: "/admin/users", label: "User Management", icon: "Users" },
+        { path: "/admin/inventory", label: "Inventory", icon: "Package" },
+        { path: "/admin/orders", label: "Orders", icon: "ShoppingCart" },
+        { path: "/admin/reports", label: "Reports", icon: "BarChart3" },
+        // Removed Assigned Deliveries and Update Status from SuperAdmin sidebar
       ],
     },
     Admin: {

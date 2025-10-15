@@ -87,7 +87,6 @@ const addOrder = async (req, res, next) => {
     }
 
     const address = deliveryAddress || null;
-
     const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
       await calculateOrderDetails(items, deliveryMode, address, req.user, connection);
 
@@ -105,12 +104,7 @@ const addOrder = async (req, res, next) => {
 
     await createPayment(req.user.id, order.id, totalPrice, deliveryCharge, paymentMethod, connection);
 
-    if (deliveryMode === 'Standard Delivery') {
-      await connection.query(
-        `INSERT INTO deliveries (orderId) VALUES (?)`,
-        [order.id]
-      );
-    }
+    // Delivery row is auto-created by sp_create_order for Standard Delivery
 
     if (paymentMethod === 'CashOnDelivery') {
       await connection.commit();
@@ -122,7 +116,7 @@ const addOrder = async (req, res, next) => {
         payment_method_types: ['card'],
         line_items: orderedItems.map(item => ({
           price_data: {
-            currency: 'lkr',
+            currency: 'usd',
             product_data: { name: item.productName },
             unit_amount: Math.round(item.price * 100)
           },
@@ -264,7 +258,15 @@ const getOrderStatus = async (req, res, next) => {
 
     if (order.deliveryMode === 'Standard Delivery') {
       result.deliveryAddress = order.deliveryAddress;
-      result.estimatedDeliveryDate = order.estimatedDeliveryDate;
+      // Compute estimated delivery date: prefer orderDate else createdAt, add 3 days
+      const base = order.orderDate || order.createdAt;
+      try {
+        const d = new Date(base);
+        d.setDate(d.getDate() + 3);
+        result.estimatedDeliveryDate = d.toISOString();
+      } catch (e) {
+        result.estimatedDeliveryDate = null;
+      }
     }
 
     res.status(200).json({ success: true, data: result });
@@ -502,6 +504,90 @@ const getStats = async (req, res, next) => {
   }
 }
 
+// Quarterly sales for a given year
+const getQuarterlySales = async (req, res, next) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    console.log(`Fetching quarterly sales for year=${year}`);
+    const rows = await query(orderQueries.quarterlySalesByYear, [year]);
+    console.log('Quarterly sales raw rows:', rows);
+
+    // If DB returned no rows, return a consistent four-quarter object with zeros
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.warn(`No quarterly sales rows found for year=${year}, returning zeroed quarters`);
+      const defaultQuarters = [
+        { quarter: 'Q1', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q2', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q3', totalOrders: 0, totalSales: 0 },
+        { quarter: 'Q4', totalOrders: 0, totalSales: 0 }
+      ];
+      return res.status(200).json({ success: true, data: { year, quarters: defaultQuarters } });
+    }
+
+    // Normalize numeric fields
+    const quarters = rows.map(r => ({
+      quarter: String(r.quarter),
+      totalOrders: Number(r.totalOrders) || 0,
+      totalSales: Number(r.totalSales) || 0
+    }));
+
+    res.status(200).json({ success: true, data: { year, quarters } });
+  } catch (err) { next(err); }
+}
+
+// Top selling products in a period
+const getTopSellingProducts = async (req, res, next) => {
+  try {
+    const { startDate, endDate, limit } = req.query;
+    const s = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    const e = endDate || new Date().toISOString().split('T')[0];
+    let l = Number(limit) || 10;
+    if (l < 5) l = 5; // enforce minimum requested limit
+
+    console.log('Top products query params:', { startDate: s, endDate: e, limit: l });
+
+    // Always use the no-limit query (avoids LIMIT parameter issues on some MySQL setups)
+    const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
+    let products = (allRows || []).slice(0, l);
+
+    // If still fewer than 5 overall (very small catalog), attempt to pad with products
+    // that have zero sales by fetching products and excluding those already present.
+    if (products.length < 5) {
+      const needed = 5 - products.length;
+      console.log(`Padding results with ${needed} additional products with zero sales`);
+      const allProducts = await query(`SELECT id AS productId, name AS productName FROM products ORDER BY name ASC`);
+      const existingIds = new Set(products.map(p => p.productId));
+      for (const p of allProducts) {
+        if (products.length >= 5) break;
+        if (!existingIds.has(p.productId)) {
+          products.push({ productId: p.productId, productName: p.productName, totalSold: 0 });
+        }
+      }
+    }
+
+    // Cap to requested limit
+    products = products.slice(0, l);
+
+    res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products } });
+  } catch (err) { next(err); }
+}
+
+// Customer-wise order summary and payment status
+const getCustomerOrderSummary = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.customerOrderSummary);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+// Upcoming orders with delivery time estimates
+const getUpcomingDeliveryEstimates = async (req, res, next) => {
+  try {
+    const rows = await query(orderQueries.getUpcomingOrdersWithEstimates);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getOrders,
   getOrder,
@@ -515,5 +601,10 @@ module.exports = {
   getAssignedOrders,
   getShippedOrders,
   getTotalOrders,
-  getStats
+  getStats,
+  // New report endpoints
+  getQuarterlySales,
+  getTopSellingProducts,
+  getCustomerOrderSummary,
+  getUpcomingDeliveryEstimates
 };

@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { getAssignedDeliveries } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
   id: string;
   orderId: string;
-  status: 'assigned' | 'in_transit' | 'delivered' | 'failed';
+  status: "assigned" | "in_transit" | "delivered" | "failed";
   customerAddress: string;
   customerPhone: string;
-  estimatedDelivery?: string;  // <-- optional
+  estimatedDelivery?: string; // <-- optional
   deliveredAt?: string;
   orderTotal?: number;
+  staffName?: string;
 }
 
 
@@ -21,36 +23,46 @@ const AssignedDeliveries: React.FC = () => {
   const [deliveriesList, setDeliveriesList] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const IconComponent: React.FC<{ iconName: keyof typeof LucideIcons; size?: number }> = ({ iconName, size = 20 }) => {
-  const Icon = LucideIcons[iconName] as unknown as React.FC<React.SVGProps<SVGSVGElement>>;
-  return Icon ? <Icon width={size} height={size} /> : <LucideIcons.Circle width={size} height={size} />;
-};
-
+  const IconComponent: React.FC<{
+    iconName: keyof typeof LucideIcons;
+    size?: number;
+  }> = ({ iconName, size = 20 }) => {
+    const Icon = LucideIcons[iconName] as unknown as React.FC<
+      React.SVGProps<SVGSVGElement>
+    >;
+    return Icon ? (
+      <Icon width={size} height={size} />
+    ) : (
+      <LucideIcons.Circle width={size} height={size} />
+    );
+  };
 
   const filteredDeliveries = (loading ? [] : deliveriesList).filter((delivery: Delivery) => {
     const matchesSearch =
       delivery.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       delivery.orderId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === '' || delivery.status === filterStatus;
+    const matchesStatus =
+      filterStatus === "" || delivery.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: Delivery['status']) => {
+  const getStatusColor = (status: Delivery["status"]) => {
     switch (status) {
-      case 'assigned':
-        return 'bg-blue-100 text-blue-800';
-      case 'in_transit':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
+      case "assigned":
+        return "bg-blue-100 text-blue-800";
+      case "in_transit":
+        return "bg-yellow-100 text-yellow-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString();
 
   // safely coerce various API shapes into a number
   const safeNumber = (value: any): number => {
@@ -115,6 +127,7 @@ const AssignedDeliveries: React.FC = () => {
             estimatedDelivery: r.estimatedDelivery || r.estimatedDeliveryDate || undefined,
             deliveredAt: r.deliveryDate || undefined,
             orderTotal: safeNumber(r.orderTotal ?? r.totalPrice ?? 0),
+            staffName: r.staffName || undefined,
           }));
           if (mounted) setDeliveriesList(rows);
         } else {
@@ -133,7 +146,9 @@ const AssignedDeliveries: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Assigned Deliveries</h1>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Assigned Deliveries
+        </h1>
         <p className="text-gray-600 mt-2">Manage your delivery assignments</p>
       </div>
 
@@ -146,7 +161,7 @@ const AssignedDeliveries: React.FC = () => {
               placeholder="Search by Delivery ID or Order ID..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <IconComponent iconName="Search" size={16} />
@@ -155,7 +170,7 @@ const AssignedDeliveries: React.FC = () => {
           <select
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">All Statuses</option>
             <option value="assigned">Assigned</option>
@@ -177,14 +192,26 @@ const AssignedDeliveries: React.FC = () => {
           // show orderTotal if present (allow 0 values)
           const orderDetails = (delivery as any).orderTotal != null ? { id: delivery.orderId, total: Number((delivery as any).orderTotal) } : undefined;
           return (
-            <div key={delivery.id} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <div
+              key={delivery.id}
+              className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500"
+            >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{delivery.id}</h3>
-                  <p className="text-sm text-gray-500">Order: {delivery.orderId}</p>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {delivery.id}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Order: {delivery.orderId}
+                  </p>
+                  {delivery.staffName && (
+                    <p className="text-sm text-gray-500">Assigned To: {delivery.staffName}</p>
+                  )}
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(delivery.status)}`}>
-                  {delivery.status.replace('_', ' ').toUpperCase()}
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(delivery.status)}`}
+                >
+                  {delivery.status.replace("_", " ").toUpperCase()}
                 </span>
               </div>
 
@@ -192,16 +219,24 @@ const AssignedDeliveries: React.FC = () => {
                 <div className="flex items-start space-x-3">
                   <IconComponent iconName="MapPin" size={16} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">Delivery Address</p>
-                    <p className="text-sm text-gray-600">{delivery.customerAddress}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      Delivery Address
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {delivery.customerAddress}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
                   <IconComponent iconName="Phone" size={16} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">Customer Phone</p>
-                    <p className="text-sm text-gray-600">{delivery.customerPhone}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      Customer Phone
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {delivery.customerPhone}
+                    </p>
                   </div>
                 </div>
 
@@ -209,12 +244,17 @@ const AssignedDeliveries: React.FC = () => {
                   <IconComponent iconName="Clock" size={16} />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-700">
-                      {delivery.status === 'delivered' ? 'Delivered At' : 'Estimated Delivery'}
+                      {delivery.status === "delivered"
+                        ? "Delivered At"
+                        : "Estimated Delivery"}
                     </p>
-                   <p className="text-sm text-gray-600">
-  {formatDate(delivery.deliveredAt ?? delivery.estimatedDelivery ?? '')}
-</p>
-
+                    <p className="text-sm text-gray-600">
+                      {formatDate(
+                        delivery.deliveredAt ??
+                          delivery.estimatedDelivery ??
+                          "",
+                      )}
+                    </p>
                   </div>
                 </div>
 
@@ -223,7 +263,7 @@ const AssignedDeliveries: React.FC = () => {
                     <IconComponent iconName="Package" size={16} />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700">Order Value</p>
-                      <p className="text-sm text-gray-600">${(Number(orderDetails.total) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">{formatCurrencyUSD(Number(orderDetails.total) || 0)}</p>
                     </div>
                   </div>
                 )}
@@ -231,12 +271,12 @@ const AssignedDeliveries: React.FC = () => {
 
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex space-x-2">
-                  {delivery.status === 'assigned' && (
+                  {delivery.status === "assigned" && (
                     <button className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">
                       Start Delivery
                     </button>
                   )}
-                  {delivery.status === 'in_transit' && (
+                  {delivery.status === "in_transit" && (
                     <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700">
                       Mark Delivered
                     </button>

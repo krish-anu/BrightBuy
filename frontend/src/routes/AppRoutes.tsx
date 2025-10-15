@@ -37,10 +37,7 @@ function App() {
             <Route path="signup" element={<UserSignup />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
-            <Route path="products/:id" element={<ProductDetailPage />} />
-            <Route element={<UserPrivateRoute />}>
-              <Route path="profile" element={<UserProfile />} />
-            </Route>
+            <Route path="products/:productID" element={<ProductDetailPage />} />
           </Route>
 
           {/* ========== Admin Routes ========== */}
@@ -48,7 +45,14 @@ function App() {
           <Route
             path="admin/*"
             element={
-              <PrivateRoute roles={["Admin", "SuperAdmin", "WarehouseStaff", "DeliveryStaff"]}>
+              <PrivateRoute
+                roles={[
+                  "Admin",
+                  "SuperAdmin",
+                  "WarehouseStaff",
+                  "DeliveryStaff",
+                ]}
+              >
                 <AdminLayout />
               </PrivateRoute>
             }

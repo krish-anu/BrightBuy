@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../contexts/AuthContext';
-import * as LucideIcons from 'lucide-react';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
+import * as LucideIcons from "lucide-react";
 // import { loginUser } from "../services/auth.services";
 
 interface IconComponentProps {
@@ -9,54 +9,60 @@ interface IconComponentProps {
   size?: number;
 }
 
-const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
-  const Icon = LucideIcons[iconName] as React.ComponentType<LucideIcons.LucideProps> | undefined;
+const IconComponent: React.FC<IconComponentProps> = ({
+  iconName,
+  size = 20,
+}) => {
+  const Icon = LucideIcons[iconName] as
+    | React.ComponentType<LucideIcons.LucideProps>
+    | undefined;
   return Icon ? <Icon size={size} /> : <LucideIcons.Circle size={size} />;
 };
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState<string>('');   // changed from username
-  const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string>('');
+  const [email, setEmail] = useState<string>(""); // changed from username
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const { login, isLoading,user } = useAuth();
+  const { login, isLoading, user } = useAuth();
   const navigate = useNavigate();
 
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  setError('');
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
 
-  if (!email || !password) {
-    setError('Please enter both email and password');
-    return;
-  }
-
-  try {
-    const result = await login(email, password);
-    console.log("REs", result);
-
-    if (result?.success === true) {
-      // Redirect based on role
-      const role = result.user?.role || user?.role;
-
-      if (role === "SuperAdmin") {
-        navigate("/superadmin");
-      } else if (role === "Admin") {
-        navigate("/admin");
-      } else if (role === "WarehouseStaff") {
-        navigate("/admin/inventory");
-      } else if (role === "DeliveryStaff") {
-        navigate("/admin/deliveries");
-      } else {
-        navigate("/shop"); // default User
-      }
-    } else {
-      setError(result?.error || 'Login failed');
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      return;
     }
-  } catch (err) {
-    setError('Something went wrong. Please try again.');
-  }
-};
+
+    try {
+      const result = await login(email, password);
+      console.log("REs", result);
+
+      if (result?.success === true) {
+        // Redirect based on role
+        const role = result.user?.role || user?.role;
+
+        if (role === "SuperAdmin") {
+          // Redirect SuperAdmin to the shared admin dashboard
+          navigate("/admin");
+        } else if (role === "Admin") {
+          navigate("/admin");
+        } else if (role === "WarehouseStaff") {
+          navigate("/admin/inventory");
+        } else if (role === "DeliveryStaff") {
+          navigate("/admin/deliveries");
+        } else {
+          navigate("/shop"); // default User
+        }
+      } else {
+        setError(result?.error || "Login failed");
+      }
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -78,7 +84,10 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email
               </label>
               <div className="mt-1 relative">
@@ -100,14 +109,17 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <div className="mt-1 relative">
                 <input
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   className="appearance-none block w-full px-3 py-2 pl-10 pr-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -123,7 +135,10 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  <IconComponent iconName={showPassword ? "EyeOff" : "Eye"} size={16} />
+                  <IconComponent
+                    iconName={showPassword ? "EyeOff" : "Eye"}
+                    size={16}
+                  />
                 </button>
               </div>
             </div>

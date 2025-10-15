@@ -4,6 +4,7 @@ import type { LucideProps } from 'lucide-react';
 import { getAllProducts, getProductsPaginated, getInventoryStats, addProduct } from '@/services/product.services';
 import { getAllCategories } from '@/services/category.services';
 import SingleSelect from '@/components/ui/SingleSelect';
+import { formatCurrencyUSD } from '../../lib/utils';
 
 // Icon props
 interface IconComponentProps {
@@ -82,6 +83,15 @@ const Inventory: React.FC = () => {
     attributes: [] as any[],
     imageFile: null as File | null,
     _brands: [] as { id: number; name: string }[],
+    _allAttributes: [] as { id: number; name: string }[],
+    _selectedAttributeId: '' as string | number,
+    _attributeValue: '' as string,
+    _creatingAttribute: false,
+    _newAttributeName: '' as string,
+    _productNames: [] as string[],
+    _useExistingProduct: true,
+    _loadingProductNames: false,
+    variantName: '' as string,
   });
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -381,8 +391,12 @@ const Inventory: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-        <p className="text-gray-600 mt-2">Manage your product inventory and stock levels</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Inventory Management
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Manage your product inventory and stock levels
+        </p>
       </div>
 
       {error && (
@@ -436,8 +450,67 @@ const Inventory: React.FC = () => {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Name</label>
-                      <input type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} className="mt-1 block w-full px-3 py-2 border rounded" />
+                      <label className="block text-sm font-medium text-gray-700">Product</label>
+                      {newProductForm._useExistingProduct ? (
+                        <div className="mt-1 flex items-center space-x-2">
+                          <select
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm.name}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                            onFocus={async () => {
+                              if (!newProductForm._productNames.length && !newProductForm._loadingProductNames) {
+                                try {
+                                  setNewProductForm((p:any) => ({ ...p, _loadingProductNames: true }));
+                                  const { getProductNames } = await import('@/services/product.services');
+                                  const names = await getProductNames();
+                                  setNewProductForm((p:any) => ({ ...p, _productNames: names, _loadingProductNames: false }));
+                                } catch (err) {
+                                  console.error('Failed to load product names', err);
+                                  setNewProductForm((p:any) => ({ ...p, _loadingProductNames: false }));
+                                }
+                              }
+                            }}
+                          >
+                            <option value="">Select existing product</option>
+                            {newProductForm._productNames.map((n:string) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs bg-gray-100 rounded"
+                            onClick={() => setNewProductForm({ ...newProductForm, _useExistingProduct: false, name: '' })}
+                          >New</button>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center space-x-2">
+                          <input
+                            type="text"
+                            className="flex-1 px-3 py-2 border rounded"
+                            placeholder="Enter new product name"
+                            value={newProductForm.name}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs bg-gray-100 rounded"
+                            onClick={() => setNewProductForm({ ...newProductForm, _useExistingProduct: true })}
+                          >Existing</button>
+                        </div>
+                      )}
+                      {newProductForm._loadingProductNames && <p className="text-xs text-gray-500 mt-1">Loading product names...</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Variant Name (optional)</label>
+                      <input
+                        type="text"
+                        value={newProductForm.variantName}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, variantName: e.target.value })}
+                        placeholder="e.g. 128GB Midnight Blue"
+                        className="mt-1 block w-full px-3 py-2 border rounded"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">If left blank, variant name will be composed from product + attribute values.</p>
                     </div>
 
                     <div>
@@ -534,6 +607,124 @@ const Inventory: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Attributes Selection */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">Attributes</label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex flex-col md:flex-row md:items-center md:space-x-2 space-y-2 md:space-y-0">
+                          <select
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm._selectedAttributeId}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, _selectedAttributeId: e.target.value })}
+                            onFocus={async () => {
+                              // lazy load attributes when user first focuses
+                              if (!newProductForm._allAttributes || newProductForm._allAttributes.length === 0) {
+                                const { getAttributes } = await import('@/services/product.services');
+                                const attrs = await getAttributes();
+                                setNewProductForm((prev: any) => ({ ...prev, _allAttributes: attrs }));
+                              }
+                            }}
+                          >
+                            <option value="">Select attribute</option>
+                            {Array.isArray(newProductForm._allAttributes) && newProductForm._allAttributes.map((a: any) => (
+                              <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder={'Value (e.g. 16GB, 6.5" Display)'}
+                            className="flex-1 px-3 py-2 border rounded"
+                            value={newProductForm._attributeValue}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProductForm({ ...newProductForm, _attributeValue: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                            onClick={() => {
+                              const attrId = newProductForm._selectedAttributeId;
+                              const val = (newProductForm._attributeValue || '').trim();
+                              if (!attrId || !val) return;
+                              // prevent duplicate attribute id entries
+                              if (newProductForm.attributes.some((a: any) => a.id == attrId)) return;
+                              setNewProductForm({
+                                ...newProductForm,
+                                attributes: [...newProductForm.attributes, { id: Number(attrId), value: val }],
+                                _selectedAttributeId: '',
+                                _attributeValue: ''
+                              });
+                            }}
+                          >Add</button>
+                          <button
+                            type="button"
+                            className="px-3 py-2 bg-gray-100 text-gray-800 rounded text-sm"
+                            onClick={() => setNewProductForm({ ...newProductForm, _creatingAttribute: !newProductForm._creatingAttribute })}
+                          >{newProductForm._creatingAttribute ? 'Cancel' : 'New Attribute'}</button>
+                        </div>
+
+                        {newProductForm._creatingAttribute && (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              placeholder="New attribute name (e.g. RAM)"
+                              className="flex-1 px-3 py-2 border rounded"
+                              value={newProductForm._newAttributeName}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, _newAttributeName: e.target.value })}
+                            />
+                            <button
+                              type="button"
+                              className="px-3 py-2 bg-green-600 text-white rounded text-sm"
+                              onClick={async () => {
+                                const raw = (newProductForm._newAttributeName || '').trim();
+                                if (!raw) return;
+                                try {
+                                  const { createAttribute, getAttributes } = await import('@/services/product.services');
+                                  const created = await createAttribute(raw);
+                                  const list = await getAttributes();
+                                  setNewProductForm((prev: any) => ({
+                                    ...prev,
+                                    _allAttributes: list,
+                                    _creatingAttribute: false,
+                                    _newAttributeName: '',
+                                    _selectedAttributeId: created ? created.id : prev._selectedAttributeId
+                                  }));
+                                } catch (e) {
+                                  console.error('Failed to create attribute', e);
+                                  alert('Failed to create attribute');
+                                }
+                              }}
+                            >Save</button>
+                          </div>
+                        )}
+
+                        {/* Selected Attributes List */}
+                        {Array.isArray(newProductForm.attributes) && newProductForm.attributes.length > 0 && (
+                          <div className="border rounded p-2 bg-gray-50">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Selected Attributes</p>
+                            <ul className="space-y-1 max-h-40 overflow-y-auto text-sm">
+                              {newProductForm.attributes.map((a: any, idx: number) => {
+                                const name = (newProductForm._allAttributes.find((x: any) => x.id === a.id) || {}).name || `Attribute ${a.id}`;
+                                return (
+                                  <li key={a.id} className="flex justify-between items-center bg-white border rounded px-2 py-1">
+                                    <span className="mr-2 truncate">{name}: <span className="text-gray-600">{a.value}</span></span>
+                                    <button
+                                      type="button"
+                                      className="text-red-600 hover:text-red-800 text-xs"
+                                      onClick={() => {
+                                        setNewProductForm({
+                                          ...newProductForm,
+                                          attributes: newProductForm.attributes.filter((_: any, i: number) => i !== idx)
+                                        });
+                                      }}
+                                    >Remove</button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Image</label>
                       <input type="file" accept="image/*" onChange={(e) => setNewProductForm({ ...newProductForm, imageFile: e.target.files?.[0] || null })} className="mt-1 block w-full" />
@@ -546,6 +737,8 @@ const Inventory: React.FC = () => {
                     <button onClick={async () => {
                       try {
                         const categoryIds: number[] = Array.isArray(newProductForm.categoryIds) ? newProductForm.categoryIds : [];
+                        // Backend currently auto-builds variantName from product name + attributes.
+                        // To support custom variantName we pass attributes as usual; after creation we could update variant if needed.
                         const productPayload = {
                           name: newProductForm.name,
                           description: newProductForm.description,
@@ -553,12 +746,22 @@ const Inventory: React.FC = () => {
                           price: Number(newProductForm.price),
                           stockQnt: Number(newProductForm.stockQnt),
                           categoryIds,
-                          attributes: [],
+                          attributes: Array.isArray(newProductForm.attributes) ? newProductForm.attributes : [],
                         };
 
                         // Create product + variant first
                         const createRes = await addProduct(productPayload);
                         const variantId = createRes?.variantId || (createRes?.data && createRes.data.variantId) || null;
+
+                        // If user provided an explicit variantName, update the variant (requires variant update endpoint)
+                        if (variantId && newProductForm.variantName && newProductForm.variantName.trim()) {
+                          try {
+                            const { updateVariant } = await import('@/services/variant.services');
+                            await updateVariant(variantId, { variantName: newProductForm.variantName.trim() });
+                          } catch (e) {
+                            console.warn('Failed to set custom variant name, using default generated one.', e);
+                          }
+                        }
 
                         // If image file provided and we have variantId, upload with entity=variant
                         if (newProductForm.imageFile && variantId) {
@@ -632,13 +835,13 @@ const Inventory: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-900">{p.variantName}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.brand}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.categories}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{p.price != null ? `$${p.price}` : null}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{p.price != null ? formatCurrencyUSD(Number(p.price)) : null}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.stockQnt != null ? p.stockQnt : null}</td>
                           <td className="px-6 py-4"><span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>{stockStatus.label}</span></td>
                           <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2">
                             <button onClick={() => openViewModal(p)} className="text-gray-700 hover:text-gray-900" title="View"><IconComponent iconName="Eye" size={16} /></button>
                             <button onClick={() => handleEditVariant(p)} disabled={p.isDefaultVariant} className={`text-blue-600 hover:text-blue-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Edit"><IconComponent iconName="Edit" size={16} /></button>
-                            <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button>
+                            {/* <button className="text-green-600 hover:text-green-900"><IconComponent iconName="Package" size={16} /></button> */}
                             <button onClick={() => handleDeleteVariant(p)} disabled={p.isDefaultVariant} className={`text-red-600 hover:text-red-900 ${p.isDefaultVariant ? 'opacity-50 cursor-not-allowed' : ''}`} title="Delete"><IconComponent iconName="Trash2" size={16} /></button>
                           </div></td>
                         </tr>
@@ -668,7 +871,7 @@ const Inventory: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
             <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-blue-100 rounded-md"><IconComponent iconName="Package" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.totalVariants}</div><div className="text-sm text-gray-500">Total Product Variants</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
             <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-yellow-100 rounded-md"><IconComponent iconName="AlertTriangle" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.lowStockItems}</div><div className="text-sm text-gray-500">Low Stock Items</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
-            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">${inventoryStats.totalInventoryValue.toLocaleString()}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
+            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{formatCurrencyUSD(inventoryStats.totalInventoryValue)}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
           </div>
         </>
       )}
@@ -701,7 +904,7 @@ const Inventory: React.FC = () => {
                   {selectedVariant?.price != null && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Price</label>
-                      <p className="mt-1 text-sm text-gray-900">${selectedVariant.price}</p>
+                      <p className="mt-1 text-sm text-gray-900">{formatCurrencyUSD(Number(selectedVariant.price))}</p>
                     </div>
                   )}
                   {selectedVariant?.stockQnt != null && (

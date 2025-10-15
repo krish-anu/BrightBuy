@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { getAssignedDeliveries, updateDeliveryStatusForStaff } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
   id: string;
   orderId: string;
-  status: 'assigned' | 'in_transit' | 'delivered' | 'failed';
+  status: "assigned" | "in_transit" | "delivered" | "failed";
   customerAddress: string;
   customerPhone: string;
   estimatedDelivery?: string; // <-- make optional
@@ -30,23 +31,37 @@ const DeliveryStatus: React.FC = () => {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const IconComponent: React.FC<IconComponentProps> = ({ iconName, size = 20 }) => {
-    const Icon = LucideIcons[iconName] as unknown as React.FC<React.SVGProps<SVGSVGElement>>;
-    return Icon ? <Icon width={size} height={size} /> : <LucideIcons.Circle width={size} height={size} />;
+  const IconComponent: React.FC<IconComponentProps> = ({
+    iconName,
+    size = 20,
+  }) => {
+    const Icon = LucideIcons[iconName] as unknown as React.FC<
+      React.SVGProps<SVGSVGElement>
+    >;
+    return Icon ? (
+      <Icon width={size} height={size} />
+    ) : (
+      <LucideIcons.Circle width={size} height={size} />
+    );
   };
 
-  const getStatusColor = (status: Delivery['status']) => {
+  const getStatusColor = (status: Delivery["status"]) => {
     switch (status) {
-      case 'assigned': return 'bg-blue-100 text-blue-800';
-      case 'in_transit': return 'bg-yellow-100 text-yellow-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "assigned":
+        return "bg-blue-100 text-blue-800";
+      case "in_transit":
+        return "bg-yellow-100 text-yellow-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const formatDate = (dateString: string | undefined) => {
-    return dateString ? new Date(dateString).toLocaleString() : 'N/A';
+    return dateString ? new Date(dateString).toLocaleString() : "N/A";
   };
 
   const safeNumber = (value: any): number => {
@@ -141,14 +156,20 @@ const DeliveryStatus: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Update Delivery Status</h1>
-        <p className="text-gray-600 mt-2">Update the status of your assigned deliveries</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Update Delivery Status
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Update the status of your assigned deliveries
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Deliveries List */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Deliveries</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Active Deliveries
+          </h3>
           <div className="space-y-4">
             {fetchError ? (
               <div className="p-4 bg-yellow-50 text-yellow-800 rounded">{fetchError}. {currentUser ? `Token payload: ${JSON.stringify(currentUser)}` : ''}</div>
@@ -182,7 +203,7 @@ const DeliveryStatus: React.FC = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <IconComponent iconName="DollarSign" size={14} />
-                          <span>${(delivery as any).orderTotal ? Number((delivery as any).orderTotal).toFixed(2) : '0.00'}</span>
+                          <span>{formatCurrencyUSD((delivery as any).orderTotal ?? 0)}</span>
                         </div>
                       </div>
                     </div>
@@ -194,12 +215,16 @@ const DeliveryStatus: React.FC = () => {
 
         {/* Status Update Panel */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h3>
-          
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Update Status
+          </h3>
+
           {selectedDelivery ? (
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-2">{selectedDelivery.id}</h4>
+                <h4 className="font-medium text-gray-900 mb-2">
+                  {selectedDelivery.id}
+                </h4>
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
                     <IconComponent iconName="Package" size={14} />
@@ -215,23 +240,29 @@ const DeliveryStatus: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <IconComponent iconName="Clock" size={14} />
-                    <span>Est: {formatDate(selectedDelivery.estimatedDelivery)}</span>
+                    <span>
+                      Est: {formatDate(selectedDelivery.estimatedDelivery)}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">New Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Status
+                </label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   value={statusUpdate}
                   onChange={(e) => setStatusUpdate(e.target.value)}
                 >
                   <option value="">Select new status...</option>
-                  {selectedDelivery.status === 'assigned' && (
-                    <option value="in_transit">Start Delivery (In Transit)</option>
+                  {selectedDelivery.status === "assigned" && (
+                    <option value="in_transit">
+                      Start Delivery (In Transit)
+                    </option>
                   )}
-                  {selectedDelivery.status === 'in_transit' && (
+                  {selectedDelivery.status === "in_transit" && (
                     <>
                       <option value="delivered">Mark as Delivered</option>
                       <option value="failed">Mark as Failed</option>
@@ -241,7 +272,9 @@ const DeliveryStatus: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes (optional)
+                </label>
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   rows={3}
@@ -298,7 +331,9 @@ const DeliveryStatus: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-gray-200">
-                <h5 className="font-medium text-gray-700 mb-3">Quick Actions</h5>
+                <h5 className="font-medium text-gray-700 mb-3">
+                  Quick Actions
+                </h5>
                 <div className="grid grid-cols-2 gap-2">
                   <button className="flex items-center justify-center px-3 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200">
                     <IconComponent iconName="Navigation" size={16} />
