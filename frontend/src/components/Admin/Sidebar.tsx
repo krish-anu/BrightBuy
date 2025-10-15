@@ -181,34 +181,43 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Logout Modal */}
+      {/* Logout Modal - match User Management modals */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <IconComponent iconName="LogOut" size={20} />
-              </div>
-              <div className="ml-4">
+        <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-lg bg-white border-gray-200">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Logout</h3>
-                <p className="text-sm text-gray-500">
-                  Are you sure you want to logout?
-                </p>
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <IconComponent iconName="X" size={20} />
+                </button>
               </div>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-              >
-                Logout
-              </button>
+              <div className="mb-4 flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <IconComponent iconName="LogOut" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-900 font-medium">Are you sure you want to logout?</p>
+                  <p className="text-sm text-gray-500 mt-1">You’ll be redirected to the login page.</p>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
