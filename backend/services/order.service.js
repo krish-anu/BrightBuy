@@ -1,66 +1,35 @@
 const ApiError = require('../utils/ApiError');
 
-const { updateStock, } = require('../services/variant.service')
-
+// Use DB stored procedures for atomic order creation and item handling
 const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
-  // Insert address if provided (Standard Delivery) and capture id
-  let deliveryAddressId = null;
-  if (deliveryMode === 'Standard Delivery' && finalAddress && typeof finalAddress === 'object') {
-    const line1 = finalAddress.line1 || '';
-    const line2 = finalAddress.line2 || null;
-    const city = finalAddress.city || '';
-    const postalCode = finalAddress.postalCode || null;
-    if (line1 && city) {
-      const addrRes = await connection.query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
-      const r = Array.isArray(addrRes) ? addrRes[0] : addrRes;
-      deliveryAddressId = r.insertId || r?.insertId;
-    }
+  // Call sp_create_order to insert optional address (for Standard Delivery), order, and delivery row
+  const line1 = finalAddress?.line1 || null;
+  const line2 = finalAddress?.line2 || null;
+  const city = finalAddress?.city || null;
+  const postalCode = finalAddress?.postalCode || null;
+
+  const [spOrderRows] = await connection.query(
+    `CALL sp_create_order(?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, deliveryMode, paymentMethod, line1, line2, city, postalCode, deliveryCharge]
+  );
+  // CALL returns multiple result sets; first set contains our SELECT with orderId
+  // Depending on mysql2 version: spOrderRows[0] or spOrderRows[0][0]
+  const orderRow = Array.isArray(spOrderRows) && spOrderRows[0] ? (Array.isArray(spOrderRows[0]) ? spOrderRows[0][0] : spOrderRows[0]) : null;
+  const orderId = orderRow?.orderId || orderRow?.ORDERID || orderRow?.order_id;
+  if (!orderId) throw new ApiError('Failed to create order via stored procedure', 500);
+
+  // Add items using sp_add_order_item which locks stock and sets totals
+  for (const item of items) {
+    await connection.query(`CALL sp_add_order_item(?, ?, ?, ?)`, [orderId, item.variantId, item.quantity, item.isBackOrdered ? 1 : 0]);
   }
-  const orderId = await createOrder(userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, connection);
-  await addOrderItems(orderId, items, connection);
+
+  // Fetch and return full order details
   return getOrderDetails(orderId, connection);
 };
 
-const createOrder = async (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod,connection) => {
-  const status = paymentMethod === 'CashOnDelivery' ? 'Confirmed' : 'Pending';
-  const sql = `
-    INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-  const values = [userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status];
-  const [result] = await connection.query(sql, values);
-  return result.insertId;
-};
-
-const addOrderItems = async (orderId, items, connection) => {
-  for (const item of items) {
-    const [variantRows] = await connection.query(`SELECT * FROM product_variants WHERE id = ?`, [item.variantId]);
-
-    if (variantRows.length === 0) {
-      throw new ApiError('Variant not found', 404);
-    }
-
-    const variant = variantRows[0];
-
-    const sql = `
-      INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice, isBackOrdered)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `;
-
-    await connection.query(sql, [
-      orderId,
-      item.variantId,
-      item.quantity,
-      variant.price,
-      variant.price * item.quantity,
-      item.isBackOrdered
-    ]);
-
-    if (!item.isBackOrdered) {
-      await updateStock(item.variantId, -item.quantity, connection);
-    }
-  }
-};
+// Legacy helpers kept for completeness (unused when using stored procedures)
+const createOrder = async () => { throw new ApiError('createOrder is superseded by stored procedures', 500); };
+const addOrderItems = async () => { throw new ApiError('addOrderItems is superseded by stored procedures', 500); };
 
 const getOrderDetails = async (orderId, connection) => {
   const [orders] = await connection.query(`SELECT * FROM orders WHERE id = ?`, [orderId]);
