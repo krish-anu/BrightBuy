@@ -37,7 +37,7 @@ export function OrderItemRow({ item }: { item: OrderItem }) {
           <p className="text-s text-muted-foreground">x {item.quantity}</p>
         </div>
       </div>
-      <div className="flex flex-col justify-between md:col-span-2 col-span-5 text-right">
+      <div className="flex flex-col justify-between md:col-span-2 col-span-5 text-right pr-2">
         <p className="font-bold text-base md:text-lg">
           LKR {(item.unitPrice * item.quantity).toFixed(2)}
         </p>

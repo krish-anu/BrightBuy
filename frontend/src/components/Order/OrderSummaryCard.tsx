@@ -37,7 +37,7 @@ export function OrderSummaryCard({
   );
   return (
     <aside
-      className={`flex flex-col  gap-3 bg-accent rounded-md p-5 shadow-sm max-h-fit md:mt-12 ${
+      className={`flex flex-col  gap-3 bg-accent rounded-md p-5 shadow-sm max-h-fit ${
         className || ""
       }`}
     >

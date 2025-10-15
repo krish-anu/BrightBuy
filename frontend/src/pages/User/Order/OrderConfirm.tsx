@@ -45,8 +45,8 @@ export default function OrderConfirm() {
 
     // Calculate subtotal by computing lineTotal for each item
     const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    const shipping = 0; // compute later
-    const discount = 0; // compute later
+    const shipping = 0;  
+    const discount = 0; 
     const total = subtotal + shipping - discount;
 
     return (
@@ -62,6 +62,7 @@ export default function OrderConfirm() {
                     discount={discount}
                     total={total}
                     onNext={() => navigate("/order/payment/temp-id")}
+                    className="mt-12"
                 />
             </div>
         </div>

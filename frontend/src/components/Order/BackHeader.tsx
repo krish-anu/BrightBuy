@@ -14,6 +14,7 @@ export function BackHeader({ title, onBack, className }: BackHeaderProps) {
     <div className={`flex flex-col gap-3 ${className || ""}`}>
       <Button
         variant="ghost"
+        size="lg"
         onClick={onBack || (() => navigate(-1))}
         aria-label="Go back"
         className="w-fit px-0 text-base font-normal"

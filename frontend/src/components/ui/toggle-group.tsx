@@ -60,7 +60,10 @@ function ToggleGroupItem({
           variant: context.variant || variant,
           size: context.size || size,
         }),
-        "min-w-0 flex-1 shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 focus:border-0 focus:outline-2 focus:shadow-sm focus:shadow-muted data-[variant=outline]:border-b data-[variant=outline]:rounded-md",
+        // Layout and focus styles (no border reset on focus)
+        "min-w-0 data-[variant=order]:min-w-fit flex-1 shrink-0 shadow-none focus-visible:z-10 focus:outline-2 focus:shadow-sm focus:shadow-muted",
+        // Only apply segmented rounding for outline variant; allow callers to control rounding via className
+        "data-[variant=outline]:first:rounded-l-md data-[variant=outline]:last:rounded-r-md data-[variant=outline]:rounded-md",
         className,
       )}
       {...props}
