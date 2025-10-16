@@ -64,7 +64,13 @@ export default function ShippingAddressSection() {
 
 	return (
 		<div>
-			<h2 className="text-xl md:text-2xl font-bold">Shipping Address</h2>
+            <span>
+			    <h2 className="text-xl md:text-2xl font-bold">Shipping Address</h2>
+                <p className="text-md md:text-lg text-muted-foreground">
+                    Please choose your preferred shipping address or add a new one below.
+                </p>
+            </span>
+
 			<div className="flex flex-row rounded-lg mt-4 p-4 bg-muted/20">
 				<div className="w-full">
 					<AddressSummary

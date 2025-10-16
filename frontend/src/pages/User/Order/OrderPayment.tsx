@@ -3,6 +3,7 @@ import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
 import PaymentMethod  from "@/components/Order/PaymentMethod";
 import ShippingMethod from "@/components/Order/ShippingMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
+import { Separator } from "@/components/ui/separator";
 
 export default function OrderPayment() {
   return (
@@ -11,8 +12,10 @@ export default function OrderPayment() {
       <div className="grid md:grid-cols-4 gap-6">
         <div className="md:col-span-3 space-y-8">
           <ShippingMethod/>
+          <Separator />
           {/* TODO Shipping Address */}
           <ShippingAddressSection />
+          <Separator />
           <PaymentMethod/>
 
         </div>

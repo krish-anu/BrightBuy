@@ -1,11 +1,15 @@
-
 import { ToggleGroup } from "../ui/toggle-group"
 import ConfirmationItemsRow  from "@/components/Order/ConfirmationItemsRow";
 
 export default function ShippingMethod() {
     return(
         <section className="flex flex-col gap-4  rounded-md">
-            <h2 className="text-xl md:text-2xl font-bold">Shipping Method</h2>
+            <span>
+              <h2 className="text-xl md:text-2xl font-bold">Shipping Method</h2>
+              <p className="text-md md:text-lg text-muted-foreground">
+                Choose how you would like to receive your order.
+              </p>
+            </span>
             <div className="flex flex-col gap-4">
               <ToggleGroup
                 type="single"

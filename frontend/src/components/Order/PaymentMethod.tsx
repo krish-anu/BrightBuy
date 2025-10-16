@@ -1,4 +1,3 @@
-
 import { ToggleGroup } from "../ui/toggle-group"
 import ConfirmationItemsRow from "@/components/Order/ConfirmationItemsRow"
 
@@ -6,6 +5,9 @@ export default function PaymentMethod() {
     return(
         <section className="flex flex-col gap-4  rounded-md">
             <h2 className="text-xl md:text-2xl font-bold">Payment Method</h2>
+            <p className="text-md md:text-lg text-muted-foreground">
+              Select your payment option.
+            </p>
             <div className="flex flex-col gap-4">
               <ToggleGroup
                 type="single"
