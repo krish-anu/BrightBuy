@@ -1,19 +1,13 @@
 const userQueries = {
   getAll: `
-    SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-      TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
-      a.cityId AS addressCityId,
+    SELECT u.id, u.name, u.email, u.role, u.role_accepted,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
-    LEFT JOIN addresses a ON u.addressId = a.id
   `,
   getById: `
-    SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-      TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
-      a.cityId AS addressCityId,
+    SELECT u.id, u.name, u.email, u.role, u.role_accepted,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
-    LEFT JOIN addresses a ON u.addressId = a.id
     WHERE u.id = ?
   `,
   getByEmail: `
@@ -22,12 +16,9 @@ const userQueries = {
     WHERE email = ?
   `,
   getAllApproved: `
-    SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-           TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
-           a.cityId AS addressCityId,
+    SELECT u.id, u.name, u.email, u.role, u.role_accepted,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
-    LEFT JOIN addresses a ON u.addressId = a.id
     WHERE u.role_accepted = 1
   `,
   getDeliveryStaff: `
@@ -42,17 +33,17 @@ const userQueries = {
     ORDER BY u.createdAt DESC
   `,
   insert: `
-    INSERT INTO users (name, email, password, role, role_accepted, phone, addressId)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (name, email, password, role, role_accepted, phone)
+    VALUES (?, ?, ?, ?, ?, ?)
   `,
   update: `
     UPDATE users
-    SET name = ?, email = ?, password = ?, role = ?, role_accepted = ?, phone = ?, addressId = ?
+    SET name = ?, email = ?, password = ?, role = ?, role_accepted = ?, phone = ?
     WHERE id = ?
   `,
   updateAdmin: `
     UPDATE users
-    SET name = ?, email = ?, role = ?, role_accepted = ?, phone = ?, addressId = ?
+    SET name = ?, email = ?, role = ?, role_accepted = ?, phone = ?
     WHERE id = ?
   `,
   delete: `
@@ -62,19 +53,13 @@ const userQueries = {
   findUserById: `
     SELECT u.name,
            u.email,
-           u.phone,
-           u.addressId,
-           a.line1 AS addressLine1,
-           a.line2 AS addressLine2,
-           a.cityId AS addressCityId,
-           a.postalCode AS addressPostalCode
+           u.phone
     FROM users u
-    LEFT JOIN addresses a ON u.addressId = a.id
     WHERE u.id = ?
   `,
   updateProfile: `
     UPDATE users
-    SET phone = ?, addressId = ?
+    SET phone = ?
     WHERE id = ?
   `
   ,

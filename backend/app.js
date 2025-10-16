@@ -12,6 +12,7 @@ const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
 const webhookRouter = require('./routes/webhook');
 const userRouter = require("./routes/user");
+const addressRouter = require('./routes/address');
 const paymentRouter = require('./routes/payment');
 const deliveryRouter = require('./routes/delivery');
 const attributeRouter = require('./routes/attribute');
@@ -34,6 +35,8 @@ app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);
 app.use('/api/order', orderRouter);
 app.use('/api/city', cityRouter);
+// Mount more specific routes before generic ones to avoid any routing ambiguity
+app.use('/api/users/addresses', addressRouter);
 app.use('/api/users', userRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/delivery', deliveryRouter);

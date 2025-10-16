@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { RoleProvider } from "../../contexts/RoleContext";
-import UserPrivateRoute from "./UserPrivateRoute";
+// import UserPrivateRoute from "./UserPrivateRoute";
 
 
 // Admin Components

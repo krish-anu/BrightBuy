@@ -1,26 +1,29 @@
-import React, { useEffect, useState } from "react";
-import axiosInstance from "../../axiosConfig"; // Import your configured axios instance
+import React, { useEffect, useMemo, useState } from "react";
+import axiosInstance from "../../axiosConfig";
 import { getAllCities, type City } from "@/services/city.services";
+import {
+  listAddresses,
+  addAddress as apiAddAddress,
+  updateAddress as apiUpdateAddress,
+  deleteAddress as apiDeleteAddress,
+  makeDefaultAddress,
+  type Address,
+} from "@/services/address.services";
 
 /**
  * UserProfile
  *
- * - Fetches user profile from backend (GET /api/user/profile)
- * - Shows a single "Full name" (from backend) and email (from backend)
- * - Editable fields: phone, addressLine1, addressLine2, postalCode, city
- * - Save button sends PATCH /api/user/profile with updated fields
+ * - Fetches user profile from backend (GET /api/users/profile)
+ * - Shows full name and email (read-only)
+ * - Editable: phone only (PATCH /api/users/profile)
+ * - Addresses: list, add, edit, delete, make default via /api/users/addresses endpoints
  */
 
 type Profile = {
   fullName: string;
   email: string;
   phone?: string;
-  address?: {
-    line1?: string;
-    line2?: string;
-    postalCode?: string;
-    cityId?: number | null;
-  };
+  addresses?: Address[];
 };
 
 export default function UserProfile() {
@@ -38,16 +41,18 @@ export default function UserProfile() {
 
   // Editable local form state
   const [phone, setPhone] = useState("");
+  const [cities, setCities] = useState<City[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [cities, setCities] = useState<City[]>([]);
   const [cityId, setCityId] = useState<number | null>(null);
 
   // Change password state
   const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
@@ -56,36 +61,41 @@ export default function UserProfile() {
     setError(null);
     try {
       const resp = await axiosInstance.get("/api/users/profile");
-
       const data: Profile = resp.data;
       setProfile(data);
-
-      // try load avatar from localStorage (frontend-only) after profile loads
-      try {
-        const stored = localStorage.getItem('profile_avatar');
-        if (stored) setAvatarUrl(stored);
-      } catch (e) {
-        // ignore
-      }
-
-      // populate editable fields
       setPhone(data.phone || "");
-      setLine1(data.address?.line1 || "");
-      setLine2(data.address?.line2 || "");
-      setPostalCode(data.address?.postalCode || "");
-      setCityId(data.address?.cityId ?? null);
-      try {
-        const cityList = await getAllCities();
-        setCities(cityList);
-      } catch (e) {
-        // non-fatal
+      // addresses
+      let addrs = Array.isArray(data.addresses) ? data.addresses : [];
+      if (!addrs.length) {
+        addrs = await listAddresses();
       }
+      setAddresses(addrs);
+      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      if (def) {
+        setEditingId(def.id);
+        setLine1(def.line1 || "");
+        setLine2(def.line2 || "");
+        setPostalCode(def.postalCode || "");
+        setCityId(def.cityId ?? null);
+      } else {
+        setEditingId(null);
+        setLine1("");
+        setLine2("");
+        setPostalCode("");
+        setCityId(null);
+      }
+      const cityList = await getAllCities();
+      setCities(cityList);
+      try {
+        const stored = localStorage.getItem("profile_avatar");
+        if (stored) setAvatarUrl(stored);
+      } catch {}
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to load profile"
+          err?.response?.data?.error ||
+          err?.message ||
+          "Failed to load profile"
       );
     } finally {
       setLoading(false);
@@ -97,34 +107,43 @@ export default function UserProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <h2 className="text-2xl font-semibold text-primary mb-4">My Profile</h2>
+        <div className="text-gray-600">Loading your profile...</div>
+      </div>
+    );
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setSuccess(null);
-
-    const payload = {
-      phone: phone || null,
-      address: {
-        line1: line1 || null,
-        line2: line2 || null,
-        postalCode: postalCode || null,
-        cityId: cityId ?? null,
-      },
-    };
+    // Include address in profile save so updates are persisted even if user doesn't click the address-specific button
+    const addrPayload = (line1 && (cityId !== null && cityId !== undefined))
+      ? {
+          id: editingId || undefined,
+          line1,
+          line2: line2 || null,
+          postalCode: postalCode || null,
+          cityId: Number(cityId),
+          // don't force default here; separate action handles it
+        }
+      : undefined;
+    const payload: any = { phone: phone || null };
+    if (addrPayload) payload.address = addrPayload;
 
     try {
       const resp = await axiosInstance.patch("/api/users/profile", payload);
-
       const updated: Profile = resp.data;
       setProfile(updated);
       setSuccess("Profile updated successfully");
-      // reflect saved values (in case backend normalizes)
       setPhone(updated.phone || "");
-      setLine1(updated.address?.line1 || "");
-      setLine2(updated.address?.line2 || "");
-  setPostalCode(updated.address?.postalCode || "");
-  setCityId(updated.address?.cityId ?? null);
+      const addrs = Array.isArray(updated.addresses) ? updated.addresses : await listAddresses();
+      setAddresses(addrs);
+      // Reset editor to default address after a profile save
+      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      if (def) await handleSelectForEdit(def);
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
@@ -134,13 +153,78 @@ export default function UserProfile() {
       );
     } finally {
       setSaving(false);
-      // clear success after a short time
       setTimeout(() => setSuccess(null), 3500);
     }
   }
 
-  if (loading) return <div>Loading profile...</div>;
-  if (error && !profile) return <div className="text-red-600">Error: {error}</div>;
+  const cityNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    cities.forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [cities]);
+
+  async function handleSelectForEdit(addr: Address) {
+    setEditingId(addr.id);
+    setLine1(addr.line1 || "");
+    setLine2(addr.line2 || "");
+    setPostalCode(addr.postalCode || "");
+    setCityId(addr.cityId ?? null);
+  }
+
+  async function handleAddOrUpdateAddress(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      if (!line1 || cityId === null || cityId === undefined) {
+        setError("Address line1 and city are required");
+        return;
+      }
+      if (editingId) {
+        await apiUpdateAddress(editingId, { line1, line2, postalCode, cityId });
+      } else {
+        await apiAddAddress({ line1, line2, postalCode, cityId, isDefault: addresses.length ? 0 : 1 });
+      }
+      const addrs = await listAddresses();
+      setAddresses(addrs);
+      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      if (def) await handleSelectForEdit(def);
+      setSuccess(editingId ? "Address updated" : "Address added");
+      setEditingId(null);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Failed to save address");
+    }
+  }
+
+  async function handleDelete(id: number) {
+    setError(null);
+    try {
+      await apiDeleteAddress(id);
+      const addrs = await listAddresses();
+      setAddresses(addrs);
+      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      if (def) await handleSelectForEdit(def);
+      setSuccess("Address deleted");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Failed to delete address");
+    }
+  }
+
+  async function handleMakeDefault(id: number) {
+    setError(null);
+    try {
+      await makeDefaultAddress(id);
+      const addrs = await listAddresses();
+      setAddresses(addrs);
+      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      if (def) await handleSelectForEdit(def);
+      setSuccess("Default address updated");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Failed to set default address");
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -150,7 +234,6 @@ export default function UserProfile() {
       {success && <div className="text-green-600 mb-3">{success}</div>}
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Avatar display and Change button (frontend-only) */}
         <div className="flex items-center mb-6 gap-4">
           <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
             <img
@@ -291,53 +374,65 @@ export default function UserProfile() {
           />
         </div>
 
-        {/* Address fields */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Address - Line 1</label>
-          <input
-            type="text"
-            value={line1}
-            onChange={(e) => setLine1(e.target.value)}
-            placeholder="Address line 1"
-            className="mt-1 block w-full border rounded p-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Address - Line 2</label>
-          <input
-            type="text"
-            value={line2}
-            onChange={(e) => setLine2(e.target.value)}
-            placeholder="Address line 2"
-            className="mt-1 block w-full border rounded p-2"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Postal code</label>
-            <input
-              type="text"
-              value={postalCode}
-              onChange={(e) => setPostalCode(e.target.value)}
-              placeholder="Postal code"
-              className="mt-1 block w-full border rounded p-2"
-            />
+        {/* Addresses list */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-primary mb-2">Addresses</h3>
+          <div className="space-y-2">
+            {addresses.map((a) => (
+              <div key={a.id} className={`flex items-center justify-between border rounded p-3 ${a.isDefault ? 'bg-green-50' : 'bg-white'}`}>
+                <div className="text-sm">
+                  <div className="font-medium">{a.line1}{a.line2 ? `, ${a.line2}` : ''}</div>
+                  <div className="text-gray-600">{a.postalCode || ''} {a.cityId ? cityNameById.get(a.cityId) || '' : ''}</div>
+                  {a.isDefault ? <span className="text-green-700 font-medium">Default</span> : null}
+                </div>
+                <div className="flex gap-2">
+                  {!a.isDefault && (
+                    <button type="button" className="px-3 py-1 border rounded" onClick={() => handleMakeDefault(a.id)}>Make default</button>
+                  )}
+                  <button type="button" className="px-3 py-1 border rounded" onClick={() => handleSelectForEdit(a)}>Edit</button>
+                  <button type="button" className="px-3 py-1 border rounded text-red-600" onClick={() => handleDelete(a.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+            {addresses.length === 0 && (
+              <div className="text-sm text-gray-600">No addresses yet. Add one below.</div>
+            )}
           </div>
+        </div>
 
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">City</label>
-            <select
-              className="mt-1 block w-full border rounded p-2 bg-white"
-              value={cityId ?? ""}
-              onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">Select a city</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+        {/* Address editor */}
+        <div className="mt-4 p-3 border rounded">
+          <h4 className="font-medium mb-2">{editingId ? 'Edit address' : 'Add new address'}</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700">Address - Line 1</label>
+              <input className="mt-1 block w-full border rounded p-2" value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Address line 1" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700">Address - Line 2</label>
+              <input className="mt-1 block w-full border rounded p-2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Address line 2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Postal code</label>
+              <input className="mt-1 block w-full border rounded p-2" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="Postal code" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">City</label>
+              <select className="mt-1 block w-full border rounded p-2 bg-white" value={cityId ?? ''} onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Select a city</option>
+                {cities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90" onClick={handleAddOrUpdateAddress}>
+              {editingId ? 'Update address' : 'Add address'}
+            </button>
+            {editingId && (
+              <button type="button" className="px-3 py-2 border rounded" onClick={() => { setEditingId(null); setLine1(''); setLine2(''); setPostalCode(''); setCityId(null); }}>Cancel</button>
+            )}
           </div>
         </div>
 
@@ -350,21 +445,7 @@ export default function UserProfile() {
             {saving ? "Saving..." : "Save changes"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              // reset local form state to last loaded profile
-              setPhone(profile?.phone || "");
-              setLine1(profile?.address?.line1 || "");
-              setLine2(profile?.address?.line2 || "");
-              setPostalCode(profile?.address?.postalCode || "");
-              setCityId(profile?.address?.cityId ?? null);
-              setError(null);
-            }}
-            className="px-3 py-2 border rounded"
-          >
-            Cancel
-          </button>
+          <button type="button" onClick={() => { setPhone(profile?.phone || ''); setError(null); }} className="px-3 py-2 border rounded">Cancel</button>
         </div>
       </form>
 

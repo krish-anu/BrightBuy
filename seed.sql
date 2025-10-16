@@ -76,16 +76,19 @@ CREATE TABLE IF NOT EXISTS cities (
 
 -- Addresses (new normalized table replacing users.address JSON and orders.deliveryAddress JSON)
 CREATE TABLE IF NOT EXISTS addresses (
-  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  line1 VARCHAR(255) NOT NULL,
-  line2 VARCHAR(255) DEFAULT NULL,
-	city VARCHAR(120) NOT NULL,
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	userId INT DEFAULT NULL,
+	line1 VARCHAR(255) NOT NULL,
+	line2 VARCHAR(255) DEFAULT NULL,
+	city VARCHAR(120) DEFAULT NULL,
 	cityId INT DEFAULT NULL,
-  postalCode VARCHAR(32) DEFAULT NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	postalCode VARCHAR(32) DEFAULT NULL,
+	isDefault TINYINT(1) NOT NULL DEFAULT 0,
+	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	KEY (cityId),
-	CONSTRAINT fk_addresses_city FOREIGN KEY (cityId) REFERENCES cities(id) ON UPDATE CASCADE ON DELETE SET NULL
+	KEY (userId),
+	KEY (isDefault)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -96,10 +99,8 @@ CREATE TABLE IF NOT EXISTS users (
 	password VARCHAR(255) NOT NULL,
 	role_accepted TINYINT(1) DEFAULT 0,
 	phone VARCHAR(32) DEFAULT NULL,
-	addressId INT DEFAULT NULL,
 	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-	KEY (addressId)
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -165,7 +166,9 @@ ALTER TABLE product_variant_options AUTO_INCREMENT = 1;
 
 SET FOREIGN_KEY_CHECKS=1;
 
--- Brands (explicit ids)\nINSERT IGNORE INTO brands (id, name) VALUES\n(1,'Samsung'),(2,'Apple'),(3,'Google'),(4,'Sony'),(5,'Xiaomi'),(6,'OnePlus'),(7,'Anker'),(8,'JBL'),(9,'Canon'),(10,'Dyson');
+-- Brands (explicit ids)
+INSERT IGNORE INTO brands (id, name) VALUES
+(1,'Samsung'),(2,'Apple'),(3,'Google'),(4,'Sony'),(5,'Xiaomi'),(6,'OnePlus'),(7,'Anker'),(8,'JBL'),(9,'Canon'),(10,'Dyson');
 
 -- Products: explicit ids 1..50 (keeps total products < 60)
 INSERT IGNORE INTO products (id, name, description, brand) VALUES
@@ -324,19 +327,19 @@ INSERT IGNORE INTO cities (id, name, isMainCategory) VALUES
 (1,'New York',TRUE),(2,'Los Angeles',TRUE),(3,'Chicago',TRUE),(4,'Houston',TRUE),(5,'Philadelphia',TRUE),(6,'Phoenix',TRUE),(7,'San Antonio',TRUE),(8,'San Diego',TRUE),(9,'Dallas',TRUE),(10,'San Jose',TRUE);
 
 -- Seed addresses for users (idempotent)
-INSERT IGNORE INTO addresses (id, line1, line2, city, cityId, postalCode) VALUES
-(1,'123 Main St',NULL,'New York',1,'10001'),
-(2,'456 Market Ave','Apt 5','Los Angeles',2,'90001'),
-(3,'789 Lake Shore Dr',NULL,'Chicago',3,'60601'),
-(4,'101 Sunset Blvd',NULL,'Houston',4,'77001'),
-(5,'202 Liberty Rd',NULL,'Philadelphia',5,'19019');
+INSERT IGNORE INTO addresses (id, userId, line1, line2, city, cityId, postalCode, isDefault) VALUES
+(1,NULL,'123 Main St',NULL,'New York',1,'10001',0),
+(2,NULL,'456 Market Ave','Apt 5','Los Angeles',2,'90001',0),
+(3,NULL,'789 Lake Shore Dr',NULL,'Chicago',3,'60601',0),
+(4,NULL,'101 Sunset Blvd',NULL,'Houston',4,'77001',0),
+(5,NULL,'202 Liberty Rd',NULL,'Philadelphia',5,'19019',0);
 
-INSERT IGNORE INTO users (id, email, password, name, role, phone, role_accepted, addressId) VALUES
-(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',TRUE,1),
-(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',TRUE,2),
-(3,'john@customer.com','password123','John Doe','Customer','1234567890',TRUE,3),
-(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',TRUE,4),
-(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',TRUE,5);
+INSERT IGNORE INTO users (id, email, password, name, role, phone, role_accepted) VALUES
+(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',TRUE),
+(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',TRUE),
+(3,'john@customer.com','password123','John Doe','Customer','1234567890',TRUE),
+(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',TRUE),
+(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',TRUE);
    
 
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
