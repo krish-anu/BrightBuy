@@ -4,6 +4,7 @@ import type { LucideProps } from 'lucide-react';
 import { getAllProducts, getProductsPaginated, getInventoryStats, addProduct } from '@/services/product.services';
 import { getAllCategories } from '@/services/category.services';
 import SingleSelect from '@/components/ui/SingleSelect';
+import { formatCurrencyUSD } from '../../lib/utils';
 
 // Icon props
 interface IconComponentProps {
@@ -834,7 +835,7 @@ const Inventory: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-900">{p.variantName}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.brand}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.categories}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{p.price != null ? `$${p.price}` : null}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{p.price != null ? formatCurrencyUSD(Number(p.price)) : null}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{p.stockQnt != null ? p.stockQnt : null}</td>
                           <td className="px-6 py-4"><span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>{stockStatus.label}</span></td>
                           <td className="px-6 py-4 text-sm font-medium"><div className="flex space-x-2">
@@ -870,7 +871,7 @@ const Inventory: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
             <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-blue-100 rounded-md"><IconComponent iconName="Package" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.totalVariants}</div><div className="text-sm text-gray-500">Total Product Variants</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
             <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-yellow-100 rounded-md"><IconComponent iconName="AlertTriangle" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{inventoryStats.lowStockItems}</div><div className="text-sm text-gray-500">Low Stock Items</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
-            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">${inventoryStats.totalInventoryValue.toLocaleString()}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
+            <div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-between"><div className="flex items-center"><div className="p-2 bg-green-100 rounded-md"><IconComponent iconName="DollarSign" size={24} /></div><div className="ml-4"><div className="text-2xl font-bold text-gray-900">{formatCurrencyUSD(inventoryStats.totalInventoryValue)}</div><div className="text-sm text-gray-500">Total Inventory Value</div></div></div><div><button onClick={loadInventoryStats} className="px-2 py-1 text-sm bg-gray-100 rounded">Refresh</button></div></div></div>
           </div>
         </>
       )}
@@ -903,7 +904,7 @@ const Inventory: React.FC = () => {
                   {selectedVariant?.price != null && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Price</label>
-                      <p className="mt-1 text-sm text-gray-900">${selectedVariant.price}</p>
+                      <p className="mt-1 text-sm text-gray-900">{formatCurrencyUSD(Number(selectedVariant.price))}</p>
                     </div>
                   )}
                   {selectedVariant?.stockQnt != null && (

@@ -42,6 +42,9 @@ const Sidebar: React.FC = () => {
 
   const { user, logout } = useAuth();
   const location = useLocation();
+  // Build safe display values in case name/email are missing in the persisted user
+  const displayName = user?.name || user?.username || (user?.email ? user.email.split('@')[0] : 'User');
+  const displayEmail = user?.email || (user?.username ? `${user.username}@local` : '');
 
   const routes: RouteItem[] = getCurrentUserRoutes() as RouteItem[];
   // const isSuperAdmin = user?.role === 'SuperAdmin';
@@ -108,8 +111,8 @@ const Sidebar: React.FC = () => {
         {!isCollapsed && user && (
           <div className="p-4 border-b border-gray-700">
             <div className="text-sm text-gray-300">
-              <p className="font-medium">{user.name}</p>
-              <p className="text-xs text-gray-400">{user.email}</p>
+              <p className="font-medium">{displayName}</p>
+              <p className="text-xs text-gray-400">{displayEmail}</p>
               <p className="text-xs text-blue-400 mt-1">
                 {getCurrentRoleName()}
               </p>
@@ -160,8 +163,8 @@ const Sidebar: React.FC = () => {
               </div>
               {!isCollapsed && user && (
                 <div>
-                  <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-gray-400">{user.email}</p>
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-gray-400">{displayEmail}</p>
                 </div>
               )}
             </div>

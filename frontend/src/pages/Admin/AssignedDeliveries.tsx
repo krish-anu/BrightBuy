@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getAssignedDeliveries } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
 
 interface Delivery {
@@ -262,7 +263,7 @@ const AssignedDeliveries: React.FC = () => {
                     <IconComponent iconName="Package" size={16} />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700">Order Value</p>
-                      <p className="text-sm text-gray-600">${(Number(orderDetails.total) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">{formatCurrencyUSD(Number(orderDetails.total) || 0)}</p>
                     </div>
                   </div>
                 )}

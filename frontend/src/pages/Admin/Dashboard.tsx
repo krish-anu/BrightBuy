@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { formatCurrencyUSD } from "../../lib/utils";
 import {
   BarChart,
   Bar,
@@ -93,7 +94,7 @@ const CombinedStatsBox: React.FC<CombinedStatsBoxProps> = ({
           <IconComponent iconName="DollarSign" size={24} color="#10B981" />
         </div>
         <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-        <p className="text-xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
+  <p className="text-xl font-bold text-green-600">{formatCurrencyUSD(totalRevenue)}</p>
       </div>
       <div className="text-center p-4 bg-blue-50 rounded-lg">
         <div className="flex justify-center mb-2">
@@ -334,7 +335,7 @@ const Dashboard: React.FC = () => {
               </div>
               <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
               <p className="text-xl font-bold text-indigo-600">
-                ${totOrder > 0 ? (totRevenue / totOrder).toFixed(2) : '0.00'}
+                {formatCurrencyUSD(totOrder > 0 ? (totRevenue / totOrder) : 0)}
               </p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
@@ -385,7 +386,7 @@ const Dashboard: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip formatter={(value: number) => [`$${value}`, "Sales"]} />
+              <Tooltip formatter={(value: number) => [formatCurrencyUSD(Number(value)), "Sales"]} />
               <Bar dataKey="sales" fill="#3B82F6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

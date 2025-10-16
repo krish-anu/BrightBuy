@@ -14,6 +14,7 @@ import {
 import { getReportsData, getInventoryStats, getQuarterlySales, getTopProducts, getUpcomingDeliveryEstimates, getTopSellingProduct, getCustomerSummaries } from '../../services/reports.services';
 import type { ReportsData } from '../../services/reports.services';
 import * as LucideIcons from 'lucide-react';
+import { formatCurrencyUSD } from '../../lib/utils';
 import type { LucideProps } from 'lucide-react';
 
 interface IconComponentProps {
@@ -139,9 +140,7 @@ const Reports: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">
-                ${reportsData ? reportsData.totalRevenue.toFixed(2) : '0.00'}
-              </p>
+              <p className="text-2xl font-bold text-gray-900">{reportsData ? formatCurrencyUSD(reportsData.totalRevenue) : formatCurrencyUSD(0)}</p>
               <p className="text-sm text-green-600 mt-1">All time revenue</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
@@ -282,7 +281,7 @@ const Reports: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded"><span className="text-sm font-medium text-gray-700">Total Products</span><span className="text-lg font-bold text-gray-900">{inventoryStats ? inventoryStats.totalVariants || 0 : 0}</span></div>
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded"><span className="text-sm font-medium text-gray-700">Low Stock Items</span><span className="text-lg font-bold text-yellow-600">{inventoryStats ? inventoryStats.lowStockItems || 0 : 0}</span></div>
-            <div className="flex justify-between items-center p-3 bg-green-50 rounded"><span className="text-sm font-medium text-gray-700">Total Inventory Value</span><span className="text-lg font-bold text-green-600">${inventoryStats ? (inventoryStats.totalInventoryValue || 0).toLocaleString() : '0'}</span></div>
+            <div className="flex justify-between items-center p-3 bg-green-50 rounded"><span className="text-sm font-medium text-gray-700">Total Inventory Value</span><span className="text-lg font-bold text-green-600">{inventoryStats ? formatCurrencyUSD(inventoryStats.totalInventoryValue || 0, { maximumFractionDigits: 0 }) : formatCurrencyUSD(0, { maximumFractionDigits: 0 })}</span></div>
           </div>
         </div>
 
@@ -348,7 +347,7 @@ const Reports: React.FC = () => {
               quarterlySales.quarters.map((q: any) => (
                 <li key={q.quarter} className="flex justify-between">
                   <span>{q.quarter}</span>
-                  <span className="font-medium">LKR {Number(q.totalSales || 0).toLocaleString()}</span>
+                  <span className="font-medium">{formatCurrencyUSD(Number(q.totalSales || 0))}</span>
                 </li>
               ))
             ) : (
@@ -400,7 +399,7 @@ const Reports: React.FC = () => {
                             <td className="py-2 pr-4 font-medium text-gray-900">{c.customerName || '—'}</td>
                             <td className="py-2 pr-4 text-gray-700">{c.customerEmail || '—'}</td>
                             <td className="py-2 pr-4 text-right">{Number(c.totalOrders || 0)}</td>
-                            <td className="py-2 pr-4 text-right">LKR {Number(c.totalSpent || 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-right">{formatCurrencyUSD(Number(c.totalSpent || 0))}</td>
                             <td className="py-2 pr-4 text-gray-700">{c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : '—'}</td>
                             <td className="py-2 pr-4">
                               <span className={`px-2 py-0.5 rounded-full border text-xs ${badgeClass(s || 'Pending')}`}>{s || 'Pending'}</span>
@@ -422,7 +421,7 @@ const Reports: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center p-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg text-white">
               <h4 className="text-lg font-semibold mb-2">Revenue Performance</h4>
-              <p className="text-3xl font-bold">${reportsData ? reportsData.totalRevenue.toFixed(0) : '0'}</p>
+              <p className="text-3xl font-bold">{reportsData ? formatCurrencyUSD(reportsData.totalRevenue, { maximumFractionDigits: 0 }) : formatCurrencyUSD(0, { maximumFractionDigits: 0 })}</p>
               <p className="text-sm opacity-90 mt-1">Total revenue generated</p>
             </div>
             <div className="text-center p-4 bg-gradient-to-r from-green-500 to-green-600 rounded-lg text-white">

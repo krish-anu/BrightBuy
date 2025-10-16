@@ -79,10 +79,13 @@ CREATE TABLE IF NOT EXISTS addresses (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   line1 VARCHAR(255) NOT NULL,
   line2 VARCHAR(255) DEFAULT NULL,
-  city VARCHAR(120) NOT NULL,
+	city VARCHAR(120) NOT NULL,
+	cityId INT DEFAULT NULL,
   postalCode VARCHAR(32) DEFAULT NULL,
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	KEY (cityId),
+	CONSTRAINT fk_addresses_city FOREIGN KEY (cityId) REFERENCES cities(id) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -94,7 +97,6 @@ CREATE TABLE IF NOT EXISTS users (
 	role_accepted TINYINT(1) DEFAULT 0,
 	phone VARCHAR(32) DEFAULT NULL,
 	addressId INT DEFAULT NULL,
-	cityId INT DEFAULT NULL,
 	createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	KEY (addressId)
@@ -322,19 +324,19 @@ INSERT IGNORE INTO cities (id, name, isMainCategory) VALUES
 (1,'New York',TRUE),(2,'Los Angeles',TRUE),(3,'Chicago',TRUE),(4,'Houston',TRUE),(5,'Philadelphia',TRUE),(6,'Phoenix',TRUE),(7,'San Antonio',TRUE),(8,'San Diego',TRUE),(9,'Dallas',TRUE),(10,'San Jose',TRUE);
 
 -- Seed addresses for users (idempotent)
-INSERT IGNORE INTO addresses (id, line1, line2, city, postalCode) VALUES
-(1,'123 Main St',NULL,'New York','10001'),
-(2,'456 Market Ave','Apt 5','Los Angeles','90001'),
-(3,'789 Lake Shore Dr',NULL,'Chicago','60601'),
-(4,'101 Sunset Blvd',NULL,'Houston','77001'),
-(5,'202 Liberty Rd',NULL,'Philadelphia','19019');
+INSERT IGNORE INTO addresses (id, line1, line2, city, cityId, postalCode) VALUES
+(1,'123 Main St',NULL,'New York',1,'10001'),
+(2,'456 Market Ave','Apt 5','Los Angeles',2,'90001'),
+(3,'789 Lake Shore Dr',NULL,'Chicago',3,'60601'),
+(4,'101 Sunset Blvd',NULL,'Houston',4,'77001'),
+(5,'202 Liberty Rd',NULL,'Philadelphia',5,'19019');
 
-INSERT IGNORE INTO users (id, email, password, name, role, phone, cityId, role_accepted, addressId) VALUES
-(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',1,TRUE,1),
-(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',1,TRUE,2),
-(3,'john@customer.com','password123','John Doe','Customer','1234567890',2,TRUE,3),
-(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',3,TRUE,4),
-(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',4,TRUE,5);
+INSERT IGNORE INTO users (id, email, password, name, role, phone, role_accepted, addressId) VALUES
+(1,'admin@brightbuy.com','$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by','Admin User','Admin','555-0000',TRUE,1),
+(2,'anudelivery@example.com','$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m','Delivery Staff','DeliveryStaff','555-0101',TRUE,2),
+(3,'john@customer.com','password123','John Doe','Customer','1234567890',TRUE,3),
+(4,'jane@customer.com','password123','Jane Smith','Customer','0987654321',TRUE,4),
+(5,'mike@customer.com','password123','Mike Johnson','Customer','5551234567',TRUE,5);
    
 
 INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
@@ -751,10 +753,10 @@ INSERT IGNORE INTO users (id, name, email, role, password, phone) VALUES
 -- Sample orders with category distribution
 -- Legacy JSON deliveryAddress replaced with normalized addresses + deliveryAddressId
 -- Additional address rows (avoid id collisions with earlier seeded addresses 1..5)
-INSERT IGNORE INTO addresses (id, line1, line2, city, postalCode) VALUES
-(101,'123 Main St',NULL,'City','12345'),
-(102,'456 Oak Ave',NULL,'City','67890'),
-(103,'789 Pine St',NULL,'City','11111');
+INSERT IGNORE INTO addresses (id, line1, line2, city, cityId, postalCode) VALUES
+(101,'123 Main St',NULL,'City',NULL,'12345'),
+(102,'456 Oak Ave',NULL,'City',NULL,'67890'),
+(103,'789 Pine St',NULL,'City',NULL,'11111');
 
 INSERT IGNORE INTO orders (id, userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status) VALUES
 (1, 2, 'Standard Delivery', 101, 1299.99, 15.00, 'Card', 'Delivered'),
@@ -915,24 +917,24 @@ INSERT INTO cities (name, isMainCategory) VALUES
 ('San Jose', TRUE);
 
 -- Insert Users data (including customers and one admin)
-INSERT INTO users (email, password, name, role, phone, cityId, role_accepted) VALUES
-('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', 1, TRUE),
-('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', 1, TRUE),
-('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', 1, TRUE),
-('jane.doe@email.com', 'password123', 'Jane Doe', 'Customer', '555-0002', 2, TRUE),
-('mike.johnson@email.com', 'password123', 'Mike Johnson', 'Customer', '555-0003', 3, TRUE),
-('sarah.wilson@email.com', 'password123', 'Sarah Wilson', 'Customer', '555-0004', 4, TRUE),
-('david.brown@email.com', 'password123', 'David Brown', 'Customer', '555-0005', 5, TRUE),
-('lisa.davis@email.com', 'password123', 'Lisa Davis', 'Customer', '555-0006', 6, TRUE),
-('robert.miller@email.com', 'password123', 'Robert Miller', 'Customer', '555-0007', 7, TRUE),
-('jennifer.garcia@email.com', 'password123', 'Jennifer Garcia', 'Customer', '555-0008', 8, TRUE),
-('michael.martinez@email.com', 'password123', 'Michael Martinez', 'Customer', '555-0009', 9, TRUE),
-('emily.anderson@email.com', 'password123', 'Emily Anderson', 'Customer', '555-0010', 10, TRUE),
-('chris.taylor@email.com', 'password123', 'Chris Taylor', 'Customer', '555-0011', 1, TRUE),
-('amanda.thomas@email.com', 'password123', 'Amanda Thomas', 'Customer', '555-0012', 2, TRUE),
-('kevin.rodriguez@email.com', 'password123', 'Kevin Rodriguez', 'Customer', '555-0013', 3, TRUE),
-('jessica.lee@email.com', 'password123', 'Jessica Lee', 'Customer', '555-0014', 4, TRUE),
-('ryan.clark@email.com', 'password123', 'Ryan Clark', 'Customer', '555-0015', 5, TRUE);
+INSERT INTO users (email, password, name, role, phone, role_accepted) VALUES
+('admin2@brightbuy.com', '$2b$10$ujNTE98wE4xP9JaxzxuRD.ZfYtQgF8REeAIn3R2OqkifBfsMER1by', 'Admin User 2', 'Admin', '555-0001', TRUE),
+('duser2@example.com', '$2b$10$DxttBS0TJRRnQ3blI4JMx.YjP5YzbZ/wIeogFtPvn1O4h0Ctgce7m', 'Delivery Staff 2', 'DeliveryStaff', '555-0102', TRUE),
+('john.smith@email.com', 'password123', 'John Smith', 'Customer', '555-0001', TRUE),
+('jane.doe@email.com', 'password123', 'Jane Doe', 'Customer', '555-0002', TRUE),
+('mike.johnson@email.com', 'password123', 'Mike Johnson', 'Customer', '555-0003', TRUE),
+('sarah.wilson@email.com', 'password123', 'Sarah Wilson', 'Customer', '555-0004', TRUE),
+('david.brown@email.com', 'password123', 'David Brown', 'Customer', '555-0005', TRUE),
+('lisa.davis@email.com', 'password123', 'Lisa Davis', 'Customer', '555-0006', TRUE),
+('robert.miller@email.com', 'password123', 'Robert Miller', 'Customer', '555-0007', TRUE),
+('jennifer.garcia@email.com', 'password123', 'Jennifer Garcia', 'Customer', '555-0008', TRUE),
+('michael.martinez@email.com', 'password123', 'Michael Martinez', 'Customer', '555-0009', TRUE),
+('emily.anderson@email.com', 'password123', 'Emily Anderson', 'Customer', '555-0010', TRUE),
+('chris.taylor@email.com', 'password123', 'Chris Taylor', 'Customer', '555-0011', TRUE),
+('amanda.thomas@email.com', 'password123', 'Amanda Thomas', 'Customer', '555-0012', TRUE),
+('kevin.rodriguez@email.com', 'password123', 'Kevin Rodriguez', 'Customer', '555-0013', TRUE),
+('jessica.lee@email.com', 'password123', 'Jessica Lee', 'Customer', '555-0014', TRUE),
+('ryan.clark@email.com', 'password123', 'Ryan Clark', 'Customer', '555-0015', TRUE);
 
 -- Insert 35 Orders with different amounts across different months (Jan 2024 - Oct 2025)
 INSERT INTO orders (userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod) VALUES

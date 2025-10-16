@@ -104,12 +104,7 @@ const addOrder = async (req, res, next) => {
 
     await createPayment(req.user.id, order.id, totalPrice, deliveryCharge, paymentMethod, connection);
 
-    if (deliveryMode === 'Standard Delivery') {
-      await connection.query(
-        `INSERT INTO deliveries (orderId) VALUES (?)`,
-        [order.id]
-      );
-    }
+    // Delivery row is auto-created by sp_create_order for Standard Delivery
 
     if (paymentMethod === 'CashOnDelivery') {
       await connection.commit();
@@ -121,7 +116,7 @@ const addOrder = async (req, res, next) => {
         payment_method_types: ['card'],
         line_items: orderedItems.map(item => ({
           price_data: {
-            currency: 'lkr',
+            currency: 'usd',
             product_data: { name: item.productName },
             unit_amount: Math.round(item.price * 100)
           },
