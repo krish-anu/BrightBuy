@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../axiosConfig";
+import { getAllCities, type City } from "@/services/city.services";
 
 // Admin Profile page uses AdminLayout automatically via routing under /admin/*
 // This view keeps the look-and-feel consistent with other admin pages.
@@ -7,7 +8,7 @@ import axiosInstance from "../../axiosConfig";
 interface Address {
   line1?: string;
   line2?: string;
-  city?: string;
+  cityId?: number | null;
   postalCode?: string;
 }
 
@@ -29,7 +30,8 @@ export default function AdminProfile() {
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [city, setCity] = useState("");
+  const [cities, setCities] = useState<City[]>([]);
+  const [cityId, setCityId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -41,7 +43,10 @@ export default function AdminProfile() {
         setLine1(data.address?.line1 || "");
         setLine2(data.address?.line2 || "");
         setPostalCode(data.address?.postalCode || "");
-        setCity(data.address?.city || "");
+        setCityId(data.address?.cityId ?? null);
+        // fetch cities for dropdown
+        const list = await getAllCities();
+        setCities(list);
       } catch (e: any) {
         setError(
           e?.response?.data?.message ||
@@ -67,7 +72,7 @@ export default function AdminProfile() {
           line1: line1 || null,
           line2: line2 || null,
           postalCode: postalCode || null,
-          city: city || null,
+          cityId: cityId ?? null,
         },
       };
       const resp = await axiosInstance.patch("/api/users/profile", payload);
@@ -128,7 +133,16 @@ export default function AdminProfile() {
             </div>
             <div>
               <label className="block text-sm font-medium">City</label>
-              <input className="mt-1 w-full border rounded p-2" value={city} onChange={(e) => setCity(e.target.value)} />
+              <select
+                className="mt-1 w-full border rounded p-2 bg-white"
+                value={cityId ?? ""}
+                onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Select a city</option>
+                {cities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="flex gap-3">
@@ -141,7 +155,7 @@ export default function AdminProfile() {
                 setLine1(profile?.address?.line1 || "");
                 setLine2(profile?.address?.line2 || "");
                 setPostalCode(profile?.address?.postalCode || "");
-                setCity(profile?.address?.city || "");
+                setCityId(profile?.address?.cityId ?? null);
                 setError(null);
               }}
             >

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../axiosConfig"; // Import your configured axios instance
+import { getAllCities, type City } from "@/services/city.services";
 
 /**
  * UserProfile
@@ -18,7 +19,7 @@ type Profile = {
     line1?: string;
     line2?: string;
     postalCode?: string;
-    city?: string;
+    cityId?: number | null;
   };
 };
 
@@ -40,7 +41,8 @@ export default function UserProfile() {
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [city, setCity] = useState("");
+  const [cities, setCities] = useState<City[]>([]);
+  const [cityId, setCityId] = useState<number | null>(null);
 
   // Change password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -71,7 +73,13 @@ export default function UserProfile() {
       setLine1(data.address?.line1 || "");
       setLine2(data.address?.line2 || "");
       setPostalCode(data.address?.postalCode || "");
-      setCity(data.address?.city || "");
+      setCityId(data.address?.cityId ?? null);
+      try {
+        const cityList = await getAllCities();
+        setCities(cityList);
+      } catch (e) {
+        // non-fatal
+      }
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
@@ -101,7 +109,7 @@ export default function UserProfile() {
         line1: line1 || null,
         line2: line2 || null,
         postalCode: postalCode || null,
-        city: city || null,
+        cityId: cityId ?? null,
       },
     };
 
@@ -115,8 +123,8 @@ export default function UserProfile() {
       setPhone(updated.phone || "");
       setLine1(updated.address?.line1 || "");
       setLine2(updated.address?.line2 || "");
-      setPostalCode(updated.address?.postalCode || "");
-      setCity(updated.address?.city || "");
+  setPostalCode(updated.address?.postalCode || "");
+  setCityId(updated.address?.cityId ?? null);
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
@@ -320,13 +328,16 @@ export default function UserProfile() {
 
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700">City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="City"
-              className="mt-1 block w-full border rounded p-2"
-            />
+            <select
+              className="mt-1 block w-full border rounded p-2 bg-white"
+              value={cityId ?? ""}
+              onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Select a city</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -347,7 +358,7 @@ export default function UserProfile() {
               setLine1(profile?.address?.line1 || "");
               setLine2(profile?.address?.line2 || "");
               setPostalCode(profile?.address?.postalCode || "");
-              setCity(profile?.address?.city || "");
+              setCityId(profile?.address?.cityId ?? null);
               setError(null);
             }}
             className="px-3 py-2 border rounded"

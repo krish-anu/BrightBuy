@@ -18,15 +18,18 @@ const registerUser = async (req, res, next) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert address row if provided
+    // Insert address row if provided (normalized to use cityId)
     let addressId = null;
-    if (address && typeof address === 'object' && (address.line1 || address.city)) {
+    if (address && typeof address === 'object' && (address.line1 || address.cityId)) {
       const line1 = address.line1 || '';
       const line2 = address.line2 || null;
-      const city = address.city || '';
+      const cityId = address.cityId ?? null;
       const postalCode = address.postalCode || null;
-      if (line1 && city) {
-        const addrRes = await query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
+      if (line1 && cityId !== null && cityId !== undefined) {
+        const addrRes = await query(
+          `INSERT INTO addresses (line1,line2,cityId,postalCode) VALUES (?,?,?,?)`,
+          [line1, line2, cityId, postalCode]
+        );
         addressId = addrRes.insertId || addrRes[0]?.insertId;
       }
     }

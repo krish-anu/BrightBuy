@@ -1,14 +1,16 @@
 const userQueries = {
   getAll: `
     SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-           TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.city, a.postalCode)) AS address,
+      TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
+      a.cityId AS addressCityId,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
     LEFT JOIN addresses a ON u.addressId = a.id
   `,
   getById: `
     SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-           TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.city, a.postalCode)) AS address,
+      TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
+      a.cityId AS addressCityId,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
     LEFT JOIN addresses a ON u.addressId = a.id
@@ -21,7 +23,8 @@ const userQueries = {
   `,
   getAllApproved: `
     SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.addressId,
-           TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.city, a.postalCode)) AS address,
+           TRIM(BOTH ', ' FROM CONCAT_WS(', ', a.line1, a.line2, a.postalCode)) AS address,
+           a.cityId AS addressCityId,
            u.phone, u.createdAt, u.updatedAt
     FROM users u
     LEFT JOIN addresses a ON u.addressId = a.id
@@ -63,7 +66,7 @@ const userQueries = {
            u.addressId,
            a.line1 AS addressLine1,
            a.line2 AS addressLine2,
-           a.city AS addressCity,
+           a.cityId AS addressCityId,
            a.postalCode AS addressPostalCode
     FROM users u
     LEFT JOIN addresses a ON u.addressId = a.id

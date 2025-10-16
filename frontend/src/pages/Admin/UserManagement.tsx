@@ -80,7 +80,7 @@ const UserManagement: React.FC = () => {
     phone: "",
     addressLine1: "",
     addressLine2: "",
-    city: "",
+  city: "",
     postalCode: "",
   });
 
@@ -105,14 +105,15 @@ const UserManagement: React.FC = () => {
     setSelectedUser(user);
     
     // Parse address JSON into separate fields
-    let addressLine1 = "", addressLine2 = "", city = "", postalCode = "";
+  let addressLine1 = "", addressLine2 = "", city = "", postalCode = "";
     
     if (user.address) {
       try {
         const addressObj = typeof user.address === 'string' ? JSON.parse(user.address) : user.address;
         addressLine1 = addressObj.line1 || addressObj.street || "";
         addressLine2 = addressObj.line2 || "";
-        city = addressObj.city || "";
+  // cityId is used in backend; keep city string empty here unless you join by cities
+  // city = addressObj.city || "";
         postalCode = addressObj.postalCode || addressObj.postal_code || "";
       } catch {
         // If address is not valid JSON, treat as line1
@@ -127,7 +128,7 @@ const UserManagement: React.FC = () => {
       phone: user.phone || "",
       addressLine1,
       addressLine2,
-      city,
+  city,
       postalCode,
     });
     setEditModalOpen(true);
@@ -152,10 +153,11 @@ const UserManagement: React.FC = () => {
     try {
       // Combine address fields into JSON object
       let addressData = null;
-      if (editForm.addressLine1.trim() || editForm.city.trim()) {
+  if (editForm.addressLine1.trim() || editForm.city.trim()) {
         addressData = {
           line1: editForm.addressLine1.trim() || null,
           line2: editForm.addressLine2.trim() || null,
+          // cityId is the new source of truth; when string city UI is replaced, send cityId as well
           city: editForm.city.trim() || null,
           postalCode: editForm.postalCode.trim() || null
         };

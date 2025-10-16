@@ -14,6 +14,7 @@ import UserManagement from "../pages/Admin/UserManagement";
 import Reports from "../pages/Admin/Reports";
 import AssignedDeliveries from "../pages/Admin/AssignedDeliveries";
 import DeliveryStatus from "../pages/Admin/DeliveryStatus";
+import AdminProfile from "../pages/Admin/Profile";
 
 // User Components
 import Layout from "@/components/Layout/Layout";
@@ -68,6 +69,7 @@ function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="deliveries" element={<AssignedDeliveries />} />
             <Route path="delivery-status" element={<DeliveryStatus />} />
+            <Route path="profile" element={<AdminProfile />} />
           </Route>
         </Routes>
       </RoleProvider>
