@@ -31,7 +31,7 @@ export function OrderSummaryCard({
       <span
         className={`text-sm md:text-base ${bold ? "font-bold" : "text-foreground"}`}
       >
-        LKR {value.toFixed(2)}
+        $ {value.toFixed(2)}
       </span>
     </div>
   );
