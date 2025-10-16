@@ -14,8 +14,8 @@ export default function ShippingMethod() {
                 variant="order"
                 size="xl"
               >
-                <ConfirmationItemsRow item={{ name: "Standard Shipping", image: "/src/assets/standard-delivery.png", value: "standard" }} />
-                <ConfirmationItemsRow item={{ name: "Store Pickup", image: "/src/assets/store-pickup.png", value: "pickup" }} />
+                <ConfirmationItemsRow item={{ name: "Standard Shipping", image: "/src/assets/standard-delivery.png", value: "standard", description: "Delivers in 5-7 business days" }} />
+                <ConfirmationItemsRow item={{ name: "Store Pickup", image: "/src/assets/store-pickup.png", value: "pickup", description: "Pick up at your nearest store" }} />
               </ToggleGroup>
             </div>
           </section>

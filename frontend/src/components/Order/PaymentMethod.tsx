@@ -14,8 +14,8 @@ export default function PaymentMethod() {
                 variant="order"
                 size="xl"
               >
-                <ConfirmationItemsRow item={{ name: "Online Payment", image: "/src/assets/stripe.png", value: "online" }} />
-                <ConfirmationItemsRow item={{ name: "Cash on Delivery", image: "/src/assets/cod.png", value: "cod" }} />
+                <ConfirmationItemsRow item={{ name: "Online Payment", image: "/src/assets/stripe.png", value: "online" , description: "Pay securely using stripe" }} />
+                <ConfirmationItemsRow item={{ name: "Cash on Delivery", image: "/src/assets/cod.png", value: "cod", description: "Pay with cash upon delivery" }} />
               </ToggleGroup>
             </div>
         </section>

@@ -61,7 +61,7 @@ export default function OrderConfirm() {
                     shipping={shipping}
                     discount={discount}
                     total={total}
-                    onNext={() => navigate("/order/payment/temp-id")}
+                    onNext={() => navigate("/order/payment/")}
                     className="mt-12"
                 />
             </div>
