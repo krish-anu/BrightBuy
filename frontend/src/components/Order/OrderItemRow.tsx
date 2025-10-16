@@ -1,5 +1,5 @@
 export interface OrderItem {
-  id: string | number;
+  id: string | number| null;
   name: string;
   image: string;
   attributesText: string;
@@ -23,7 +23,7 @@ export function OrderItemRow({ item }: { item: OrderItem }) {
             <h2 className="font-semibold text-lg leading-snug line-clamp-2">
               {item.name}
             </h2>
-            <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
+            <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 text-pretty break-word whitespace-normal">
               {item.attributesText}
             </p>
           </div>
