@@ -30,6 +30,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    develop:
+      watch:
+        # Rebuild image when Dockerfile or dependency manifests change
+        - path: ./backend/Dockerfile
+          action: rebuild
+        - path: ./backend/package.json
+          action: rebuild
+        - path: ./backend/package-lock.json
+          action: rebuild
 
   frontend:
     build: ./frontend
@@ -40,6 +49,15 @@ services:
     ports:
       - "5173:5173"
     command: sh -c "npm ci && npm run dev"
+    develop:
+      watch:
+        # Rebuild image when Dockerfile or dependency manifests change
+        - path: ./frontend/Dockerfile
+          action: rebuild
+        - path: ./frontend/package.json
+          action: rebuild
+        - path: ./frontend/package-lock.json
+          action: rebuild
 
 volumes:
   mysql_data:
