@@ -102,7 +102,6 @@ jobs:
           if [ "$missing" -eq 1 ]; then
             echo "One or more required secrets are missing. Set them under Settings > Secrets and variables > Actions."; exit 1; fi
 
-      # Optional debug: test SSH before deploy
       - name: Test SSH connection
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -120,19 +119,22 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
+            # Ensure docker is in PATH
+            export PATH=$PATH:/usr/bin
+
             # Docker login
-            echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            echo ${{ secrets.DOCKER_PASSWORD }} | /usr/bin/docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
             # Pull images by commit SHA or fallback to latest
             BACKEND_SHA=${{ github.sha }}
             FRONTEND_SHA=${{ github.sha }}
-            docker pull ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA || docker pull ${{ env.IMAGE_BASE }}-backend:latest
-            docker pull ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA || docker pull ${{ env.IMAGE_BASE }}-frontend:latest
+            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:latest
+            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:latest
 
             # Retag to latest for docker-compose
-            docker tag ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA ${{ env.IMAGE_BASE }}-backend:latest || true
-            docker tag ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA ${{ env.IMAGE_BASE }}-frontend:latest || true
+            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA ${{ env.IMAGE_BASE }}-backend:latest || true
+            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA ${{ env.IMAGE_BASE }}-frontend:latest || true
 
             cd /home/brightbuy
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            /usr/bin/docker compose -f docker-compose.prod.yml pull
+            /usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
