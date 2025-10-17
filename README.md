@@ -271,7 +271,8 @@ Authorization: Bearer <token>
   "items": [
     {"variantId": "2", "quantity": 200, "isBackOrdered": true},
     {"variantId": "10", "quantity": 20, "isBackOrdered": false}
-  ],
+  ],docker compose -f docker-compose.dev.yml up --build
+
   "paymentMethod": "Card",
   "deliveryMode": "Standard Delivery",
   "deliveryAddress": {

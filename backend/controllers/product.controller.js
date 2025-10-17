@@ -252,7 +252,7 @@ const getProductsPaginated = async (req, res, next) => {
   const paginatedSql = `${productQueries.getAllProductsPaginated} LIMIT ${limit} OFFSET ${offset}`;
   const products = await query(paginatedSql);
     console.log(`Products fetched: ${products.length}`);
-    
+    console.log(products)
     // Get total count
     console.log('Executing total count query...');
     const countResult = await query(productQueries.getTotalProductsCount);

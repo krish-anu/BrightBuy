@@ -39,6 +39,7 @@ const getVariants = async (req, res, next) => {
     }
 
     const variants = Array.from(variantsMap.values());
+    console.log(variants)
 
     res.status(200).json({ success: true, data: variants });
   } catch (error) {
@@ -284,6 +285,7 @@ const deleteVariant = async (req, res, next) => {
     );
 
     await connection.query(variantQueries.delete, [req.params.id]);
+    console.log('variant deleted')
 
     await connection.commit();
 
