@@ -21,12 +21,12 @@ services:
     container_name: backend
     volumes:
       - ./backend:/app
-      - /app/node_modules
+      - ./backend/node_modules:/app/node_modules
     ports:
       - "8081:8081"
     env_file:
       - ./backend/.env
-    command: npm run dev
+    command: sh -c "npm ci --legacy-peer-deps && npm run dev"
     depends_on:
       db:
         condition: service_healthy
@@ -36,10 +36,10 @@ services:
     container_name: frontend
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/node_modules:/app/node_modules
     ports:
       - "5173:5173"
-    command: npm run dev
+    command: sh -c "npm ci && npm run dev"
 
 volumes:
   mysql_data:

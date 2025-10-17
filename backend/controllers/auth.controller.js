@@ -18,30 +18,32 @@ const registerUser = async (req, res, next) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert address row if provided
-    let addressId = null;
-    if (address && typeof address === 'object' && (address.line1 || address.city)) {
-      const line1 = address.line1 || '';
-      const line2 = address.line2 || null;
-      const city = address.city || '';
-      const postalCode = address.postalCode || null;
-      if (line1 && city) {
-        const addrRes = await query(`INSERT INTO addresses (line1,line2,city,postalCode) VALUES (?,?,?,?)`, [line1, line2, city, postalCode]);
-        addressId = addrRes.insertId || addrRes[0]?.insertId;
-      }
-    }
-
     const assignedRole = role || 'Customer';
     const autoApproved = ['Customer', 'SuperAdmin'].includes(assignedRole) ? 1 : 0;
-    await query(userQueries.insert, [
+    const userRes = await query(userQueries.insert, [
       name,
       email,
       hashedPassword,
       assignedRole,
       autoApproved,
-      phone || null,
-      addressId
+      phone || null
     ]);
+    const newUserId = userRes.insertId || userRes[0]?.insertId;
+
+    // Optional address insert after user created
+    if (newUserId && address && typeof address === 'object' && (address.line1 || address.cityId)) {
+      const line1 = address.line1 || '';
+      const line2 = address.line2 || null;
+      const cityId = address.cityId ?? null;
+      const postalCode = address.postalCode || null;
+      const isDefault = 1; // first provided address, set default
+      if (line1 && cityId !== null && cityId !== undefined) {
+        await query(
+          `INSERT INTO addresses (userId, line1, line2, cityId, postalCode, isDefault) VALUES (?,?,?,?,?,?)`,
+          [newUserId, line1, line2, cityId, postalCode, isDefault]
+        );
+      }
+    }
 
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
@@ -89,7 +91,7 @@ const loginUser = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '10m' } // session valid for 10 minutes
+      { expiresIn: '1h' } // session valid for 10 minutes
     );
 
   res.status(200).json({ token, role: user.role, email: user.email, name: user.name, id: user.id, roleAccepted: !!user.role_accepted });

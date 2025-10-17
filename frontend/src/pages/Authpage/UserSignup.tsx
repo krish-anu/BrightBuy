@@ -230,7 +230,7 @@ const UserSignup: React.FC = () => {
         <p className="mt-5 text-center text-sm text-gray-600">
           Already have an account?{" "}
           <a
-            href="/userlogin"
+            href="/login"
             className="text-primary hover:underline font-medium"
           >
             Sign in

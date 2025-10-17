@@ -44,7 +44,7 @@ CREATE INDEX idx_product_categories_categoryId ON product_categories (categoryId
 CREATE INDEX idx_categories_parentId ON categories (parentId);
 
 CREATE INDEX idx_users_role ON users (role);
-CREATE INDEX idx_users_addressId ON users (addressId);
+-- removed: users.addressId no longer exists (addresses link to user)
 
 CREATE INDEX idx_orders_userId ON orders (userId);
 CREATE INDEX idx_orders_status ON orders (status);
@@ -74,10 +74,7 @@ ALTER TABLE order_items
 -- Foreign Keys (add where they don't already exist)
 -- Note: If you get errors about existing constraints, remove IF NOT EXISTS or adjust names.
 
-ALTER TABLE users
-  ADD CONSTRAINT fk_users_address
-    FOREIGN KEY (addressId) REFERENCES addresses(id)
-    ON UPDATE CASCADE ON DELETE SET NULL;
+-- removed: fk_users_address (users.addressId)
 
 ALTER TABLE categories
   ADD CONSTRAINT fk_categories_parent

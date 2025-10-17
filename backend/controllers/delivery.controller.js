@@ -24,7 +24,7 @@ const getAssignedDeliveriesForStaff = async (req, res, next) => {
         d.*, 
         o.id AS orderId, 
         o.totalPrice AS orderTotal, 
-        COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.city, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
+  COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
         DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, 
         o.status AS orderStatus, 
         cust.phone AS customerPhone,

@@ -6,14 +6,15 @@ const router = require('express').Router();
 
 
 
-router.get('/isMain/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,isMainCity)
-router.get('/main', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getMainCities)
-router.get('/other', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getOtherCities)
-router.get('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getCities)
-router.get('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getCity);
+// Read endpoints: allow any authenticated role
+router.get('/isMain/:id', verifyToken, isMainCity)
+router.get('/main', verifyToken, getMainCities)
+router.get('/other', verifyToken, getOtherCities)
+router.get('/', verifyToken, getCities)
+router.get('/:id', verifyToken, getCity);
 
+// Write endpoints: restricted to Admin/SuperAdmin
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addCity);
-
 router.patch('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addToMainCity)
 
 module.exports = router;
