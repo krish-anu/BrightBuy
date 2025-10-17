@@ -89,7 +89,7 @@ SELECT
         JSON_ARRAY()
     ) AS Categories
 FROM products p
-LEFT JOIN product_variants pv ON p.id = pv.productId
+INNER JOIN product_variants pv ON p.id = pv.productId
 GROUP BY p.id, p.name, p.description, p.brand
 ORDER BY p.name ASC
 `;
