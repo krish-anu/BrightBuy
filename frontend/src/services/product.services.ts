@@ -14,10 +14,12 @@ interface PaginationResponse<T> {
   };
 }
 
-export const getAllProducts = async () => {
+export const getAllProducts = async (categoryId?: number) => {
   try {
     console.log('Calling products API...');
-    const response = await axiosInstance.get('/api/product');
+    const response = await axiosInstance.get('/api/product', {
+      params: categoryId ? { categoryId } : undefined,
+    });
     console.log('Product service response:', response);
     
     if (response.status !== 200) {
@@ -41,10 +43,12 @@ interface InventoryStats {
   totalInventoryValue: number;
 }
 
-export const getProductsPaginated = async (page: number = 1, limit: number = 10): Promise<PaginationResponse<any>> => {
+export const getProductsPaginated = async (page: number = 1, limit: number = 10, categoryId?: number): Promise<PaginationResponse<any>> => {
   try {
     console.log(`Calling paginated products API - page: ${page}, limit: ${limit}`);
-    const response = await axiosInstance.get(`/api/product/paginated?page=${page}&limit=${limit}`);
+    const response = await axiosInstance.get(`/api/product/paginated`, {
+      params: { page, limit, ...(categoryId ? { categoryId } : {}) },
+    });
     console.log('Paginated product service response:', response);
     
     if (response.status !== 200) {
@@ -135,8 +139,9 @@ export const getProductNames = async (): Promise<string[]> => {
     const rows = res?.data || [];
     const set = new Set<string>();
     for (const r of rows) {
-      if (r && typeof r.name === 'string' && r.name.trim()) {
-        set.add(r.name.trim());
+      const pname = (r && (r.productName || r.name)) ? String(r.productName || r.name) : '';
+      if (pname.trim()) {
+        set.add(pname.trim());
       }
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));

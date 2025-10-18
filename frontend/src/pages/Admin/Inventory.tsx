@@ -22,10 +22,12 @@ interface IconComponentProps {
 // API product variant type
 interface ProductVariant {
   id: number;
+  // backend returns variantId as id for variant endpoints; normalize here
   variantName: string;
-  price: number | null;
+  price: number | null | string;
   stockQnt: number | null;
   imageURL?: string | null;
+  SKU?: string | null;
 }
 
 // API product type
@@ -96,9 +98,27 @@ const Inventory: React.FC = () => {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const flattenProducts = (list: Product[]): ProductVariantFlattened[] => {
+  const flattenProducts = (list: any[]): ProductVariantFlattened[] => {
     const out: ProductVariantFlattened[] = [];
     for (const product of list) {
+      // New backend may already return flattened variant rows with product fields duplicated
+      const isFlattenedRow = product && product.variantId && product.productId;
+      if (isFlattenedRow) {
+        const cats = Array.isArray(product.Categories) ? product.Categories : [];
+        out.push({
+          id: Number(product.variantId),
+          variantName: product.variantName || 'Default',
+          price: product.price != null ? Number(product.price) : null,
+          stockQnt: product.stockQnt != null ? Number(product.stockQnt) : null,
+          imageURL: product.imageURL ?? null,
+          isDefaultVariant: false,
+          productName: product.productName || product.name || 'Unknown Product',
+          brand: product.productBrand || product.brand || 'Unknown Brand',
+          categories: cats.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+        });
+        continue;
+      }
+
       const variants = product.ProductVariants || [];
       // Dedupe categories by id and name for safety
       const rawCategories = product.Categories || [];
@@ -129,10 +149,11 @@ const Inventory: React.FC = () => {
         // skip null/undefined variants (some API responses may include null entries)
         if (!variant) continue;
         out.push({
-          ...variant,
+          id: (variant as any).id ?? (variant as any).variantId,
+          variantName: (variant as any).variantName,
           imageURL: (variant as any).imageURL ?? null,
           isDefaultVariant: false,
-          price: (variant as any).price ?? (product ? (product as any).price ?? null : null),
+          price: (variant as any).price != null ? Number((variant as any).price) : (product ? (product as any).price ?? null : null),
           stockQnt: (variant as any).stockQnt ?? (product ? (product as any).stockQnt ?? null : null),
           productName: product.name || 'Unknown Product',
           brand: product.brand || 'Unknown Brand',
@@ -232,7 +253,8 @@ const Inventory: React.FC = () => {
     try {
       // If searching OR a stock-status filter is active, fetch the full dataset and filter client-side
       if ((searchTerm && searchTerm.trim() !== '') || (filterStockStatus && filterStockStatus !== '')) {
-        const res = await getAllProducts();
+        const categoryId = categories.find(c => c.name === filterCategory)?.id;
+        const res = await getAllProducts(categoryId);
         if (res && res.success && res.data) {
           let flattened = flattenProducts(res.data as Product[]);
 
@@ -274,7 +296,8 @@ const Inventory: React.FC = () => {
       }
 
       // normal paginated fetch
-      const res = await getProductsPaginated(page, itemsPerPage);
+  const categoryId = categories.find(c => c.name === filterCategory)?.id;
+  const res = await getProductsPaginated(page, itemsPerPage, categoryId);
       if (res && res.success && res.data) {
         const flattened = flattenProducts(res.data as Product[]);
         setProducts(flattened);
