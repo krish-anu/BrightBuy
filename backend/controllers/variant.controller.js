@@ -4,6 +4,8 @@ const ApiError = require("../utils/ApiError");
 const generateSKU = require("../utils/generateSKU");
 const productQueries = require("../queries/productQueries");
 const { handlePreOrdered } = require("../services/variant.service");
+const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const s3 = require('../config/s3');
 
 // Get all variants
 const getVariants = async (req, res, next) => {
@@ -279,6 +281,26 @@ const deleteVariant = async (req, res, next) => {
     );
     if (!variantRows.length) throw new ApiError("Variant not found", 404);
 
+    // Attempt to delete existing S3 image for this variant (best-effort)
+    const oldImageURL = variantRows[0]?.imageURL || null;
+    if (oldImageURL) {
+      try {
+        let key = null;
+        try {
+          const u = new URL(oldImageURL);
+          key = u.pathname.startsWith('/') ? u.pathname.slice(1) : u.pathname;
+        } catch (_) {
+          const parts = String(oldImageURL).split('.amazonaws.com/');
+          key = parts.length > 1 ? parts[1] : null;
+        }
+        if (key) {
+          await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME, Key: key }));
+        }
+      } catch (delErr) {
+        console.error('Failed to delete S3 image for deleted variant', req.params.id, delErr);
+      }
+    }
+
     await connection.query(
       `DELETE FROM product_variant_options WHERE variantId = ?`,
       [req.params.id]
@@ -372,9 +394,6 @@ const getPopularVariants = async (req, res, next) => {
     next(error);
   }
 };
-
-const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const s3 = require('../config/s3');
 
 // Set or update variant image URL (and delete previous S3 object if replacing/removing)
 const setVariantImage = async (req, res, next) => {
