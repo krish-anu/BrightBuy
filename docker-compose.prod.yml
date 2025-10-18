@@ -5,8 +5,12 @@ services:
       - ./backend/.env
     ports:
       - "8081:8081"
+    # Ensure backend waits for DB to be healthy before starting
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # Run production start command (no nodemon)
+    command: npm start
 
   frontend:
     image: anusan2003/brightbuy-frontend:latest
@@ -21,6 +25,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pbrightbuy"]
+      interval: 5s
+      retries: 10
+      start_period: 30s
 
 volumes:
   mysql_data:

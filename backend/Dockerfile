@@ -9,5 +9,6 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-EXPOSE 5173
+# Backend API runs on 8081
+EXPOSE 8081
 CMD ["npm", "run", "dev"]

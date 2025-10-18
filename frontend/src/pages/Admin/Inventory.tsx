@@ -100,7 +100,15 @@ const Inventory: React.FC = () => {
     const out: ProductVariantFlattened[] = [];
     for (const product of list) {
       const variants = product.ProductVariants || [];
-      const categories = product.Categories || [];
+      // Dedupe categories by id and name for safety
+      const rawCategories = product.Categories || [];
+      const categories = Array.from(
+        new Map(
+          rawCategories
+            .filter((c: any) => c && (c.id != null || c.name))
+            .map((c: any) => [String(c.id ?? c.name), { id: c.id, name: c.name }])
+        ).values()
+      );
       if (!product || variants.length === 0) {
         out.push({
           id: product.id,
@@ -111,7 +119,9 @@ const Inventory: React.FC = () => {
           isDefaultVariant: true,
           productName: product.name || 'Unknown Product',
           brand: product.brand || 'Unknown Brand',
-          categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+          categories: (filterCategory && filterCategory !== '')
+            ? filterCategory
+            : categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
         });
         continue;
       }
@@ -126,7 +136,9 @@ const Inventory: React.FC = () => {
           stockQnt: (variant as any).stockQnt ?? (product ? (product as any).stockQnt ?? null : null),
           productName: product.name || 'Unknown Product',
           brand: product.brand || 'Unknown Brand',
-          categories: categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+          categories: (filterCategory && filterCategory !== '')
+            ? filterCategory
+            : categories.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
         });
       }
     }

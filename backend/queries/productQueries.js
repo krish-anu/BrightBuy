@@ -28,15 +28,19 @@ SELECT
         JSON_ARRAY()
     ) AS ProductVariants,
     COALESCE(
-        (SELECT JSON_ARRAYAGG(
+        (
+        SELECT JSON_ARRAYAGG(
             JSON_OBJECT(
-                'id', c2.id,
-                'name', c2.name
+                'id', csub.id,
+                'name', csub.name
             )
         )
-        FROM product_categories pc2
-        LEFT JOIN categories c2 ON pc2.categoryId = c2.id
-        WHERE pc2.productId = p.id
+        FROM (
+            SELECT DISTINCT c2.id, c2.name
+            FROM product_categories pc2
+            JOIN categories c2 ON pc2.categoryId = c2.id
+            WHERE pc2.productId = p.id
+        ) AS csub
         ),
         JSON_ARRAY()
     ) AS Categories
@@ -112,22 +116,26 @@ SELECT
     p.brand AS productBrand,
     COALESCE(
         (
-            SELECT JSON_ARRAYAGG(
-                JSON_OBJECT(
-                    'id', c.id,
-                    'name', c.name
-                )
+        SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'id', csub.id,
+                'name', csub.name
             )
-            FROM product_categories pc
-            INNER JOIN categories c ON pc.categoryId = c.id
-            WHERE pc.productId = p.id
+        )
+        FROM (
+            SELECT DISTINCT c2.id, c2.name
+            FROM product_categories pc2
+            JOIN categories c2 ON pc2.categoryId = c2.id
+            WHERE pc2.productId = p.id
+        ) AS csub
         ),
         JSON_ARRAY()
     ) AS Categories
-FROM product_variants pv
-INNER JOIN products p ON p.id = pv.productId
-// `;
-
+FROM products p
+LEFT JOIN product_variants pv ON p.id = pv.productId
+GROUP BY p.id, p.name, p.description, p.brand
+ORDER BY p.name ASC
+`;
 
 // Get total count of products for pagination
 const getTotalProductsCount = `

@@ -172,6 +172,39 @@ Detach without stopping: `Ctrl + P` then `Ctrl + Q`.
 - `seed.sql` runs automatically on first container startup.
 - Contains initial categories, products, and sample data.
 
+---
+
+## CI/CD (GitHub Actions)
+
+This repo includes a workflow at `.github/workflows/ci-cd.yml` that:
+
+- Runs backend tests and builds the frontend
+- Builds and pushes Docker images for backend and frontend
+- Optionally deploys to a remote server via SSH
+
+Required configuration:
+
+- Set `IMAGE_BASE` in the workflow `env:` to your image base, for example `yourdockeruser/brightbuy`.
+  - Images will be tagged as `${IMAGE_BASE}-backend` and `${IMAGE_BASE}-frontend`.
+
+- GitHub Actions repository secrets (Settings → Secrets and variables → Actions):
+  - `DOCKER_USERNAME` — your Docker Hub username
+  - `DOCKER_PASSWORD` — a Docker Hub Personal Access Token (recommended) or password
+  - For deploy (optional):
+    - `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`
+
+Notes:
+
+- If you prefer GitHub Container Registry (GHCR), update the login step and tags:
+  - Use `registry: ghcr.io` and a `GHCR_TOKEN` with `write:packages` scope, and set `IMAGE_BASE=ghcr.io/<owner>/brightbuy`.
+  - Example login step:
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+  - Then tag images as `ghcr.io/<owner>/brightbuy-backend` and `-frontend`.
+
 
 
 # API Usage
