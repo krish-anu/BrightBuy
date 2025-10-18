@@ -172,7 +172,7 @@ const Inventory: React.FC = () => {
   // Edit/Delete modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<any>({ variantName: '', price: 0, stockQnt: 0 });
+  const [editForm, setEditForm] = useState<any>({ variantName: '', price: 0, stockQnt: 0, currentStock: 0, addStock: 0, _newImageFile: null as File | null, _imagePreviewUrl: null as string | null });
 
   const openViewModal = (variant: ProductVariantFlattened) => {
     (async () => {
@@ -998,12 +998,31 @@ const Inventory: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Image</label>
-                    <div className="mt-1">
-                      {selectedVariant?.imageURL ? (
+                    <div className="mt-1 space-y-2">
+                      {editForm._imagePreviewUrl ? (
+                        <img src={editForm._imagePreviewUrl} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
+                      ) : selectedVariant?.imageURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
                       ) : (
                         <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          if (file) {
+                            const url = URL.createObjectURL(file);
+                            setEditForm((prev: any) => ({ ...prev, _newImageFile: file, _imagePreviewUrl: url }));
+                          } else {
+                            setEditForm((prev: any) => ({ ...prev, _newImageFile: null, _imagePreviewUrl: null }));
+                          }
+                        }}
+                        className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {editForm._newImageFile && (
+                        <p className="text-xs text-gray-500">Selected: {editForm._newImageFile.name}</p>
                       )}
                     </div>
                   </div>
@@ -1015,9 +1034,22 @@ const Inventory: React.FC = () => {
                       const { updateVariant } = await import('@/services/variant.services');
                       const variantId = selectedVariant.id;
                       const newStock = (Number(editForm.currentStock) || 0) + (Number(editForm.addStock) || 0);
+                      // 1) Update variant basic fields
                       await updateVariant(variantId, { variantName: editForm.variantName, price: editForm.price ?? 0, stockQnt: newStock });
+
+                      // 2) If a new image was selected, upload to S3 and set on variant
+                      if (editForm._newImageFile) {
+                        const { uploadImageForEntity, setVariantImage } = await import('@/services/product.services');
+                        const uploadRes = await uploadImageForEntity(editForm._newImageFile, 'variant', variantId);
+                        const imageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes?.data?.message || uploadRes?.url;
+                        if (imageUrl) {
+                          await setVariantImage(variantId, imageUrl);
+                        }
+                      }
+
                       setEditModalOpen(false);
-                      // refresh products
+                      setSelectedVariant(null);
+                      // refresh products and stats
                       await loadProducts(currentPage);
                       await loadInventoryStats();
                     } catch (err) {

@@ -373,7 +373,10 @@ const getPopularVariants = async (req, res, next) => {
   }
 };
 
-// Set or update variant image URL
+const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const s3 = require('../config/s3');
+
+// Set or update variant image URL (and delete previous S3 object if replacing/removing)
 const setVariantImage = async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
@@ -385,11 +388,40 @@ const setVariantImage = async (req, res, next) => {
     const [variantRows] = await connection.query(variantQueries.getVariantById, [variantId]);
     if (!variantRows.length) throw new ApiError("Variant not found", 404);
 
-    await connection.query(productQueries.updateVariantImage, [imageURL || null, variantId]);
+    const oldImageURL = variantRows[0]?.imageURL || null;
+    const newImageURL = imageURL || null;
+
+    // If there was a previous image and it is being changed/cleared, attempt to delete the old S3 object
+    if (oldImageURL && oldImageURL !== newImageURL) {
+      try {
+        // Derive the S3 object key from the URL
+        let key = null;
+        try {
+          const u = new URL(oldImageURL);
+          // pathname begins with '/'
+          key = u.pathname.startsWith('/') ? u.pathname.slice(1) : u.pathname;
+        } catch (_) {
+          // Fallback split in case URL constructor fails
+          const parts = String(oldImageURL).split('.amazonaws.com/');
+          key = parts.length > 1 ? parts[1] : null;
+        }
+        if (key) {
+          await s3.send(new DeleteObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: key,
+          }));
+        }
+      } catch (delErr) {
+        // Best-effort delete: log and continue without failing the whole request
+        console.error('Failed to delete old S3 image for variant', variantId, delErr);
+      }
+    }
+
+    await connection.query(productQueries.updateVariantImage, [newImageURL, variantId]);
 
     await connection.commit();
 
-    res.status(200).json({ success: true, message: "Variant image updated", data: { id: variantId, imageURL: imageURL || null } });
+    res.status(200).json({ success: true, message: "Variant image updated", data: { id: variantId, imageURL: newImageURL } });
   } catch (error) {
     if (connection) await connection.rollback();
     next(error);
