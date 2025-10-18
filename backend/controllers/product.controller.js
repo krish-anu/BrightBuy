@@ -317,7 +317,7 @@ const getProductsPaginated = async (req, res, next) => {
     const totalPages = Math.ceil(totalCount / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
-
+  
     res.status(200).json({
       success: true,
       data: products,
