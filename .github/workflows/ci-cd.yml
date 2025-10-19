@@ -112,8 +112,8 @@ jobs:
           mkdir -p deploy_bundle/backend
           cp docker-compose.prod.yml deploy_bundle/
           cp seed.sql deploy_bundle/
-          # write backend .env from secret
-          printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          # write backend .env from secret (preserves newlines)
+          echo "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
 
       - name: Upload deployment bundle to server
         uses: appleboy/scp-action@v0.1.7
@@ -121,7 +121,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy_bundle/*"
+          source: "deploy_bundle/**"
           target: "~/brightbuy"
 
       - name: Deploy to server via SSH
@@ -130,7 +130,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          timeout: '90s'
+          timeout: '120s'
           debug: true
           script: |
             set -e
@@ -140,29 +140,32 @@ jobs:
             mkdir -p "$PROJECT_DIR/backend"
             cd "$PROJECT_DIR"
 
-            # Move uploaded .env into correct location
-            mv deploy_bundle/backend/.env backend/.env
+            echo "=== Checking uploaded files ==="
+            ls -R deploy_bundle || true
 
-            # Ensure backend/.env exists
+            echo "=== Moving backend .env ==="
+            mv deploy_bundle/backend/.env backend/.env || true
+
+            echo "=== Checking if backend/.env exists ==="
             if [ ! -f backend/.env ]; then
               echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
               exit 1
             fi
 
-            # Docker login
+            echo "=== Logging into Docker Hub ==="
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
             IMAGE_BASE="${{ env.IMAGE_BASE }}"
             BACKEND_SHA="${{ github.sha }}"
             FRONTEND_SHA="${{ github.sha }}"
 
-            # Pull and retag images
+            echo "=== Pulling and deploying containers ==="
             docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
             docker pull ${IMAGE_BASE}-frontend:$FRONTEND_SHA || docker pull ${IMAGE_BASE}-frontend:latest
+
             docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
             docker tag ${IMAGE_BASE}-frontend:$FRONTEND_SHA ${IMAGE_BASE}-frontend:latest || true
 
-            # Deploy with docker-compose
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
