@@ -106,23 +106,30 @@ jobs:
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Prepare deployment bundle
+      - name: Create backend .env locally
         run: |
-          set -e
-          mkdir -p deploy_bundle/backend
-          cp docker-compose.prod.yml deploy_bundle/
-          cp seed.sql deploy_bundle/
-          # write backend .env from secret (preserves newlines)
-          echo "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          mkdir -p backend
+          echo "${{ secrets.BACKEND_ENV }}" > backend/.env
 
-      - name: Upload deployment bundle to server
+      - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy_bundle/**"
+          source: |
+            docker-compose.prod.yml
+            seed.sql
           target: "~/brightbuy"
+
+      - name: Upload backend .env to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "backend/.env"
+          target: "~/brightbuy/backend/.env"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -134,23 +141,8 @@ jobs:
           debug: true
           script: |
             set -e
-            export PATH=$PATH:/usr/bin
-
             PROJECT_DIR="$HOME/brightbuy"
-            mkdir -p "$PROJECT_DIR/backend"
             cd "$PROJECT_DIR"
-
-            echo "=== Checking uploaded files ==="
-            ls -R deploy_bundle || true
-
-            echo "=== Moving backend .env ==="
-            mv deploy_bundle/backend/.env backend/.env || true
-
-            echo "=== Checking if backend/.env exists ==="
-            if [ ! -f backend/.env ]; then
-              echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
-              exit 1
-            fi
 
             echo "=== Logging into Docker Hub ==="
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -159,13 +151,14 @@ jobs:
             BACKEND_SHA="${{ github.sha }}"
             FRONTEND_SHA="${{ github.sha }}"
 
-            echo "=== Pulling and deploying containers ==="
+            echo "=== Pulling Docker images ==="
             docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
             docker pull ${IMAGE_BASE}-frontend:$FRONTEND_SHA || docker pull ${IMAGE_BASE}-frontend:latest
 
             docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
             docker tag ${IMAGE_BASE}-frontend:$FRONTEND_SHA ${IMAGE_BASE}-frontend:latest || true
 
+            echo "=== Deploying containers ==="
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
