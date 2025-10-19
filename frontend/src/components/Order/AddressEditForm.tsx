@@ -1,4 +1,5 @@
 import type { Address } from "@/types/Address"
+import type { City } from "@/services/city.services"
 import { Field, FieldContent, FieldGroup, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -7,12 +8,14 @@ import { Button } from "@/components/ui/button"
 export function AddressEditForm({
   value,
   isLastDefault,
+  cities = [],
   onChange,
   onCancel,
   onSubmit,
 }: {
   value: Address
   isLastDefault: boolean
+  cities?: City[]
   onChange: (next: Address) => void
   onCancel: () => void
   onSubmit: () => void
@@ -57,7 +60,27 @@ export function AddressEditForm({
               <label htmlFor="city" className="text-sm font-medium">
                 City
               </label>
-              <Input id="city" value={a.city} onChange={(e) => onChange({ ...a, city: e.target.value })} />
+              {cities.length ? (
+                <select
+                  id="city"
+                  className="mt-1 block w-full border rounded p-2 bg-background"
+                  value={a.cityId ?? ""}
+                  onChange={(e) => {
+                    const id = e.target.value ? Number(e.target.value) : undefined
+                    const name = id ? cities.find((c) => c.id === id)?.name || "" : ""
+                    onChange({ ...a, cityId: id, city: name })
+                  }}
+                >
+                  <option value="">Select a city</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input id="city" value={a.city} onChange={(e) => onChange({ ...a, city: e.target.value })} />
+              )}
             </FieldContent>
           </Field>
           <Field>

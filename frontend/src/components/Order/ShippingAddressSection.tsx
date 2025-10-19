@@ -12,40 +12,70 @@ import { AddressSummary } from "./AddressSummary";
 import { AddressList } from "./AddressList";
 import { AddressEditForm } from "./AddressEditForm";
 import { getUserProfile } from "@/services/user.services";
+import { addAddress as apiAddAddress, updateAddress as apiUpdateAddress, makeDefaultAddress as apiMakeDefault } from "@/services/address.services";
+import { getAllCities, type City } from "@/services/city.services";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ShippingAddressSection() {
-	const navigate = useNavigate();
-	const location = useLocation();
-	const [addresses, setAddresses] = useState<Address[]>([]);
-	const [selectedId, setSelectedId] = useState<string>("");
-	const [isEditing, setIsEditing] = useState(false);
-	const [formData, setFormData] = useState<Address | null>(null);
-	const [open, setOpen] = useState(false);
-	const [profileLoading, setProfileLoading] = useState(false);
-	const [profileError, setProfileError] = useState<unknown>(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [addresses, setAddresses] = useState<Address[]>([]);
+    const [selectedId, setSelectedId] = useState<string>("");
+    const [isEditing, setIsEditing] = useState(false);
+    const [formData, setFormData] = useState<Address | null>(null);
+    const [open, setOpen] = useState(false);
+	const [cities, setCities] = useState<City[]>([]);
+		const [profileLoading, setProfileLoading] = useState(false);
+		const [profileError, setProfileError] = useState<unknown>(null);
+		const [profileSaving, setProfileSaving] = useState(false);
+		const [profileSaveError, setProfileSaveError] = useState<unknown>(null);
+
+		const refetchAddresses = async () => {
+			try {
+				const res = await getUserProfile();
+				const payload =
+					res && typeof res === "object" && "data" in (res as Record<string, unknown>)
+						? (res as { data: unknown }).data
+						: res;
+				const rawAddresses = Array.isArray((payload as any)?.addresses)
+					? ((payload as any).addresses as any[])
+					: [];
+				const mapped = rawAddresses.map((raw: any, idx: number): Address => ({
+					id: String(raw?.id ?? `addr-${idx}`),
+					name: raw?.fullName ?? raw?.name ?? "",
+					address: [raw?.line1, raw?.line2].filter(Boolean).join(", ") || raw?.address || "",
+					city: raw?.city ?? raw?.cityName ?? "",
+					cityId: raw?.cityId ?? undefined,
+					zip: String(raw?.postalCode ?? ""),
+					phone: String(raw?.phone ?? ""),
+					isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
+				}));
+				setAddresses(mapped);
+				if (mapped.length) {
+					const fallback = mapped.find((a) => a.isDefault) ?? mapped[0];
+					setSelectedId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : fallback.id));
+				} else {
+					setSelectedId("");
+				}
+			} catch (e) {
+				// bubble to caller normally
+				throw e;
+			}
+		};
 
 	useEffect(() => {
 		let ignore = false;
 
 		const mapToAddress = (raw: any, index: number): Address => ({
-			id: String(
-				raw?.id ??
-					raw?.addressId ??
-					raw?.uuid ??
-					raw?._id ??
-					`addr-${index}`
-			),
-			name: raw?.fullName ?? raw?.name ?? raw?.contactName ?? "",
-			address:
-				[raw?.line1, raw?.line2, raw?.street].filter(Boolean).join(", ") ||
-				raw?.address ||
-				"",
-			city: raw?.cityName ?? raw?.city ?? "",
-			zip: String(raw?.postalCode ?? raw?.zip ?? ""),
-			phone: String(raw?.phone ?? raw?.mobile ?? ""),
-			isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
-		});
+            id: String(raw?.id ?? `addr-${index}`),
+            name: raw?.fullName ?? raw?.name ?? "",
+            address: [raw?.line1, raw?.line2].filter(Boolean).join(", ") || raw?.address || "",
+            city: raw?.city ?? raw?.cityName ?? "",
+            cityId: raw?.cityId ?? null,
+            zip: String(raw?.postalCode ?? ""),
+            phone: String(raw?.phone ?? ""),
+            isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
+        });
 
 		const fetchProfile = async () => {
 			try {
@@ -63,13 +93,20 @@ export default function ShippingAddressSection() {
 				console.log("Fetched profile payload:", payload);
 
 				const rawAddresses = Array.isArray((payload as any)?.addresses)
-					? ((payload as any).addresses as any[])
-					: [];
+                    ? ((payload as any).addresses as any[])
+                    : [];
 
 				const mapped = rawAddresses.map(mapToAddress);
 				if (ignore) return;
-				setAddresses(mapped);
+								setAddresses(mapped);
 				console.log("Mapped addresses:", mapped);
+								// load cities once to power the city selector
+								try {
+									const allCities = await getAllCities();
+									setCities(allCities);
+								} catch (e) {
+									console.warn("Failed to load cities", e);
+								}
 				if (!mapped.length) {
 					setSelectedId("");
 					return;
@@ -135,32 +172,101 @@ export default function ShippingAddressSection() {
 		setIsEditing(true);
 	};
 
-	const handleEditSubmit = (next: Address) => {
-		setAddresses((prev) => {
-			const exists = prev.some((addr) => addr.id === next.id);
-			if (!exists) {
-				if (next.isDefault) {
-					const cleared = prev.map((addr) => ({ ...addr, isDefault: false }));
-					return [...cleared, { ...next, isDefault: true }];
-				}
-				return [...prev, { ...next, isDefault: false }];
+	const handleEditSubmit = async (next: Address) => {
+		// resolve cityId before any optimistic updates
+		let resolvedCityId = next.cityId ?? null;
+		if ((resolvedCityId === null || resolvedCityId === undefined) && next.city) {
+			try {
+				const cities = await getAllCities();
+				const match = cities.find((c) => String(c.name).toLowerCase() === String(next.city).toLowerCase());
+				if (match) resolvedCityId = match.id;
+			} catch (e) {
+				console.warn("Unable to resolve cityId from city name", e);
 			}
-
+		}
+		if (resolvedCityId === null || resolvedCityId === undefined) {
+			setProfileSaveError(new Error("City is required"));
+			return;
+		}
+		// build new addresses list deterministically so we can persist it
+		const exists = addresses.some((addr) => addr.id === next.id);
+		let newAddresses: Address[] = [];
+		if (!exists) {
 			if (next.isDefault) {
-				return prev.map((addr) =>
-					addr.id === next.id
-						? { ...next, isDefault: true }
-						: { ...addr, isDefault: false }
-				);
+				newAddresses = addresses.map((addr) => ({ ...addr, isDefault: false }));
+				newAddresses = [...newAddresses, { ...next, isDefault: true }];
+			} else {
+				newAddresses = [...addresses, { ...next, isDefault: false }];
 			}
+		} else {
+			if (next.isDefault) {
+				newAddresses = addresses.map((addr) =>
+					addr.id === next.id ? { ...next, isDefault: true } : { ...addr, isDefault: false }
+				);
+			} else {
+				newAddresses = addresses.map((addr) => (addr.id === next.id ? { ...next } : addr));
+			}
+		}
 
-			return prev.map((addr) => (addr.id === next.id ? { ...next } : addr));
-		});
-
+		// optimistic update
+		setAddresses(newAddresses);
 		setSelectedId(next.id);
 		setIsEditing(false);
 		setFormData(null);
 		setOpen(false);
+		// persist via dedicated endpoints
+		try {
+			setProfileSaving(true);
+			setProfileSaveError(null);
+			// If next.id is numeric from backend, update; else add
+			const numericId = Number(next.id);
+			const payload = {
+				line1: next.address.split(",")[0]?.trim() || next.address,
+				line2: next.address.includes(",") ? next.address.split(",").slice(1).join(",").trim() : null,
+				cityId: resolvedCityId,
+				postalCode: next.zip || null,
+				isDefault: !!next.isDefault,
+			};
+			if (Number.isFinite(numericId) && String(numericId) === next.id) {
+				await apiUpdateAddress(numericId, payload as any);
+				if (next.isDefault) {
+					await apiMakeDefault(numericId);
+				}
+			} else {
+				const resp = await apiAddAddress(payload as any);
+				const createdId = resp?.id;
+				if (createdId && next.isDefault) {
+					await apiMakeDefault(Number(createdId));
+				}
+			}
+			// refetch to align with backend truth
+			await refetchAddresses();
+		} catch (err) {
+			console.error("Failed to persist address change", err);
+			setProfileSaveError(err);
+		} finally {
+			setProfileSaving(false);
+		}
+	};
+	// optional: persist when user changes default selection in UI (if you provide that UI)
+	// example setter that persists default change
+	const setDefaultAddress = async (id: string) => {
+		const newAddresses = addresses.map((a) => ({ ...a, isDefault: a.id === id }));
+		setAddresses(newAddresses);
+		setSelectedId(id);
+		try {
+			setProfileSaving(true);
+			setProfileSaveError(null);
+			const numericId = Number(id);
+			if (Number.isFinite(numericId) && String(numericId) === id) {
+				await apiMakeDefault(numericId);
+			}
+			await refetchAddresses();
+		} catch (err) {
+			setProfileSaveError(err);
+		} finally {
+			setProfileSaving(false);
+		}
 	};
 
 	const defaultId =
@@ -179,6 +285,12 @@ export default function ShippingAddressSection() {
 				<div className="w-full space-y-2">
 					{profileLoading && (
 						<p className="text-sm text-muted-foreground">Loading your saved addresses…</p>
+					)}
+					{profileSaving && (
+						<p className="text-sm text-muted-foreground">Saving address changes…</p>
+					)}
+					{!!profileSaveError && (
+						<p className="text-sm text-destructive">We couldn't save your address changes. Please try again.</p>
 					)}
 					{!profileLoading && !addresses.length && !profileError && (
 						<p className="text-sm text-muted-foreground">
@@ -226,7 +338,12 @@ export default function ShippingAddressSection() {
 											<AddressList
 												addresses={addresses}
 												value={selectedId || defaultId}
-												onChange={(val) => setSelectedId(val)}
+												onChange={(val) => {
+													if (val !== selectedId) {
+														console.debug("Address selection changed", { from: selectedId, to: val });
+														setSelectedId(val);
+													}
+												}}
 												onEdit={(addr) => {
 												setFormData(addr);
 												setIsEditing(true);
@@ -237,7 +354,7 @@ export default function ShippingAddressSection() {
 												No saved addresses yet. Add one below.
 											</p>
 										)}
-										<div>
+										<div className="space-y-2">
 											<Button
 												variant="order_outline"
 												className="mt-4 text-primary border-primary hover:text-background w-full"
@@ -245,12 +362,28 @@ export default function ShippingAddressSection() {
 											>
 												+ Add New Address
 											</Button>
+											{/* <Button
+												variant="order"
+												className="w-full"
+												disabled={!selectedId || selectedId === (addresses.find((a) => a.isDefault)?.id ?? "")}
+												onClick={async () => {
+													const currentDefault = addresses.find((a) => a.isDefault)?.id ?? "";
+													if (selectedId && selectedId !== currentDefault) {
+														console.debug("Confirming selection; persisting default", { selectedId, currentDefault });
+														await setDefaultAddress(selectedId);
+													}
+													setOpen(false);
+												}}
+											>
+												Use Selected Address
+											</Button> */}
 										</div>
 									</>
 								) : (
 									formData && (
 										<AddressEditForm
 											value={formData}
+											cities={cities}
 											isLastDefault={
 												addresses.filter((addr) => addr.isDefault).length === 1 &&
 												!!formData.isDefault
