@@ -83,10 +83,10 @@ jobs:
             ${{ env.IMAGE_BASE }}-frontend:latest
 
   deploy:
-    needs: build-and-push-images
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
+      needs: build-and-push-images
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main'
+      steps:
       - name: Validate deploy secrets
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -100,7 +100,7 @@ jobs:
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
           if [ "$missing" -eq 1 ]; then
-            echo "One or more required secrets are missing. Set them under Settings > Secrets and variables > Actions."; exit 1; fi
+            echo "❌ One or more required secrets are missing."; exit 1; fi
 
       - name: Test SSH connection
         uses: appleboy/ssh-action@v1.2.2
@@ -108,8 +108,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            echo "✅ SSH works! Connected to $(hostname)"
+          script: echo "✅ SSH connection successful to $(hostname)"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -117,29 +116,33 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          # optional: set port via secret SERVER_PORT if not 22
-          # port: ${{ secrets.SERVER_PORT }}
-          # increase connection timeout and enable debug
-          timeout: '60s'
+          timeout: '90s'
           debug: true
           script: |
             set -e
-            # Ensure docker is in PATH
             export PATH=$PATH:/usr/bin
 
-            # Docker login
-            echo ${{ secrets.DOCKER_PASSWORD }} | /usr/bin/docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            # Ensure project directory exists
+            PROJECT_DIR="/home/ubuntu/brightbuy"
+            sudo mkdir -p "$PROJECT_DIR"
+            sudo chown $USER:$USER "$PROJECT_DIR"
+            cd "$PROJECT_DIR"
 
-            # Pull images by commit SHA or fallback to latest
+            # Docker login
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+            # Pull images
             BACKEND_SHA=${{ github.sha }}
             FRONTEND_SHA=${{ github.sha }}
-            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:latest
-            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:latest
+            docker pull ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA || docker pull ${{ env.IMAGE_BASE }}-backend:latest
+            docker pull ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA || docker pull ${{ env.IMAGE_BASE }}-frontend:latest
 
-            # Retag to latest for docker-compose
-            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA ${{ env.IMAGE_BASE }}-backend:latest || true
-            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA ${{ env.IMAGE_BASE }}-frontend:latest || true
+            # Retag for docker-compose
+            docker tag ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA ${{ env.IMAGE_BASE }}-backend:latest || true
+            docker tag ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA ${{ env.IMAGE_BASE }}-frontend:latest || true
 
-            cd /home/brightbuy
-            /usr/bin/docker compose -f docker-compose.prod.yml pull
-            /usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # Deploy with docker compose
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "🚀 Deployment completed successfully on $(hostname)"
