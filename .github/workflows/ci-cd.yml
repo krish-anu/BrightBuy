@@ -102,8 +102,6 @@ jobs:
           for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
-          # Check BACKEND_ENV secret directly
-          if [ -z "${{ secrets.BACKEND_ENV }}" ]; then echo "Missing secret: BACKEND_ENV"; missing=1; fi
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
@@ -114,7 +112,11 @@ jobs:
           cp docker-compose.prod.yml deploy_bundle/
           cp seed.sql deploy_bundle/
           # write backend .env from secret
-          printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
+            printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          else
+            echo "Skipping backend .env creation; BACKEND_ENV is not set."
+          fi
 
       - name: Test SSH connection
         uses: appleboy/ssh-action@v1.2.2
@@ -162,6 +164,12 @@ jobs:
             sudo mkdir -p "$PROJECT_DIR"
             sudo chown $USER:$USER "$PROJECT_DIR"
             cd "$PROJECT_DIR"
+
+              # Ensure backend env exists either from upload or previous deploy
+              if [ ! -f backend/.env ]; then
+                echo "❌ Missing backend/.env. Either set BACKEND_ENV secret (to upload .env) or create $PROJECT_DIR/backend/.env on the server.";
+                exit 1;
+              fi
 
             # Docker login
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
