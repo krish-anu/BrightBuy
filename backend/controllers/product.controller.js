@@ -298,8 +298,8 @@ const getProductsPaginated = async (req, res, next) => {
 
     // Count query for pagination
     let countSql = `
-      SELECT COUNT(DISTINCT p.id) AS totalCount
-      FROM products p
+      SELECT COUNT(DISTINCT pv.id) AS totalCount
+      FROM product_variants pv
     `;
     const countParams = [];
 
