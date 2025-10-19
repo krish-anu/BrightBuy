@@ -22,10 +22,12 @@ interface IconComponentProps {
 // API product variant type
 interface ProductVariant {
   id: number;
+  // backend returns variantId as id for variant endpoints; normalize here
   variantName: string;
-  price: number | null;
+  price: number | null | string;
   stockQnt: number | null;
   imageURL?: string | null;
+  SKU?: string | null;
 }
 
 // API product type
@@ -96,9 +98,27 @@ const Inventory: React.FC = () => {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const flattenProducts = (list: Product[]): ProductVariantFlattened[] => {
+  const flattenProducts = (list: any[]): ProductVariantFlattened[] => {
     const out: ProductVariantFlattened[] = [];
     for (const product of list) {
+      // New backend may already return flattened variant rows with product fields duplicated
+      const isFlattenedRow = product && product.variantId && product.productId;
+      if (isFlattenedRow) {
+        const cats = Array.isArray(product.Categories) ? product.Categories : [];
+        out.push({
+          id: Number(product.variantId),
+          variantName: product.variantName || 'Default',
+          price: product.price != null ? Number(product.price) : null,
+          stockQnt: product.stockQnt != null ? Number(product.stockQnt) : null,
+          imageURL: product.imageURL ?? null,
+          isDefaultVariant: false,
+          productName: product.productName || product.name || 'Unknown Product',
+          brand: product.productBrand || product.brand || 'Unknown Brand',
+          categories: cats.map((c: any) => c?.name || `Category ${c?.id || 'unknown'}`).join(', ') || 'Uncategorized',
+        });
+        continue;
+      }
+
       const variants = product.ProductVariants || [];
       // Dedupe categories by id and name for safety
       const rawCategories = product.Categories || [];
@@ -129,10 +149,11 @@ const Inventory: React.FC = () => {
         // skip null/undefined variants (some API responses may include null entries)
         if (!variant) continue;
         out.push({
-          ...variant,
+          id: (variant as any).id ?? (variant as any).variantId,
+          variantName: (variant as any).variantName,
           imageURL: (variant as any).imageURL ?? null,
           isDefaultVariant: false,
-          price: (variant as any).price ?? (product ? (product as any).price ?? null : null),
+          price: (variant as any).price != null ? Number((variant as any).price) : (product ? (product as any).price ?? null : null),
           stockQnt: (variant as any).stockQnt ?? (product ? (product as any).stockQnt ?? null : null),
           productName: product.name || 'Unknown Product',
           brand: product.brand || 'Unknown Brand',
@@ -151,7 +172,7 @@ const Inventory: React.FC = () => {
   // Edit/Delete modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<any>({ variantName: '', price: 0, stockQnt: 0 });
+  const [editForm, setEditForm] = useState<any>({ variantName: '', price: 0, stockQnt: 0, currentStock: 0, addStock: 0, _newImageFile: null as File | null, _imagePreviewUrl: null as string | null });
 
   const openViewModal = (variant: ProductVariantFlattened) => {
     (async () => {
@@ -232,7 +253,8 @@ const Inventory: React.FC = () => {
     try {
       // If searching OR a stock-status filter is active, fetch the full dataset and filter client-side
       if ((searchTerm && searchTerm.trim() !== '') || (filterStockStatus && filterStockStatus !== '')) {
-        const res = await getAllProducts();
+        const categoryId = categories.find(c => c.name === filterCategory)?.id;
+        const res = await getAllProducts(categoryId);
         if (res && res.success && res.data) {
           let flattened = flattenProducts(res.data as Product[]);
 
@@ -274,7 +296,8 @@ const Inventory: React.FC = () => {
       }
 
       // normal paginated fetch
-      const res = await getProductsPaginated(page, itemsPerPage);
+  const categoryId = categories.find(c => c.name === filterCategory)?.id;
+  const res = await getProductsPaginated(page, itemsPerPage, categoryId);
       if (res && res.success && res.data) {
         const flattened = flattenProducts(res.data as Product[]);
         setProducts(flattened);
@@ -975,12 +998,31 @@ const Inventory: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Image</label>
-                    <div className="mt-1">
-                      {selectedVariant?.imageURL ? (
+                    <div className="mt-1 space-y-2">
+                      {editForm._imagePreviewUrl ? (
+                        <img src={editForm._imagePreviewUrl} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
+                      ) : selectedVariant?.imageURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
                       ) : (
                         <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          if (file) {
+                            const url = URL.createObjectURL(file);
+                            setEditForm((prev: any) => ({ ...prev, _newImageFile: file, _imagePreviewUrl: url }));
+                          } else {
+                            setEditForm((prev: any) => ({ ...prev, _newImageFile: null, _imagePreviewUrl: null }));
+                          }
+                        }}
+                        className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {editForm._newImageFile && (
+                        <p className="text-xs text-gray-500">Selected: {editForm._newImageFile.name}</p>
                       )}
                     </div>
                   </div>
@@ -992,9 +1034,22 @@ const Inventory: React.FC = () => {
                       const { updateVariant } = await import('@/services/variant.services');
                       const variantId = selectedVariant.id;
                       const newStock = (Number(editForm.currentStock) || 0) + (Number(editForm.addStock) || 0);
+                      // 1) Update variant basic fields
                       await updateVariant(variantId, { variantName: editForm.variantName, price: editForm.price ?? 0, stockQnt: newStock });
+
+                      // 2) If a new image was selected, upload to S3 and set on variant
+                      if (editForm._newImageFile) {
+                        const { uploadImageForEntity, setVariantImage } = await import('@/services/product.services');
+                        const uploadRes = await uploadImageForEntity(editForm._newImageFile, 'variant', variantId);
+                        const imageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes?.data?.message || uploadRes?.url;
+                        if (imageUrl) {
+                          await setVariantImage(variantId, imageUrl);
+                        }
+                      }
+
                       setEditModalOpen(false);
-                      // refresh products
+                      setSelectedVariant(null);
+                      // refresh products and stats
                       await loadProducts(currentPage);
                       await loadInventoryStats();
                     } catch (err) {

@@ -87,6 +87,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Validate deploy secrets
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -94,22 +97,34 @@ jobs:
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
         run: |
           missing=0
           for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
           if [ "$missing" -eq 1 ]; then
-            echo "One or more required secrets are missing. Set them under Settings > Secrets and variables > Actions."; exit 1; fi
+            echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Test SSH connection
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Prepare deployment bundle
+        run: |
+          set -e
+          mkdir -p deploy_bundle/backend
+          cp docker-compose.prod.yml deploy_bundle/
+          cp seed.sql deploy_bundle/
+          # write backend .env from secret if it exists
+          if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
+            printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          fi
+
+      - name: Upload deployment bundle to server
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            echo "✅ SSH works! Connected to $(hostname)"
+          source: "deploy_bundle/*"
+          target: "~/brightbuy"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -117,24 +132,36 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: '90s'
+          debug: true
           script: |
             set -e
-            # Ensure docker is in PATH
             export PATH=$PATH:/usr/bin
 
-            # Docker login
-            echo ${{ secrets.DOCKER_PASSWORD }} | /usr/bin/docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            PROJECT_DIR="$HOME/brightbuy"
+            mkdir -p "$PROJECT_DIR/backend"
+            cd "$PROJECT_DIR"
 
-            # Pull images by commit SHA or fallback to latest
-            BACKEND_SHA=${{ github.sha }}
-            FRONTEND_SHA=${{ github.sha }}
-            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-backend:latest
-            /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA || /usr/bin/docker pull ${{ env.IMAGE_BASE }}-frontend:latest
+            # Ensure backend/.env exists
+            if [ ! -f backend/.env ]; then
+              echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
+              exit 1
+            fi
 
-            # Retag to latest for docker-compose
-            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-backend:$BACKEND_SHA ${{ env.IMAGE_BASE }}-backend:latest || true
-            /usr/bin/docker tag ${{ env.IMAGE_BASE }}-frontend:$FRONTEND_SHA ${{ env.IMAGE_BASE }}-frontend:latest || true
+            # Docker login (inline secrets)
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            cd /home/brightbuy
-            /usr/bin/docker compose -f docker-compose.prod.yml pull
-            /usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # Pull and retag images (inline contexts)
+            IMAGE_BASE="${{ env.IMAGE_BASE }}"
+            BACKEND_SHA="${{ github.sha }}"
+            FRONTEND_SHA="${{ github.sha }}"
+            docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
+            docker pull ${IMAGE_BASE}-frontend:$FRONTEND_SHA || docker pull ${IMAGE_BASE}-frontend:latest
+            docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
+            docker tag ${IMAGE_BASE}-frontend:$FRONTEND_SHA ${IMAGE_BASE}-frontend:latest || true
+
+            # Deploy with docker-compose
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "🚀 Deployment completed successfully on $(hostname)"

@@ -1,8 +1,10 @@
 import axios from "axios";
 import { LOCAL_STORAGE__TOKEN } from "./services/auth.services";
 
+// Prefer environment-provided backend URL; fall back to relative base in production
+// so that Nginx can proxy /api to the backend. Avoid hardcoding localhost in builds.
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_BASE_URL || "http://localhost:8081",
+  baseURL: import.meta.env.VITE_BACKEND_BASE_URL || "/",
   headers: {
     "Content-Type": "application/json",
   },
