@@ -106,21 +106,22 @@ jobs:
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Prepare deploy_bundle
+      - name: Create backend .env locally
         run: |
-          mkdir -p deploy_bundle/backend
-          echo "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
-          cp docker-compose.prod.yml deploy_bundle/
-          cp seed.sql deploy_bundle/
+          mkdir -p backend
+          echo "${{ secrets.BACKEND_ENV }}" > backend/.env
 
-      - name: Upload deploy_bundle to server
+      - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy_bundle/**"
-          target: "~/brightbuy"
+          source: |
+            docker-compose.prod.yml
+            seed.sql
+            backend/.env
+          target: "~/brightbuy/"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -134,6 +135,9 @@ jobs:
             set -e
             PROJECT_DIR="$HOME/brightbuy"
             cd "$PROJECT_DIR"
+
+            echo "=== Verify uploaded files ==="
+            ls -la
 
             echo "=== Logging into Docker Hub ==="
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
