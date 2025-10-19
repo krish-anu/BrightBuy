@@ -174,3 +174,11 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             echo "🚀 Deployment completed successfully on $(hostname)"
+
+            echo "=== Post-deploy diagnostics ==="
+            echo "Docker compose ps:" && docker compose -f docker-compose.prod.yml ps || true
+            echo "Listening ports (80,8081):" && (ss -tulpn | grep -E ":(80|8081)\s" || true)
+            echo "Frontend logs (last 100 lines):" && docker compose -f docker-compose.prod.yml logs --no-color --tail=100 frontend || true
+            echo "Backend logs (last 100 lines):" && docker compose -f docker-compose.prod.yml logs --no-color --tail=100 backend || true
+            echo "Curl localhost:80 headers:" && (curl -sI http://localhost/ || true)
+            echo "Curl backend root:" && (curl -s http://localhost:8081/ || true)
