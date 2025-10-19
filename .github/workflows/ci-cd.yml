@@ -100,7 +100,7 @@ jobs:
           BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
         run: |
           missing=0
-          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
+          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD BACKEND_ENV; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
           if [ "$missing" -eq 1 ]; then
@@ -112,10 +112,8 @@ jobs:
           mkdir -p deploy_bundle/backend
           cp docker-compose.prod.yml deploy_bundle/
           cp seed.sql deploy_bundle/
-          # write backend .env from secret if it exists
-          if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
-            printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
-          fi
+          # write backend .env from secret
+          printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
 
       - name: Upload deployment bundle to server
         uses: appleboy/scp-action@v0.1.7
@@ -142,19 +140,23 @@ jobs:
             mkdir -p "$PROJECT_DIR/backend"
             cd "$PROJECT_DIR"
 
+            # Move uploaded .env into correct location
+            mv deploy_bundle/backend/.env backend/.env
+
             # Ensure backend/.env exists
             if [ ! -f backend/.env ]; then
               echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
               exit 1
             fi
 
-            # Docker login (inline secrets)
+            # Docker login
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # Pull and retag images (inline contexts)
             IMAGE_BASE="${{ env.IMAGE_BASE }}"
             BACKEND_SHA="${{ github.sha }}"
             FRONTEND_SHA="${{ github.sha }}"
+
+            # Pull and retag images
             docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
             docker pull ${IMAGE_BASE}-frontend:$FRONTEND_SHA || docker pull ${IMAGE_BASE}-frontend:latest
             docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
