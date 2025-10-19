@@ -106,21 +106,34 @@ jobs:
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Upload deployment bundle to server
+      - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "docker-compose.prod.yml, seed.sql"
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          key: ${{ env.SERVER_SSH_KEY }}
+          source: "docker-compose.prod.yml seed.sql"
           target: "~/brightbuy"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+          IMAGE_BASE: ${{ env.IMAGE_BASE }}
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          key: ${{ env.SERVER_SSH_KEY }}
           timeout: '90s'
           debug: true
           script: |
@@ -130,7 +143,7 @@ jobs:
             PROJECT_DIR="$HOME/brightbuy"
             mkdir -p "$PROJECT_DIR/backend"
 
-            # Write backend/.env from secret (always ensures it exists)
+            # Write backend .env
             printf "%s\n" "${BACKEND_ENV}" > "$PROJECT_DIR/backend/.env"
 
             cd "$PROJECT_DIR"
@@ -138,7 +151,7 @@ jobs:
             # Docker login
             echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 
-            # Pull and retag images
+            # Pull & retag images
             BACKEND_SHA=${GITHUB_SHA}
             FRONTEND_SHA=${GITHUB_SHA}
             docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
@@ -146,7 +159,7 @@ jobs:
             docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
             docker tag ${IMAGE_BASE}-frontend:$FRONTEND_SHA ${IMAGE_BASE}-frontend:latest || true
 
-            # Deploy with docker-compose
+            # Deploy with Docker Compose
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
