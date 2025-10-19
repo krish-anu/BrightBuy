@@ -41,14 +41,17 @@ services:
           action: rebuild
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: builder
     container_name: frontend
     volumes:
       - ./frontend:/app
       - ./frontend/node_modules:/app/node_modules
     ports:
       - "5173:5173"
-    command: sh -c "npm ci && npm run dev"
+    working_dir: /app
+    command: sh -c "npm run dev -- --host"
     develop:
       watch:
         # Rebuild image when Dockerfile or dependency manifests change
