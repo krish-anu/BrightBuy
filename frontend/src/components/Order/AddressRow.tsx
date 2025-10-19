@@ -20,10 +20,10 @@ export function AddressRow({
           className="hover:cursor-pointer bg-background data-[state=checked]:bg-primary/50 size-5 border-primary"
         />
         <label htmlFor={a.id} className="flex flex-col md:px-6 px-4 text-left gap-0 hover:cursor-pointer">
-          <span className="font-bold md:text-xl text-lg ">
+          {/* <span className="font-bold md:text-xl text-lg ">
             {a.name}
             <span className="font-normal text-muted-foreground pl-4 md:text-md text-sm">{a.phone}</span>
-          </span>
+          </span> */}
           <p className="text-muted-foreground">{a.address}</p>
           <p className="text-muted-foreground">{a.city}</p>
           <p className="text-muted-foreground">{a.zip}</p>
