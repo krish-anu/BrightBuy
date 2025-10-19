@@ -100,11 +100,22 @@ jobs:
           BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
         run: |
           missing=0
-          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD BACKEND_ENV; do
+          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
+
+      - name: Prepare deployment bundle
+        run: |
+          set -e
+          mkdir -p deploy_bundle/backend
+          cp docker-compose.prod.yml deploy_bundle/
+          cp seed.sql deploy_bundle/
+          # write backend .env from secret if it exists
+          if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
+            printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          fi
 
       - name: Upload deployment bundle to server
         uses: appleboy/scp-action@v0.1.7
@@ -129,11 +140,13 @@ jobs:
 
             PROJECT_DIR="$HOME/brightbuy"
             mkdir -p "$PROJECT_DIR/backend"
-
-            # Write backend/.env from secret (always ensures it exists)
-            printf "%s\n" "${BACKEND_ENV}" > "$PROJECT_DIR/backend/.env"
-
             cd "$PROJECT_DIR"
+
+            # Ensure backend/.env exists
+            if [ ! -f backend/.env ]; then
+              echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
+              exit 1
+            fi
 
             # Docker login
             echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
