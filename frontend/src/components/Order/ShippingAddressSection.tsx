@@ -12,8 +12,11 @@ import { AddressSummary } from "./AddressSummary";
 import { AddressList } from "./AddressList";
 import { AddressEditForm } from "./AddressEditForm";
 import { getUserProfile } from "@/services/user.services";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ShippingAddressSection() {
+	const navigate = useNavigate();
+	const location = useLocation();
 	const [addresses, setAddresses] = useState<Address[]>([]);
 	const [selectedId, setSelectedId] = useState<string>("");
 	const [isEditing, setIsEditing] = useState(false);
@@ -79,12 +82,19 @@ export default function ShippingAddressSection() {
 					return fallback ? fallback.id : "";
 				});
 			} catch (error) {
-				if (!ignore) setProfileError(error);
-				console.log(error);
-			} finally {
-				if (!ignore) setProfileLoading(false);
-			}
-		};
+				const status = (error as any)?.response?.status ?? (error as any)?.status;
+				console.log("Fetch profile error status:", status, "typeof:", typeof status);
+				if (status === 401) {
+					// pass current location so login can return the user here
+					navigate("/login", { state: { from: location }, replace: true });
+					return;
+				}
+                 if (!ignore) setProfileError(error);
+                 console.log("Error while fetching address data: ",error);
+             } finally {
+                 if (!ignore) setProfileLoading(false);
+             }
+         };
 
 		fetchProfile();
 
