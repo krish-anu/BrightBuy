@@ -111,17 +111,33 @@ jobs:
           mkdir -p backend
           echo "${{ secrets.BACKEND_ENV }}" > backend/.env
 
+      - name: Verify files exist before upload
+        run: |
+          echo "Listing repository root:" && ls -la
+          echo "Listing backend directory:" && ls -la backend || true
+          echo "Check specific files:" 
+          for f in docker-compose.prod.yml seed.sql backend/.env; do
+            if [ -f "$f" ]; then echo "✔ exists: $f"; else echo "✖ missing: $f"; fi
+          done
+
+      - name: Ensure remote target directory exists
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            mkdir -p ~/brightbuy
+
       - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: |
-            docker-compose.prod.yml
-            seed.sql
-            backend/.env
+          source: "./docker-compose.prod.yml,./seed.sql,./backend/.env"
           target: "~/brightbuy/"
+          overwrite: true
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
