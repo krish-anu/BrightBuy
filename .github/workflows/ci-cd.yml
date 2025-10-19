@@ -106,30 +106,21 @@ jobs:
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Create backend .env locally
+      - name: Prepare deploy_bundle
         run: |
-          mkdir -p backend
-          echo "${{ secrets.BACKEND_ENV }}" > backend/.env
+          mkdir -p deploy_bundle/backend
+          echo "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
+          cp docker-compose.prod.yml deploy_bundle/
+          cp seed.sql deploy_bundle/
 
-      - name: Upload deployment files to server
+      - name: Upload deploy_bundle to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: |
-            docker-compose.prod.yml
-            seed.sql
+          source: "deploy_bundle/**"
           target: "~/brightbuy"
-
-      - name: Upload backend .env to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "backend/.env"
-          target: "~/brightbuy/backend/.env"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
