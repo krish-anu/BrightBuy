@@ -1,7 +1,15 @@
 import { ToggleGroup } from "../ui/toggle-group"
 import ConfirmationItemsRow from "@/components/Order/ConfirmationItemsRow"
 
-export default function PaymentMethod() {
+type PaymentChoice = "online" | "cod";
+
+export default function PaymentMethod({
+  value,
+  onChange,
+}: {
+  value: PaymentChoice;
+  onChange: (val: PaymentChoice) => void;
+}) {
     return(
         <section className="flex flex-col gap-4  rounded-md">
             <h2 className="text-xl md:text-2xl font-bold">Payment Method</h2>
@@ -12,7 +20,8 @@ export default function PaymentMethod() {
               <ToggleGroup
                 type="single"
                 className="w-full gap-4 md:px-0 px-2 flex flex-wrap"
-                defaultValue="online"
+                value={value}
+                onValueChange={(v) => onChange((v as PaymentChoice) || "online")}
                 variant="order"
                 size="xl"
               >

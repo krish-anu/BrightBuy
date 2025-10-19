@@ -1,7 +1,15 @@
 import { ToggleGroup } from "../ui/toggle-group"
 import ConfirmationItemsRow  from "@/components/Order/ConfirmationItemsRow";
 
-export default function ShippingMethod() {
+type ShippingChoice = "standard" | "pickup";
+
+export default function ShippingMethod({
+  value,
+  onChange,
+}: {
+  value: ShippingChoice;
+  onChange: (val: ShippingChoice) => void;
+}) {
     return(
         <section className="flex flex-col gap-4  rounded-md">
             <span>
@@ -14,7 +22,8 @@ export default function ShippingMethod() {
               <ToggleGroup
                 type="single"
                 className="w-full gap-4 md:px-0 px-2 flex flex-wrap"
-                defaultValue="standard"
+                value={value}
+                onValueChange={(v) => onChange((v as ShippingChoice) || "standard")}
                 variant="order"
                 size="xl"
               >

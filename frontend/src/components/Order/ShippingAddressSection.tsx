@@ -16,7 +16,11 @@ import { addAddress as apiAddAddress, updateAddress as apiUpdateAddress, makeDef
 import { getAllCities, type City } from "@/services/city.services";
 import { useNavigate, useLocation } from "react-router-dom";
 
-export default function ShippingAddressSection() {
+export default function ShippingAddressSection({
+	onSelectionChange,
+}: {
+	onSelectionChange?: (addressId: string | undefined, address?: Address) => void;
+}) {
     const navigate = useNavigate();
     const location = useLocation();
     const [addresses, setAddresses] = useState<Address[]>([]);
@@ -152,6 +156,14 @@ export default function ShippingAddressSection() {
 		}
 	}, [addresses, selectedId]);
 
+	// bubble selection changes up
+	useEffect(() => {
+		if (onSelectionChange) {
+			const selected = addresses.find((a) => a.id === selectedId);
+			onSelectionChange(selectedId || undefined, selected);
+		}
+	}, [selectedId, addresses, onSelectionChange]);
+
 	useEffect(() => {
 		if (!open) {
 			setIsEditing(false);
@@ -248,26 +260,7 @@ export default function ShippingAddressSection() {
 			setProfileSaving(false);
 		}
 	};
-	// optional: persist when user changes default selection in UI (if you provide that UI)
-	// example setter that persists default change
-	const setDefaultAddress = async (id: string) => {
-		const newAddresses = addresses.map((a) => ({ ...a, isDefault: a.id === id }));
-		setAddresses(newAddresses);
-		setSelectedId(id);
-		try {
-			setProfileSaving(true);
-			setProfileSaveError(null);
-			const numericId = Number(id);
-			if (Number.isFinite(numericId) && String(numericId) === id) {
-				await apiMakeDefault(numericId);
-			}
-			await refetchAddresses();
-		} catch (err) {
-			setProfileSaveError(err);
-		} finally {
-			setProfileSaving(false);
-		}
-	};
+    // Note: default address persistence is handled via the edit form toggle or a separate confirm button (if enabled)
 
 	const defaultId =
 		addresses.find((addr) => addr.isDefault)?.id ?? addresses[0]?.id ?? "";
