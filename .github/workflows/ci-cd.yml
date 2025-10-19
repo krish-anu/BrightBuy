@@ -87,6 +87,9 @@ jobs:
       runs-on: ubuntu-latest
       if: github.ref == 'refs/heads/main'
       steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Validate deploy secrets
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -99,8 +102,19 @@ jobs:
           for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
+          # Check BACKEND_ENV secret directly
+          if [ -z "${{ secrets.BACKEND_ENV }}" ]; then echo "Missing secret: BACKEND_ENV"; missing=1; fi
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
+
+      - name: Prepare deployment bundle (compose, seed, backend env)
+        run: |
+          set -e
+          mkdir -p deploy_bundle/backend
+          cp docker-compose.prod.yml deploy_bundle/
+          cp seed.sql deploy_bundle/
+          # write backend .env from secret
+          printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
 
       - name: Test SSH connection
         uses: appleboy/ssh-action@v1.2.2
@@ -109,6 +123,27 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: echo "✅ SSH connection successful to $(hostname)"
+
+      - name: Ensure project directory exists on server
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            PROJECT_DIR="$HOME/brightbuy"
+            mkdir -p "$PROJECT_DIR"
+            echo "Ensured project dir: $PROJECT_DIR"
+
+      - name: Upload deployment bundle to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "deploy_bundle/*"
+          target: "~/brightbuy"
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -123,7 +158,7 @@ jobs:
             export PATH=$PATH:/usr/bin
 
             # Ensure project directory exists
-            PROJECT_DIR="/home/ubuntu/brightbuy"
+            PROJECT_DIR="$HOME/brightbuy"
             sudo mkdir -p "$PROJECT_DIR"
             sudo chown $USER:$USER "$PROJECT_DIR"
             cd "$PROJECT_DIR"
