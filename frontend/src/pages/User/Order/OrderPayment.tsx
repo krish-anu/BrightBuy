@@ -70,7 +70,7 @@ export default function OrderPayment() {
               const flow = paymentMethod; // "online" | "cod"
               const extra = new URLSearchParams(qs);
               extra.set("flow", flow);
-              navigate(`/order/success?${extra.toString()}`);
+              navigate(`/order/summary?${extra.toString()}`);
             }}
             nextLabel={paymentMethod === "online" ? "Proceed to Pay" : "Review & Confirm"}
           />
