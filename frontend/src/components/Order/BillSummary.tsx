@@ -22,6 +22,7 @@ export function BillSummary({
   shippingMethod,
   paymentMethod,
   deliveryAddressText,
+  paymentStatus,
   subtotal,
   shipping,
   discount,
@@ -34,13 +35,24 @@ export function BillSummary({
   shippingMethod: string;
   paymentMethod: string;
   deliveryAddressText?: string;
+  paymentStatus?: string;
   subtotal: number;
   shipping: number;
   discount: number;
   total: number;
-  onNext: () => void;
-  nextLabel: string;
+  onNext?: () => void;
+  nextLabel?: string;
 }) {
+  const statusTone = (paymentStatus || "").toLowerCase().includes("paid")
+    ? "success"
+    : (paymentStatus || "").toLowerCase().includes("due") || (paymentStatus || "").toLowerCase().includes("pending")
+    ? "warning"
+    : undefined;
+  const statusClass = statusTone === "success"
+    ? "bg-green-100 text-green-700 border-green-200"
+    : statusTone === "warning"
+    ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+    : "bg-muted text-foreground/80 border-muted";
   return (
     <div className="w-full bg-background border rounded-md shadow-sm p-6 md:p-8 space-y-6">
       {/* Header */}
@@ -105,6 +117,14 @@ export function BillSummary({
             )}
           </p>
         </div>
+        {paymentStatus ? (
+          <div className="space-y-1 md:col-span-3">
+            <h3 className="text-sm font-semibold">Payment Status</h3>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-md border text-xs font-medium ${statusClass}`}>
+              {paymentStatus}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <Separator />
@@ -131,9 +151,11 @@ export function BillSummary({
       </div>
 
       {/* Action */}
-      <div className="flex justify-end">
-        <Button className="h-12 text-lg" onClick={onNext}>{nextLabel}</Button>
-      </div>
+      {onNext && nextLabel ? (
+        <div className="flex justify-end">
+          <Button className="h-12 text-lg" onClick={onNext}>{nextLabel}</Button>
+        </div>
+      ) : null}
     </div>
   );
 }
