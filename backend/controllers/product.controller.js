@@ -243,7 +243,8 @@ const getProductsPaginated = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
-    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+  const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+  const parentCategoryId = req.query.parentCategoryId ? parseInt(req.query.parentCategoryId) : null;
 
 
 
@@ -347,12 +348,13 @@ const getProductsPaginatedFrontend = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 12;
     const offset = (page - 1) * limit;
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+    const parentCategoryId = req.query.parentCategoryId ? parseInt(req.query.parentCategoryId) : null;
 
     // Base product selection scoped to pagination (and optional category)
     let baseSql = `
       SELECT p.id, p.name, p.description, p.brand
       FROM products p
-      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : ''}
+      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : parentCategoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id INNER JOIN categories c ON c.id = pc.categoryId AND (c.id = ${parentCategoryId} OR c.parentId = ${parentCategoryId})` : ''}
       ORDER BY p.name ASC
       LIMIT ${limit} OFFSET ${offset}
     `;
@@ -374,6 +376,21 @@ const getProductsPaginatedFrontend = async (req, res, next) => {
           WHEN pv.stockQnt > 0 THEN 'Low Stock'
           ELSE 'Out of Stock'
         END AS status,
+        COALESCE(
+          (
+            SELECT JSON_ARRAYAGG(
+              JSON_OBJECT(
+                'attributeId', va.id,
+                'attributeName', va.name,
+                'attributeValue', pvo.value
+              )
+            )
+            FROM product_variant_options pvo
+            LEFT JOIN variant_attributes va ON pvo.attributeId = va.id
+            WHERE pvo.variantId = pv.id
+          ),
+          JSON_ARRAY()
+        ) AS attributes,
         COALESCE(
           (
             SELECT JSON_ARRAYAGG(JSON_OBJECT('id', c.id, 'name', c.name))
@@ -399,9 +416,9 @@ const getProductsPaginatedFrontend = async (req, res, next) => {
 
     // Count products (not variants)
     let countSql = `
-      SELECT COUNT(*) AS totalCount
+      SELECT COUNT(DISTINCT p.id) AS totalCount
       FROM products p
-      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : ''}
+      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : parentCategoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id INNER JOIN categories c ON c.id = pc.categoryId AND (c.id = ${parentCategoryId} OR c.parentId = ${parentCategoryId})` : ''}
     `;
     const countRows = await query(countSql, []);
     const totalCount = countRows[0]?.totalCount || 0;

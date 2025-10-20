@@ -65,11 +65,11 @@ export const getProductsPaginated = async (page: number = 1, limit: number = 10,
 }
 
 // Frontend storefront: one row per product with a representative variant
-export const getProductsPaginatedFrontend = async (page: number = 1, limit: number = 10, categoryId?: number): Promise<PaginationResponse<any>> => {
+export const getProductsPaginatedFrontend = async (page: number = 1, limit: number = 10, categoryId?: number, parentCategoryId?: number): Promise<PaginationResponse<any>> => {
   try {
     console.log(`Calling frontend paginated products API - page: ${page}, limit: ${limit}`);
     const response = await axiosInstance.get(`/api/product/paginated/frontend`, {
-      params: { page, limit, ...(categoryId ? { categoryId } : {}) },
+      params: { page, limit, ...(categoryId ? { categoryId } : {}), ...(parentCategoryId ? { parentCategoryId } : {}) },
     });
     console.log('Frontend paginated product service response:', response);
     if (response.status !== 200) {
