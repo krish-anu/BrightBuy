@@ -57,7 +57,7 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
           <p className="text-muted-foreground mb-6">
             Looks like you haven't added anything to your cart yet.
           </p>
-          <Link to="/products">
+          <Link to="/shop">
             <Button variant="outline" size="lg">
               Continue Shopping
             </Button>
@@ -79,7 +79,7 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
           asChild
           className="text-muted-foreground hover:text-foreground"
         >
-          <Link to="/products">Continue Shopping</Link>
+          <Link to="/shop">Continue Shopping</Link>
         </Button>
       </div>
       <div className="grid md:grid-cols-4">  
