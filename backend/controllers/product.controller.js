@@ -340,6 +340,91 @@ const getProductsPaginated = async (req, res, next) => {
   }
 };
 
+// Frontend storefront: paginate by products and join a representative variant per product
+const getProductsPaginatedFrontend = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const offset = (page - 1) * limit;
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+
+    // Base product selection scoped to pagination (and optional category)
+    let baseSql = `
+      SELECT p.id, p.name, p.description, p.brand
+      FROM products p
+      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : ''}
+      ORDER BY p.name ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    const sql = `
+      SELECT 
+        bp.id AS productId,
+        bp.name AS productName,
+        bp.description AS productDescription,
+        bp.brand AS productBrand,
+        pv.id AS variantId,
+        pv.variantName,
+        pv.SKU,
+        pv.price,
+        pv.stockQnt,
+        pv.imageURL,
+        CASE 
+          WHEN pv.stockQnt > 10 THEN 'In Stock'
+          WHEN pv.stockQnt > 0 THEN 'Low Stock'
+          ELSE 'Out of Stock'
+        END AS status,
+        COALESCE(
+          (
+            SELECT JSON_ARRAYAGG(JSON_OBJECT('id', c.id, 'name', c.name))
+            FROM product_categories pc2
+            INNER JOIN categories c ON pc2.categoryId = c.id
+            WHERE pc2.productId = bp.id
+          ),
+          JSON_ARRAY()
+        ) AS Categories
+      FROM (${baseSql}) AS bp
+      LEFT JOIN product_variants pv
+        ON pv.productId = bp.id
+        AND pv.id = (
+          SELECT pv2.id FROM product_variants pv2
+          WHERE pv2.productId = bp.id
+          ORDER BY pv2.id ASC
+          LIMIT 1
+        )
+      ORDER BY bp.name ASC
+    `;
+
+    const rows = await query(sql, []);
+
+    // Count products (not variants)
+    let countSql = `
+      SELECT COUNT(*) AS totalCount
+      FROM products p
+      ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : ''}
+    `;
+    const countRows = await query(countSql, []);
+    const totalCount = countRows[0]?.totalCount || 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.status(200).json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit,
+      },
+    });
+  } catch (err) {
+    console.error('Error in getProductsPaginatedFrontend:', err);
+    next(err);
+  }
+};
+
 
 
 // Get inventory statistics (not affected by pagination)
@@ -377,6 +462,7 @@ const getPopularProduct = async (req, res, next) => {
 module.exports = {
   getProducts,
   getProductsPaginated,
+  getProductsPaginatedFrontend,
   getInventoryStats,
   getProduct,
   addProduct,
