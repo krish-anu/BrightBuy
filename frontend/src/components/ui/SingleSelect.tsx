@@ -63,8 +63,8 @@ const SingleSelect: React.FC<SingleSelectProps> = ({ options, value, onChange, p
             {filtered.length === 0 ? (
               <div className="p-3 text-sm text-gray-500">No categories</div>
             ) : (
-              filtered.map(opt => (
-                <div key={opt.id} className="p-2 hover:bg-gray-50 flex items-center cursor-pointer" onClick={() => handleSelect(opt.id)}>
+              filtered.map((opt, idx) => (
+                <div key={`opt-${Number.isFinite(opt.id as any) ? opt.id : 'noid'}-${idx}`} className="p-2 hover:bg-gray-50 flex items-center cursor-pointer" onClick={() => handleSelect(opt.id)}>
                   <span className="text-sm">{opt.name}</span>
                 </div>
               ))
