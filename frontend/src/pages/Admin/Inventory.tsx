@@ -959,7 +959,16 @@ const Inventory: React.FC = () => {
                     <div className="mt-1">
                       {selectedVariant?.imageURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={selectedVariant.imageURL} alt={`${selectedVariant?.productName || 'Product'}`} className="w-full h-40 object-contain rounded-md" />
+                        <img
+                          src={selectedVariant.imageURL}
+                          alt={`${selectedVariant?.productName || 'Product'}`}
+                          className="w-full h-40 object-contain rounded-md"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '';
+                          }}
+                        />
                       ) : (
                         <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
                       )}
@@ -1000,10 +1009,28 @@ const Inventory: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700">Image</label>
                     <div className="mt-1 space-y-2">
                       {editForm._imagePreviewUrl ? (
-                        <img src={editForm._imagePreviewUrl} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
+                        <img
+                          src={editForm._imagePreviewUrl}
+                          alt={`${selectedVariant.productName}`}
+                          className="w-full h-40 object-contain rounded-md"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '';
+                          }}
+                        />
                       ) : selectedVariant?.imageURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={selectedVariant.imageURL} alt={`${selectedVariant.productName}`} className="w-full h-40 object-contain rounded-md" />
+                        <img
+                          src={selectedVariant.imageURL}
+                          alt={`${selectedVariant.productName}`}
+                          className="w-full h-40 object-contain rounded-md"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '';
+                          }}
+                        />
                       ) : (
                         <div className="w-full h-40 bg-gray-100 flex items-center justify-center rounded-md text-gray-500">No image</div>
                       )}
