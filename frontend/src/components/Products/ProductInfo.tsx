@@ -16,6 +16,7 @@ import {
   getUniqueAttributes,
 } from "@/utils/productVariantUtils";
 import { formatCurrencyUSD } from "@/lib/utils";
+import QuantitySelector from "./QuantitySelector";
 
 interface ProductPageProps {
   product: ProductDetail;
@@ -34,11 +35,18 @@ export default function ProductInfo({ product }: ProductPageProps) {
     undefined,
   );
   const [stockStatus, setStockStatus] = useState<string>("");
+  const [qty, setQty] = useState<number>(1);
 
   useEffect(() => {
     const variant = findByOptions(variants, selectedOptions);
     setDisplayVariant(variant);
     setStockStatus(checkStock(variant));
+    // Reset or clamp quantity when variant changes
+    const max = variant?.stockQnt ?? Number.POSITIVE_INFINITY;
+    setQty((prev) => {
+      const next = Math.max(1, Math.min(prev, Number.isFinite(max) ? max : prev));
+      return next;
+    });
   }, [selectedOptions, variants]);
 
   function handleSelect(attrName: string, value: string) {
@@ -168,8 +176,16 @@ export default function ProductInfo({ product }: ProductPageProps) {
             </span>
           ) : null}
 
-          {/* Quantity Selector - To Do */}
-
+          {/* Quantity Selector */}
+          <div className="px-4">
+            <QuantitySelector
+              min={1}
+              max={displayVariant?.stockQnt}
+              value={qty}
+              onChange={setQty}
+              disabled={stockStatus === "not-available" || stockStatus === "out-of-stock"}
+            />
+          </div>
 
           {/* Action Buttons ( Buy Now / Add to Cart ) */}
           <div className="flex flex-row justify-start sm:gap-2 gap-6 text-md">
@@ -185,7 +201,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
                     const params = new URLSearchParams({
                       productId: String(pid),
                       variantId: String(vid),
-                      qty: "1",
+                      qty: String(qty),
                     });
                     navigate(`/order/confirm?${params.toString()}`);
                   }}
