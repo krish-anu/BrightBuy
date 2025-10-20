@@ -4,6 +4,7 @@ import { Field, FieldContent, FieldGroup, FieldSet } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 
 export function AddressEditForm({
   value,
@@ -21,6 +22,24 @@ export function AddressEditForm({
   onSubmit: () => void
 }) {
   const a = value
+  const [line1, setLine1] = useState("")
+  const [line2, setLine2] = useState("")
+
+  useEffect(() => {
+    if (!a?.address) {
+      setLine1("")
+      setLine2("")
+      return
+    }
+    const parts = String(a.address).split(",").map((p) => p.trim()).filter(Boolean)
+    setLine1(parts[0] || "")
+    setLine2(parts.slice(1).join(", ") || "")
+  }, [a?.address])
+
+  const commitAddressChange = (newPartial: Partial<Address> = {}) => {
+    const combinedAddress = [newPartial.address ?? `${line1}${line2 ? `, ${line2}` : ""}`].filter(Boolean)[0]
+    onChange({ ...a, ...newPartial, address: combinedAddress })
+  }
   return (
     <form
       className="mt-4 space-y-3"
@@ -49,10 +68,15 @@ export function AddressEditForm({
           </Field>
           <Field>
             <FieldContent>
-              <label htmlFor="address" className="text-sm font-medium">
-                Address
+              <label htmlFor="address-line1" className="text-sm font-medium">
+                Address Line 1
               </label>
-              <Input id="address" value={a.address} onChange={(e) => onChange({ ...a, address: e.target.value })} />
+              <Input id="address-line1" value={line1} onChange={(e) => { setLine1(e.target.value); commitAddressChange() }} />
+
+              <label htmlFor="address-line2" className="text-sm font-medium mt-2 block">
+                Address Line 2
+              </label>
+              <Input id="address-line2" value={line2} onChange={(e) => { setLine2(e.target.value); commitAddressChange() }} />
             </FieldContent>
           </Field>
           <Field>
@@ -68,7 +92,7 @@ export function AddressEditForm({
                   onChange={(e) => {
                     const id = e.target.value ? Number(e.target.value) : undefined
                     const name = id ? cities.find((c) => c.id === id)?.name || "" : ""
-                    onChange({ ...a, cityId: id, city: name })
+                    commitAddressChange({ city: name, cityId: id })
                   }}
                 >
                   <option value="">Select a city</option>
@@ -79,7 +103,7 @@ export function AddressEditForm({
                   ))}
                 </select>
               ) : (
-                <Input id="city" value={a.city} onChange={(e) => onChange({ ...a, city: e.target.value })} />
+                <Input id="city" value={a.city} onChange={(e) => commitAddressChange({ city: e.target.value })} />
               )}
             </FieldContent>
           </Field>
@@ -88,7 +112,7 @@ export function AddressEditForm({
               <label htmlFor="zip" className="text-sm font-medium">
                 ZIP
               </label>
-              <Input id="zip" value={a.zip} onChange={(e) => onChange({ ...a, zip: e.target.value })} />
+              <Input id="zip" value={a.zip} onChange={(e) => commitAddressChange({ zip: e.target.value })} />
             </FieldContent>
           </Field>
           <Field>
