@@ -119,7 +119,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     0
   );
 
-  const itemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Number of displayed variants (distinct rows), not the sum of quantities
+  const itemsCount = items.filter(it => Number.isFinite(Number(it.variantId))).length;
 
   return (
     <CartContext.Provider

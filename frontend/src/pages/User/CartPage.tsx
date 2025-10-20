@@ -15,7 +15,6 @@ interface CartPageProps {
   itemsCount: number;
 }
 
-// Row component moved to components/Cart
 
 function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: CartPageProps) {
   const navigate = useNavigate();
@@ -69,10 +68,10 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">My Cart</h1>
+          <h1 className="text-3xl md:text-5xl font-black">My Cart</h1>
           <p className="text-muted-foreground">Number of Items: {itemsCount}</p>
         </div>
         <Button
