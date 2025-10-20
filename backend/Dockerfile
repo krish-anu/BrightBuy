@@ -4,11 +4,13 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Switch to npm install (less strict, better for dev, avoids timeout)
-RUN npm install --legacy-peer-deps
+# Install production dependencies only to keep image small
+ENV NODE_ENV=production
+RUN npm ci --omit=dev --legacy-peer-deps
 
 COPY . .
 
 # Backend API runs on 8081
 EXPOSE 8081
-CMD ["npm", "run", "dev"]
+# Default to production start; docker-compose can override if needed
+CMD ["npm", "start"]

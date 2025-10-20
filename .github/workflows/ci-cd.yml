@@ -68,6 +68,11 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
+          pull: true
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ env.IMAGE_BASE }}-backend:${{ github.sha }}
             ${{ env.IMAGE_BASE }}-backend:latest
@@ -78,6 +83,11 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
+          pull: true
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ env.IMAGE_BASE }}-frontend:${{ github.sha }}
             ${{ env.IMAGE_BASE }}-frontend:latest
