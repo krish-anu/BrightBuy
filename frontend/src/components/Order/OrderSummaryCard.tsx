@@ -5,7 +5,7 @@ import { CircleArrowRightIcon } from "lucide-react";
 interface OrderSummaryCardProps {
   subtotal: number;
   shipping: number;
-  discount: number;
+  discount?: number;
   total: number;
   onNext: () => void;
   nextLabel?: string;
@@ -44,7 +44,7 @@ export function OrderSummaryCard({
       <h2 className="text-xl font-bold">Order Summary</h2>
       {row("Subtotal", subtotal)}
       {row("Shipping", shipping)}
-      {/* {row("Discount", discount)} */}
+  {typeof discount === "number" ? row("Discount", discount) : null}
       <Separator />
       {row("Total", total, true)}
       <Button variant="order" onClick={onNext} className="mt-2 font-semibold gap-2 w-full md:w-auto h-12 text-xl">

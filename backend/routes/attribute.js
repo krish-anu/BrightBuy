@@ -5,8 +5,10 @@ const ROLES = require('../roles');
 
 const router = require('express').Router();
 
+// Allow public GET for attributes (storefront needs to read attributes without admin auth)
 router.get('/', getAttributes);
 router.get('/:id', getAttribute);
+
 
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addAttribute);
 

@@ -38,7 +38,7 @@ export function BillSummary({
   paymentStatus?: string;
   subtotal: number;
   shipping: number;
-  discount: number;
+  discount?: number;
   total: number;
   onNext?: () => void;
   nextLabel?: string;
@@ -139,10 +139,12 @@ export function BillSummary({
           <span className="text-muted-foreground">Shipping</span>
           <span>{money(shipping)}</span>
         </div>
-        {/* <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Discount</span>
-          <span>{money(discount)}</span>
-        </div> */}
+        {typeof discount === 'number' ? (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Discount</span>
+            <span>{money(discount)}</span>
+          </div>
+        ) : null}
         <Separator className="my-2" />
         <div className="flex justify-between text-base font-bold">
           <span>Total</span>

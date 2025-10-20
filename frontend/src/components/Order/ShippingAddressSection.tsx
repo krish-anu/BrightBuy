@@ -172,16 +172,70 @@ export default function ShippingAddressSection({
 	}, [open]);
 
 	const handleAddNew = () => {
-		setFormData({
-			id: `addr-${Date.now()}`,
-			name: "",
-			address: "",
-			city: "",
-			zip: "",
-			phone: "",
-			isDefault: addresses.length === 0,
-		});
-		setIsEditing(true);
+		(async () => {
+			// If we already have addresses, prefill from the first/default address
+			const prefillFrom = addresses.find((a) => a.isDefault) ?? addresses[0];
+			if (prefillFrom) {
+				setFormData({
+					id: `addr-${Date.now()}`,
+					name: prefillFrom.name || "",
+					address: prefillFrom.address || "",
+					city: prefillFrom.city || "",
+					zip: prefillFrom.zip || "",
+					phone: prefillFrom.phone || "",
+					isDefault: addresses.length === 0,
+				});
+				setIsEditing(true);
+				return;
+			}
+
+			// Otherwise attempt to fetch profile details to prefill
+			try {
+				setProfileLoading(true);
+				const res = await getUserProfile();
+				const payload =
+					res && typeof res === "object" && "data" in (res as Record<string, unknown>)
+						? (res as { data: unknown }).data
+						: res;
+				const name = (payload as any)?.fullName ?? (payload as any)?.name ?? "";
+				const phone = String((payload as any)?.phone ?? "");
+				// Try to pull a primary address object if available
+				const rawAddr = Array.isArray((payload as any)?.addresses) ? ((payload as any).addresses as any[])[0] : (payload as any)?.address ?? null;
+				let addrStr = "";
+				let city = "";
+				let zip = "";
+				if (rawAddr) {
+					addrStr = [rawAddr?.line1, rawAddr?.line2].filter(Boolean).join(", ") || rawAddr?.address || "";
+					city = rawAddr?.city ?? rawAddr?.cityName ?? "";
+					zip = String(rawAddr?.postalCode ?? "");
+				}
+
+				setFormData({
+					id: `addr-${Date.now()}`,
+					name: name,
+					address: addrStr,
+					city: city,
+					zip: zip,
+					phone: phone,
+					isDefault: addresses.length === 0,
+				});
+				setIsEditing(true);
+			} catch (e) {
+				// fallback to empty form
+				setFormData({
+					id: `addr-${Date.now()}`,
+					name: "",
+					address: "",
+					city: "",
+					zip: "",
+					phone: "",
+					isDefault: addresses.length === 0,
+				});
+				setIsEditing(true);
+			} finally {
+				setProfileLoading(false);
+			}
+		})();
 	};
 
 	const handleEditSubmit = async (next: Address) => {
@@ -232,11 +286,39 @@ export default function ShippingAddressSection({
 			setProfileSaveError(null);
 			// If next.id is numeric from backend, update; else add
 			const numericId = Number(next.id);
+			// Parse address into line1, line2, city and postal code when possible.
+			const parseAddress = (addressStr: string, cityStr?: string, zipStr?: string) => {
+				const result: { line1: string; line2: string | null; city?: string; postalCode?: string | null } = {
+					line1: addressStr || "",
+					line2: null,
+					city: cityStr || undefined,
+					postalCode: zipStr || null,
+				};
+				if (!addressStr) return result;
+				// Split on commas — first part is line1, rest join into line2
+				const parts = addressStr.split(",").map((p) => p.trim()).filter(Boolean);
+				if (parts.length) {
+					result.line1 = parts[0];
+					if (parts.length > 1) result.line2 = parts.slice(1).join(", ");
+				}
+				// If city string contains postal code at the end, try to separate it
+				if (result.city) {
+					const match = String(result.city).match(/^(.*?)[,\s]+(\d{3,10})$/);
+					if (match) {
+						result.city = match[1].trim();
+						result.postalCode = match[2];
+					}
+				}
+				return result;
+			};
+
+			const parsed = parseAddress(next.address || "", next.city, next.zip || undefined);
+
 			const payload = {
-				line1: next.address.split(",")[0]?.trim() || next.address,
-				line2: next.address.includes(",") ? next.address.split(",").slice(1).join(",").trim() : null,
+				line1: parsed.line1 || next.address,
+				line2: parsed.line2 || null,
 				cityId: resolvedCityId,
-				postalCode: next.zip || null,
+				postalCode: (parsed.postalCode ?? next.zip) || null,
 				isDefault: !!next.isDefault,
 			};
 			if (Number.isFinite(numericId) && String(numericId) === next.id) {
@@ -268,9 +350,9 @@ export default function ShippingAddressSection({
 	return (
 		<div>
 			<span>
-				<h2 className="text-xl md:text-2xl font-bold">Shipping Address</h2>
+				<h2 className="text-xl md:text-2xl font-bold">Delivery Details</h2>
 				<p className="text-md md:text-lg text-muted-foreground">
-					Please choose your preferred shipping address or add a new one below.
+					Please choose your preferred delivery address or add a new one below.
 				</p>
 			</span>
 
@@ -317,12 +399,12 @@ export default function ShippingAddressSection({
 						</DialogTrigger>
 						<DialogContent className="md:w-full">
 							<DialogTitle>
-								{isEditing ? "Edit Address" : "Change Shipping Address"}
+								{isEditing ? "Edit Address" : "Change Delivery Details"}
 							</DialogTitle>
 							<DialogDescription>
 								{isEditing
 									? "Update the fields and save your changes"
-									: "Select or edit your shipping address"}
+									: "Select or edit your delivery details"}
 							</DialogDescription>
 							<section>
 								{!isEditing ? (
@@ -348,13 +430,13 @@ export default function ShippingAddressSection({
 											</p>
 										)}
 										<div className="space-y-2">
-											<Button
-												variant="order_outline"
-												className="mt-4 text-primary border-primary hover:text-background w-full"
-												onClick={handleAddNew}
-											>
-												+ Add New Address
-											</Button>
+												<Button
+													variant="order_outline"
+													className="mt-4 text-primary border-primary hover:text-background w-full"
+													onClick={handleAddNew}
+												>
+													Check your details
+												</Button>
 											{/* <Button
 												variant="order"
 												className="w-full"
