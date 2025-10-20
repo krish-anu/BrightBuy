@@ -4,24 +4,46 @@ import { Link } from "react-router-dom";
 import CartGuard from "@/components/Guards/CartGuard";
 import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
 import { CartItemsSection } from "@/components/Cart/CartItemsSection";
+import { useMemo, useState } from "react";
 
 interface CartPageProps {
   items: CartItem[];
   removeItem: (variantId: number) => void;
   updateQuantity: (variantId: number, quantity: number) => void;
-  total: number;
   itemsCount: number;
 }
 
 // Row component moved to components/Cart
 
-function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount }: CartPageProps) {
+function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: CartPageProps) {
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+    () => new Set(items.map((i) => Number(i.variantId)))
+  );
 
   const handleQuantityChange = (variantId: number, newQuantity: number) => {
     if (newQuantity > 0) {
       updateQuantity(variantId, newQuantity);
     }
   };
+
+  const toggleSelect = (variantId: number, next: boolean) => {
+    setSelectedIds((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(Number(variantId));
+      else copy.delete(Number(variantId));
+      return copy;
+    });
+  };
+
+  const selectedItems = useMemo(
+    () => items.filter((i) => selectedIds.has(Number(i.variantId))),
+    [items, selectedIds]
+  );
+
+  const selectedSubtotal = useMemo(
+    () => selectedItems.reduce((s, it) => s + it.price * it.quantity, 0),
+    [selectedItems]
+  );
 
   if (items.length === 0) {
     return (
@@ -64,18 +86,24 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
             items={items}
             onRemove={removeItem}
             onUpdateQuantity={handleQuantityChange}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
           />
         </div>
 
         {/* Order Summary (reusing shared card) */}
         <div className="lg:col-span-1">
           <OrderSummaryCard
-            subtotal={items.reduce((s, it) => s + it.price * it.quantity, 0)}
+            subtotal={selectedSubtotal}
             shipping={0}
             discount={0}
-            total={total}
-            onNext={() => {/* TODO: hook up checkout route */}}
-            nextLabel="PROCEED TO CHECKOUT"
+            total={selectedSubtotal}
+            onNext={() => {
+              // Only proceed with selected items; if none, do nothing or prompt
+              if (selectedItems.length === 0) return;
+              // TODO: navigate to checkout with selectedItems
+            }}
+            nextLabel="PROCEED WITH SELECTED"
           />
         </div>
       </div>
@@ -84,17 +112,11 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
 }
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, total, itemsCount } = useCart();
+  const { items, removeItem, updateQuantity, itemsCount } = useCart();
   
   return (
     <CartGuard>
-      <CartPageContent
-        items={items}
-        removeItem={removeItem}
-        updateQuantity={updateQuantity}
-        total={total}
-        itemsCount={itemsCount}
-      />
+      <CartPageContent items={items} removeItem={removeItem} updateQuantity={updateQuantity} itemsCount={itemsCount} />
     </CartGuard>
   );
 }

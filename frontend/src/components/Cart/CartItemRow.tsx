@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import QuantitySelector from "@/components/Products/QuantitySelector";
 import { Trash2 } from "lucide-react";
 import type { CartItem } from "../../../contexts/CartContext";
@@ -7,10 +8,14 @@ export function CartItemRow({
   item,
   onRemove,
   onUpdateQuantity,
+  selected,
+  onSelectChange,
 }: {
   item: CartItem;
   onRemove: (variantId: number) => void;
   onUpdateQuantity: (variantId: number, qty: number) => void;
+  selected: boolean;
+  onSelectChange: (variantId: number, next: boolean) => void;
 }) {
   const attributesText = [
     item.color ? `Color: ${item.color}` : undefined,
@@ -20,8 +25,16 @@ export function CartItemRow({
     .join(" · ");
 
   return (
-    <div className="grid grid-cols-10 gap-4 border rounded-md p-4 bg-background">
-      <div className="md:col-span-6 col-span-10 flex gap-4">
+    <div className="grid grid-cols-11 gap-4 border rounded-md p-4 bg-background">
+      <div className="md:col-span-6 col-span-10 flex gap-4 ">
+        <div className=" flex items-center justify-center">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(val) => onSelectChange(item.variantId, val === true)}
+            aria-label={`Select ${item.name}`}
+            className="h-5 w-5"
+          />
+        </div>
         <div className="aspect-square w-24 h-24 shrink-0">
           {item.imageUrl ? (
             <img
@@ -47,7 +60,7 @@ export function CartItemRow({
         </div>
       </div>
 
-      <div className="flex flex-col md:items-center justify-between md:col-span-2 col-span-5">
+      <div className="flex flex-col md:items-center justify-between md:col-span-3 col-span-5">
         <QuantitySelector
           value={item.quantity}
           min={1}

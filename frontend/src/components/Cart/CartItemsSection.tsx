@@ -5,10 +5,14 @@ export function CartItemsSection({
   items,
   onRemove,
   onUpdateQuantity,
+  selectedIds,
+  onToggleSelect,
 }: {
   items: CartItem[];
   onRemove: (variantId: number) => void;
   onUpdateQuantity: (variantId: number, qty: number) => void;
+  selectedIds: Set<number>;
+  onToggleSelect: (variantId: number, next: boolean) => void;
 }) {
   return (
     <section className="flex flex-col gap-4 rounded-md">
@@ -22,6 +26,8 @@ export function CartItemsSection({
               item={it}
               onRemove={onRemove}
               onUpdateQuantity={onUpdateQuantity}
+              selected={selectedIds.has(Number(it.variantId))}
+              onSelectChange={onToggleSelect}
             />
           ))}
       </div>
