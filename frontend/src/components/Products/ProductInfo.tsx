@@ -223,15 +223,27 @@ export default function ProductInfo({ product }: ProductPageProps) {
                 className="bg-primary-foreground text-secondary hover:bg-foreground hover:text-background"
                 onClick={() => {
                   if (displayVariant) {
+                    const pid = Number((product as any)?.id ?? (product as any)?.productID ?? (product as any)?.productId);
+                    const vid = Number((displayVariant as any)?.variantId ?? (displayVariant as any)?.id);
+                    if (!Number.isFinite(pid) || !Number.isFinite(vid)) {
+                      console.warn('[cart] Cannot add item due to invalid ids', {
+                        productId: (product as any)?.id,
+                        productID: (product as any)?.productID,
+                        productIdAlt: (product as any)?.productId,
+                        variantId: (displayVariant as any)?.variantId,
+                        id: (displayVariant as any)?.id,
+                      });
+                      return;
+                    }
                     addItem({
-                      variantId: parseInt(displayVariant.id),
-                      productId: parseInt(product.id),
-                      quantity: 1,
+                      variantId: vid,
+                      productId: pid,
+                      quantity: qty,
                       name: product.name,
-                      price: displayVariant.price,
+                      price: Number((displayVariant as any)?.price),
                       color: selectedOptions["Color"],
                       size: selectedOptions["Size"],
-                      imageUrl: displayVariant.image,
+                      imageUrl: (displayVariant as any)?.image,
                     });
                   }
                 }}
