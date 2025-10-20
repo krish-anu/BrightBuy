@@ -4,7 +4,8 @@ import PaymentMethod  from "@/components/Order/PaymentMethod";
 import ShippingMethod from "@/components/Order/ShippingMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
 import { Separator } from "@/components/ui/separator";
-import { useState, useRef } from "react";
+import { useOrderSession } from "../../../../contexts/OrderContext";
+import { useSearchParams } from "react-router-dom";
 
 type ShippingChoice = "standard" | "pickup";
 type PaymentChoice = "online" | "cod";
@@ -13,20 +14,15 @@ type PaymentChoice = "online" | "cod";
 export type OrderSelections = {
   shippingMethod: ShippingChoice;
   paymentMethod: PaymentChoice;
-  shippingAddressId?: string; // id from ShippingAddressSection
+  shippingAddressId?: string; 
 };
 
 export default function OrderPayment() {
-  const [shippingMethod, setShippingMethod] = useState<ShippingChoice>("standard");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>("online");
-  const [shippingAddressId, setShippingAddressId] = useState<string | undefined>(undefined);
-
-  // capture selections in a ref to avoid re-renders
-  const selectionsRef = useRef<OrderSelections>({ shippingMethod, paymentMethod, shippingAddressId });
-  selectionsRef.current = { shippingMethod, paymentMethod, shippingAddressId };
-
-  // selectionRefs.current to 
-  const getCurrentSelections = (): OrderSelections => selectionsRef.current;
+  const [searchParams] = useSearchParams();
+  const productId: string | null = searchParams.get("productId");
+  const variantId: string | null = searchParams.get("variantId");
+  const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
+  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
 
   return (
     <div className="space-y-8">
@@ -46,7 +42,9 @@ export default function OrderPayment() {
             shipping={0}
             discount={0}
             total={400}
-            onNext={() => {}}
+            onNext={() => {
+              alert(`Proceeding with:\nItems: ${items.length}\nShipping: ${shippingMethod}\nPayment: ${paymentMethod}\nAddressId: ${shippingAddressId || "(none)"}`)
+            }}
             nextLabel="Pay Now"
           />
         </div>

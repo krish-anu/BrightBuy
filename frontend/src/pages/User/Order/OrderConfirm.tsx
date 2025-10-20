@@ -6,17 +6,21 @@ import {useSearchParams, useNavigate } from "react-router-dom";
 import { useEffect,useState } from "react";
 import  {getProductByID}  from "@/services/product.services";
 import type {  Variant, Product, ProductResponse, Attribute } from "@/types/order";
+import { useOrderSession } from "../../../../contexts/OrderContext";
 
 
 export default function OrderConfirm() {
     const navigate = useNavigate();
-    const [items, setItems] = useState<OrderItem[]>([]);
+    // Use a stable session key derived from URL params so multiple orders can co-exist
+    // e.g., order session: productId|variantId
     const [searchParams] = useSearchParams();
-
-    //get productId and qty from search params
     const productId: string | null = searchParams.get("productId");
-    const qty: number = Number(searchParams.get("qty") || "1");
     const variantId: string | null = searchParams.get("variantId");
+    const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
+    const { setItems: setGlobalItems } = useOrderSession(sessionKey);
+    const [items, setLocalItems] = useState<OrderItem[]>([]);
+    //get qty from search params
+    const qty: number = Number(searchParams.get("qty") || "1");
     
     useEffect(() => {
         if (productId) {
@@ -31,7 +35,7 @@ export default function OrderConfirm() {
 
                 if (!selectedVariant) {
                     console.error("Variant not found");
-                    setItems([]);
+                    setLocalItems([]);
                     return;
                 }
 
@@ -47,12 +51,16 @@ export default function OrderConfirm() {
                     quantity: qty,
                     attributesText: uniqueAttributes.map((a: Attribute) => `${a.attributeName}: ${a.attributeValue}`).join(", ")
                 };
-                setItems([item]);
+                setLocalItems([item]);
             });
         }
     }, [productId, qty, variantId]);
 
-    // Store in global state <To DO>
+    // Store in global state when items are ready
+    useEffect(() => {
+        if (items.length) setGlobalItems(items);
+    }, [items, setGlobalItems]);
+
 
     // Calculate subtotal by computing lineTotal for each item
     const subtotal: number = items.reduce((sum: number, i: OrderItem) => sum + i.unitPrice * i.quantity, 0);
@@ -76,7 +84,11 @@ export default function OrderConfirm() {
                     shipping={shipping}
                     discount={discount}
                     total={total}
-                    onNext={() => navigate("/order/payment/")}
+                    onNext={() => {
+                        // computes the same session key
+                        const qs = searchParams.toString();
+                        navigate(`/order/payment/${qs ? `?${qs}` : ""}`);
+                    }}
                     className="mt-12"
                 />
             </div>
