@@ -36,17 +36,12 @@ export function CartItemRow({
           />
         </div>
         <div className="aspect-square w-24 h-24 shrink-0">
-          {item.imageUrl ? (
+          
             <img
-              src={item.imageUrl}
+              src={item.imageUrl?item.imageUrl:"src/assets/product-placeholder.png"}
               alt={item.name}
               className="w-full h-full object-cover rounded-md"
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground bg-muted rounded-md">
-              No Image
-            </div>
-          )}
         </div>
         <div className="flex flex-col justify-between">
           <div>
