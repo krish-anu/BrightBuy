@@ -33,7 +33,7 @@ export default function UserProfile() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Avatar (frontend-only) - persisted to localStorage
+  // Avatar (frontend-only)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -55,6 +55,15 @@ export default function UserProfile() {
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  // ✅ FIX: Move all hooks (like useMemo) ABOVE any conditional return
+  const cityNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    cities.forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [cities]);
 
   async function fetchProfile() {
     setLoading(true);
@@ -107,10 +116,13 @@ export default function UserProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ Now safe to conditionally render
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto p-4">
-        <h2 className="text-2xl font-semibold text-primary mb-4">My Profile</h2>
+        <h2 className="text-2xl font-semibold text-primary mb-4">
+          My Profile
+        </h2>
         <div className="text-gray-600">Loading your profile...</div>
       </div>
     );
@@ -119,17 +131,16 @@ export default function UserProfile() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    // Include address in profile save so updates are persisted even if user doesn't click the address-specific button
-    const addrPayload = (line1 && (cityId !== null && cityId !== undefined))
-      ? {
-          id: editingId || undefined,
-          line1,
-          line2: line2 || null,
-          postalCode: postalCode || null,
-          cityId: Number(cityId),
-          // don't force default here; separate action handles it
-        }
-      : undefined;
+    const addrPayload =
+      line1 && (cityId !== null && cityId !== undefined)
+        ? {
+            id: editingId || undefined,
+            line1,
+            line2: line2 || null,
+            postalCode: postalCode || null,
+            cityId: Number(cityId),
+          }
+        : undefined;
     const payload: any = { phone: phone || null };
     if (addrPayload) payload.address = addrPayload;
 
@@ -139,29 +150,24 @@ export default function UserProfile() {
       setProfile(updated);
       setSuccess("Profile updated successfully");
       setPhone(updated.phone || "");
-      const addrs = Array.isArray(updated.addresses) ? updated.addresses : await listAddresses();
+      const addrs = Array.isArray(updated.addresses)
+        ? updated.addresses
+        : await listAddresses();
       setAddresses(addrs);
-      // Reset editor to default address after a profile save
       const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to save profile"
+          err?.response?.data?.error ||
+          err?.message ||
+          "Failed to save profile"
       );
     } finally {
       setSaving(false);
       setTimeout(() => setSuccess(null), 3500);
     }
   }
-
-  const cityNameById = useMemo(() => {
-    const m = new Map<number, string>();
-    cities.forEach((c) => m.set(c.id, c.name));
-    return m;
-  }, [cities]);
 
   async function handleSelectForEdit(addr: Address) {
     setEditingId(addr.id);
@@ -182,7 +188,13 @@ export default function UserProfile() {
       if (editingId) {
         await apiUpdateAddress(editingId, { line1, line2, postalCode, cityId });
       } else {
-        await apiAddAddress({ line1, line2, postalCode, cityId, isDefault: addresses.length ? 0 : 1 });
+        await apiAddAddress({
+          line1,
+          line2,
+          postalCode,
+          cityId,
+          isDefault: addresses.length ? 0 : 1,
+        });
       }
       const addrs = await listAddresses();
       setAddresses(addrs);
@@ -192,7 +204,9 @@ export default function UserProfile() {
       setEditingId(null);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to save address");
+      setError(
+        err?.response?.data?.message || err?.message || "Failed to save address"
+      );
     }
   }
 
@@ -207,7 +221,11 @@ export default function UserProfile() {
       setSuccess("Address deleted");
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to delete address");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete address"
+      );
     }
   }
 
@@ -222,7 +240,11 @@ export default function UserProfile() {
       setSuccess("Default address updated");
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to set default address");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to set default address"
+      );
     }
   }
 
@@ -241,7 +263,9 @@ export default function UserProfile() {
                 avatarPreview ||
                 avatarUrl ||
                 (profile?.email
-                  ? `https://www.gravatar.com/avatar/${encodeURIComponent(profile.email)}?d=identicon`
+                  ? `https://www.gravatar.com/avatar/${encodeURIComponent(
+                      profile.email
+                    )}?d=identicon`
                   : "https://via.placeholder.com/80")
               }
               alt="Profile"
@@ -278,7 +302,9 @@ export default function UserProfile() {
 
             {editingAvatar && (
               <div className="mt-3 p-3 border rounded bg-gray-50">
-                <label className="block text-sm font-medium text-gray-700">Image URL</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Image URL
+                </label>
                 <input
                   type="text"
                   value={avatarUrlInput}
@@ -314,7 +340,10 @@ export default function UserProfile() {
                           localStorage.setItem("profile_avatar", toSave);
                           setAvatarUrl(toSave);
                         } catch (e) {
-                          console.error("Failed to save avatar to localStorage", e);
+                          console.error(
+                            "Failed to save avatar to localStorage",
+                            e
+                          );
                         }
                       }
                       setEditingAvatar(false);
@@ -340,9 +369,12 @@ export default function UserProfile() {
             )}
           </div>
         </div>
-        {/* Full name (from backend) */}
+
+        {/* Full name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Full name</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Full name
+          </label>
           <input
             type="text"
             value={profile?.fullName || ""}
@@ -351,9 +383,11 @@ export default function UserProfile() {
           />
         </div>
 
-        {/* Email (from backend) */}
+        {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Email
+          </label>
           <input
             type="email"
             value={profile?.email || ""}
@@ -362,9 +396,11 @@ export default function UserProfile() {
           />
         </div>
 
-        {/* Phone (editable) */}
+        {/* Phone */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Phone number</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Phone number
+          </label>
           <input
             type="tel"
             value={phone}
@@ -374,182 +410,288 @@ export default function UserProfile() {
           />
         </div>
 
-        {/* Addresses list */}
+        {/* Addresses */}
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-primary mb-2">Addresses</h3>
           <div className="space-y-2">
             {addresses.map((a) => (
-              <div key={a.id} className={`flex items-center justify-between border rounded p-3 ${a.isDefault ? 'bg-green-50' : 'bg-white'}`}>
+              <div
+                key={a.id}
+                className={`flex items-center justify-between border rounded p-3 ${
+                  a.isDefault ? "bg-green-50" : "bg-white"
+                }`}
+              >
                 <div className="text-sm">
-                  <div className="font-medium">{a.line1}{a.line2 ? `, ${a.line2}` : ''}</div>
-                  <div className="text-gray-600">{a.postalCode || ''} {a.cityId ? cityNameById.get(a.cityId) || '' : ''}</div>
-                  {a.isDefault ? <span className="text-green-700 font-medium">Default</span> : null}
+                  <div className="font-medium">
+                    {a.line1}
+                    {a.line2 ? `, ${a.line2}` : ""}
+                  </div>
+                  <div className="text-gray-600">
+                    {a.postalCode || ""}{" "}
+                    {a.cityId ? cityNameById.get(a.cityId) || "" : ""}
+                  </div>
+                  {a.isDefault ? (
+                    <span className="text-green-700 font-medium">Default</span>
+                  ) : null}
                 </div>
                 <div className="flex gap-2">
                   {!a.isDefault && (
-                    <button type="button" className="px-3 py-1 border rounded" onClick={() => handleMakeDefault(a.id)}>Make default</button>
+                    <button
+                      type="button"
+                      className="px-3 py-1 border rounded"
+                      onClick={() => handleMakeDefault(a.id)}
+                    >
+                      Make default
+                    </button>
                   )}
-                  <button type="button" className="px-3 py-1 border rounded" onClick={() => handleSelectForEdit(a)}>Edit</button>
-                  <button type="button" className="px-3 py-1 border rounded text-red-600" onClick={() => handleDelete(a.id)}>Delete</button>
+                  <button
+                    type="button"
+                    className="px-3 py-1 border rounded"
+                    onClick={() => handleSelectForEdit(a)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-1 border rounded text-red-600"
+                    onClick={() => handleDelete(a.id)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
             {addresses.length === 0 && (
-              <div className="text-sm text-gray-600">No addresses yet. Add one below.</div>
+              <div className="text-sm text-gray-600">
+                No addresses yet. Add one below.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Address editor */}
-        <div className="mt-4 p-3 border rounded">
-          <h4 className="font-medium mb-2">{editingId ? 'Edit address' : 'Add new address'}</h4>
+        {/* Change password section */}
+        <div className="mt-6 p-4 border rounded bg-gray-50">
+          <h3 className="text-lg font-semibold text-primary mb-2">
+            Change password
+          </h3>
+
+          {passwordError && (
+            <div className="text-red-600 mb-2">{passwordError}</div>
+          )}
+          {passwordSuccess && (
+            <div className="text-green-600 mb-2">{passwordSuccess}</div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Address - Line 1</label>
-              <input className="mt-1 block w-full border rounded p-2" value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="Address line 1" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Address - Line 2</label>
-              <input className="mt-1 block w-full border rounded p-2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Address line 2" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Postal code</label>
-              <input className="mt-1 block w-full border rounded p-2" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="Postal code" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">City</label>
-              <select className="mt-1 block w-full border rounded p-2 bg-white" value={cityId ?? ''} onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">Select a city</option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button type="button" className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90" onClick={handleAddOrUpdateAddress}>
-              {editingId ? 'Update address' : 'Add address'}
-            </button>
-            {editingId && (
-              <button type="button" className="px-3 py-2 border rounded" onClick={() => { setEditingId(null); setLine1(''); setLine2(''); setPostalCode(''); setCityId(null); }}>Cancel</button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90"
-          >
-            {saving ? "Saving..." : "Save changes"}
-          </button>
-
-          <button type="button" onClick={() => { setPhone(profile?.phone || ''); setError(null); }} className="px-3 py-2 border rounded">Cancel</button>
-        </div>
-      </form>
-
-      {/* Change Password Section */}
-      <div className="mt-8 bg-white border rounded p-4">
-        <h3 className="text-lg font-semibold text-primary mb-4">Change Password</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Current Password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Current password"
-              className="mt-1 block w-full border rounded p-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">New Password</label>
-            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700">
+                Current password
+              </label>
               <input
-                type={showNewPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New password"
-                className="mt-1 block w-full border rounded p-2 pr-10"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="mt-1 block w-full border rounded p-2"
+                placeholder="Your current password"
+                autoComplete="current-password"
               />
-              <button
-                type="button"
-                onClick={() => setShowNewPassword(!showNewPassword)}
-                className="absolute right-2 top-2 text-gray-500"
-              >
-                {showNewPassword ? 'Hide' : 'Show'}
-              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                New password
+              </label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="mt-1 block w-full border rounded p-2"
+                  placeholder="New password"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((s) => !s)}
+                  className="absolute right-2 top-2 text-sm text-gray-600"
+                >
+                  {showNewPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Confirm new password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-1 block w-full border rounded p-2"
+                placeholder="Repeat new password"
+                autoComplete="new-password"
+              />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              className="mt-1 block w-full border rounded p-2"
-            />
-          </div>
-
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex gap-2 mt-3">
             <button
               type="button"
               onClick={async () => {
-                // Basic client-side validation
-                setError(null);
-                setSuccess(null);
-                if (!currentPassword) return setError('Please enter your current password');
-                if (!newPassword) return setError('Please enter a new password');
-                if (newPassword !== confirmPassword) return setError('New passwords do not match');
+                setPasswordError(null);
+                setPasswordSuccess(null);
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                  setPasswordError("All password fields are required");
+                  return;
+                }
+                if (newPassword !== confirmPassword) {
+                  setPasswordError("New password and confirmation do not match");
+                  return;
+                }
+                if (newPassword.length < 6) {
+                  setPasswordError("Password must be at least 6 characters");
+                  return;
+                }
 
                 setChangingPassword(true);
                 try {
-                  const resp = await axiosInstance.post('/api/users/change-password', {
-                    currentPassword,
-                    newPassword,
-                  });
-                  setSuccess(resp.data?.message || 'Password changed successfully');
-                  // clear fields
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
+                  const resp = await axiosInstance.post(
+                    "/api/users/change-password",
+                    { currentPassword, newPassword }
+                  );
+                  setPasswordSuccess(
+                    resp?.data?.message || "Password changed successfully"
+                  );
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setTimeout(() => setPasswordSuccess(null), 3000);
                 } catch (err: any) {
-                  setError(
-                    err?.response?.data?.message ||
-                    err?.response?.data?.error ||
-                    err?.message ||
-                    'Failed to change password'
+                  setPasswordError(
+                    err?.response?.data?.message || err?.message || "Failed to change password"
                   );
                 } finally {
                   setChangingPassword(false);
-                  setTimeout(() => setSuccess(null), 3500);
                 }
               }}
-              className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90"
               disabled={changingPassword}
+              className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-60"
             >
-              {changingPassword ? 'Changing...' : 'Change Password'}
+              {changingPassword ? "Changing..." : "Change password"}
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setCurrentPassword('');
-                setNewPassword('');
-                setConfirmPassword('');
-                setError(null);
-              }}
               className="px-3 py-2 border rounded"
+              onClick={() => {
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+                setPasswordError(null);
+                setPasswordSuccess(null);
+              }}
             >
               Cancel
             </button>
           </div>
         </div>
-      </div>
+
+        {/* Address editor */}
+        <div className="mt-4 p-3 border rounded">
+          <h4 className="font-medium mb-2">
+            {editingId ? "Edit address" : "Add new address"}
+          </h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Address - Line 1
+              </label>
+              <input
+                className="mt-1 block w-full border rounded p-2"
+                value={line1}
+                onChange={(e) => setLine1(e.target.value)}
+                placeholder="Address line 1"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Address - Line 2
+              </label>
+              <input
+                className="mt-1 block w-full border rounded p-2"
+                value={line2}
+                onChange={(e) => setLine2(e.target.value)}
+                placeholder="Address line 2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Postal code
+              </label>
+              <input
+                className="mt-1 block w-full border rounded p-2"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                placeholder="Postal code"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                City
+              </label>
+              <select
+                className="mt-1 block w-full border rounded p-2 bg-white"
+                value={cityId ?? ""}
+                onChange={(e) =>
+                  setCityId(e.target.value ? Number(e.target.value) : null)
+                }
+              >
+                <option value="">Select a city</option>
+                {cities.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 hover:bg-primary/90"
+              onClick={handleAddOrUpdateAddress}
+            >
+              {editingId ? "Update address" : "Add address"}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                className="px-3 py-2 border rounded"
+                onClick={() => {
+                  setEditingId(null);
+                  setLine1("");
+                  setLine2("");
+                  setPostalCode("");
+                  setCityId(null);
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

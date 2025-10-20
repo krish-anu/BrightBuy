@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ShoppingBagIcon, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ProductDetail, Variant } from "@/types/ProductDetail";
+import { useCart } from "../../../contexts/CartContext";
 import {
   checkStock,
   findByOptions,
@@ -22,6 +23,7 @@ interface ProductPageProps {
 
 export default function ProductInfo({ product }: ProductPageProps) {
   const { variants } = product;
+  const { addItem } = useCart();
   const attributeNames = getUniqueAttributes(variants);
   const attributeValues = getAttributeValues(new Set(attributeNames), variants);
 
@@ -189,9 +191,22 @@ export default function ProductInfo({ product }: ProductPageProps) {
               <Button
                 variant="order_outline"
                 size="lg"
-                className="bg-primary-foreground text-secondary hover:bg-foreground  hover:text-background"
+                className="bg-primary-foreground text-secondary hover:bg-foreground hover:text-background"
+                onClick={() => {
+                  if (displayVariant) {
+                    addItem({
+                      variantId: parseInt(displayVariant.id),
+                      productId: parseInt(product.id),
+                      quantity: 1,
+                      name: product.name,
+                      price: displayVariant.price,
+                      color: selectedOptions["Color"],
+                      size: selectedOptions["Size"],
+                      imageUrl: displayVariant.image,
+                    });
+                  }
+                }}
               >
-                {" "}
                 <ShoppingCart className="inline-block mr-2" /> Add to Cart
               </Button>
             )}

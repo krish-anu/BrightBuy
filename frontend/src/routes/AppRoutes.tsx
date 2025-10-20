@@ -4,7 +4,8 @@ import { RoleProvider } from "../../contexts/RoleContext";
 // import UserPrivateRoute from "./UserPrivateRoute";
 
 
-// Admin Components
+// Route Protection
+import UserPrivateRoute from "./UserPrivateRoute";
 import PrivateRoute from "../components/Admin/PrivateRoute";
 import AdminLayout from "../components/Admin/AdminLayout";
 import Dashboard from "../pages/Admin/Dashboard";
@@ -39,10 +40,10 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:productID" element={<ProductDetailPage />} />
-            {/* Protected user profile route */}
-            
+            {/* Protected user routes */}
+            <Route element={<UserPrivateRoute />}>
               <Route path="profile" element={<UserProfile />} />
-            
+            </Route>
           </Route>
 
           {/* ========== Admin Routes ========== */}

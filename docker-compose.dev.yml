@@ -26,7 +26,7 @@ services:
       - "8081:8081"
     env_file:
       - ./backend/.env
-    command: sh -c "npm ci --legacy-peer-deps && npm run dev"
+    command: npm run dev
     depends_on:
       db:
         condition: service_healthy
