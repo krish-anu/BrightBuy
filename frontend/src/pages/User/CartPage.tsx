@@ -126,7 +126,7 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
               const params = new URLSearchParams({ sessionKey });
               navigate(`/order/confirm?${params.toString()}`);
             }}
-            nextLabel="PROCEED WITH SELECTED"
+            nextLabel="Proceed with Selected"
           />
         </div>
       </div>
