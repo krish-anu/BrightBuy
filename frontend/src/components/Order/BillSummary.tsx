@@ -139,10 +139,10 @@ export function BillSummary({
           <span className="text-muted-foreground">Shipping</span>
           <span>{money(shipping)}</span>
         </div>
-        <div className="flex justify-between text-sm">
+        {/* <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Discount</span>
           <span>{money(discount)}</span>
-        </div>
+        </div> */}
         <Separator className="my-2" />
         <div className="flex justify-between text-base font-bold">
           <span>Total</span>

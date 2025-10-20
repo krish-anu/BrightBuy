@@ -44,7 +44,7 @@ export function OrderSummaryCard({
       <h2 className="text-xl font-bold">Order Summary</h2>
       {row("Subtotal", subtotal)}
       {row("Shipping", shipping)}
-      {row("Discount", discount)}
+      {/* {row("Discount", discount)} */}
       <Separator />
       {row("Total", total, true)}
       <Button variant="order" onClick={onNext} className="mt-2 font-semibold gap-2 w-full md:w-auto h-12 text-xl">
