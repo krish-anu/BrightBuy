@@ -23,7 +23,7 @@ export default function ShippingMethod({
                 type="single"
                 className="w-full gap-4 md:px-0 px-2 flex flex-wrap"
                 value={value}
-                onValueChange={(v) => onChange((v as ShippingChoice) || "standard")}
+                onValueChange={(v: string) => onChange((v as ShippingChoice) || "standard")}
                 variant="order"
                 size="xl"
               >

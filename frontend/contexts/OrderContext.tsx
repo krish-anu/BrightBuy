@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useMemo, useState, useCallback, type ReactNode } from "react";
 export type OrderItem = {
   id: string | number | null;
   name: string;
@@ -32,7 +32,7 @@ const defaultSelection: OrderSelection = {
   shippingAddressId: undefined,
 };
 
-export function OrderProvider({ children }: { children: React.ReactNode }) {
+export function OrderProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Record<string, OrderSelection>>({});
   const value = useMemo<OrderContextValue>(() => ({ orders, setOrders }), [orders]);
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
@@ -44,35 +44,35 @@ export function useOrderSession(key: string) {
   const current = ctx.orders[key] ?? defaultSelection;
 
   const setItems = useCallback((items: OrderItem[]) => {
-    ctx.setOrders((prev) => ({
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
       [key]: { ...(prev[key] ?? defaultSelection), items },
     }));
   }, [ctx.setOrders, key]);
 
   const setShippingMethod = useCallback((val: ShippingChoice) => {
-    ctx.setOrders((prev) => ({
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
       [key]: { ...(prev[key] ?? defaultSelection), shippingMethod: val },
     }));
   }, [ctx.setOrders, key]);
 
   const setPaymentMethod = useCallback((val: PaymentChoice) => {
-    ctx.setOrders((prev) => ({
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
       [key]: { ...(prev[key] ?? defaultSelection), paymentMethod: val },
     }));
   }, [ctx.setOrders, key]);
 
   const setShippingAddressId = useCallback((id?: string) => {
-    ctx.setOrders((prev) => ({
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
       [key]: { ...(prev[key] ?? defaultSelection), shippingAddressId: id },
     }));
   }, [ctx.setOrders, key]);
 
   const reset = useCallback(() => {
-    ctx.setOrders((prev) => ({
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
       [key]: defaultSelection,
     }));

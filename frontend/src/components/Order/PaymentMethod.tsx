@@ -21,7 +21,7 @@ export default function PaymentMethod({
                 type="single"
                 className="w-full gap-4 md:px-0 px-2 flex flex-wrap"
                 value={value}
-                onValueChange={(v) => onChange((v as PaymentChoice) || "online")}
+                onValueChange={(v: string) => onChange((v as PaymentChoice) || "online")}
                 variant="order"
                 size="xl"
               >

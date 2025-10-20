@@ -144,7 +144,7 @@ export default function ProductInfo({ product }: ProductPageProps) {
                       variant="outline"
                       className="flex flex-wrap gap-2 data-[variant=outline]:shadow-none shadow-none rounded-0  items-start"
                       value={selectedOptions[propName]}
-                      onValueChange={(val) => {
+                      onValueChange={(val: string) => {
                         if (val) handleSelect(propName, val);
                       }}
                       aria-label={propName}
