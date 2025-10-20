@@ -39,6 +39,16 @@ export default function ProductInfo({ product }: ProductPageProps) {
   const [stockStatus, setStockStatus] = useState<string>("");
   const [qty, setQty] = useState<number>(1);
 
+  // animation state to show a fade/slide on first render (or when product changes)
+  const [animate, setAnimate] = useState<boolean>(false);
+
+  // Trigger the animation on mount / when product changes
+  useEffect(() => {
+    setAnimate(false);
+    const t = window.setTimeout(() => setAnimate(true), 30);
+    return () => window.clearTimeout(t);
+  }, [product]);
+
   useEffect(() => {
     const variant = findByOptions(variants, selectedOptions);
     setDisplayVariant(variant);
@@ -59,13 +69,27 @@ export default function ProductInfo({ product }: ProductPageProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 md:px-16 ">
+    <div
+      className={`flex flex-col gap-6 md:px-16 transition-all duration-300 ease-out will-change-transform ${
+        animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      }`}
+      aria-hidden={!animate ? "true" : "false"}
+    >
       <div className=" inline-flex min-w-full min-h-64  flex-col md:flex-row gap-6">
         <div className="flex-1 md:max-w-1/3">
           <AspectRatio ratio={1 / 1}>
             <img
-              src={displayVariant?.image ? displayVariant?.image : "/src/assets/product-placeholder.png"}
+              src={
+                (displayVariant as any)?.imageURL ||
+                "/src/assets/product-placeholder.png"
+              }
+              alt={product.name}
+              onError={(e) => {
+                // fallback to a public asset if provided URL fails
+                e.currentTarget.src = "/src/assets/product-placeholder.png";
+              }}
               className="object-cover w-full h-full rounded-md border-1"
+              loading="lazy"
             />
           </AspectRatio>
         </div>
@@ -243,7 +267,11 @@ export default function ProductInfo({ product }: ProductPageProps) {
                       price: Number((displayVariant as any)?.price),
                       color: selectedOptions["Color"],
                       size: selectedOptions["Size"],
-                      imageUrl: (displayVariant as any)?.image,
+                      imageUrl:
+                        (displayVariant as any)?.image ||
+                        (displayVariant as any)?.imageURL ||
+                        (displayVariant as any)?.imageUrl ||
+                        "/vite.svg",
                     });
                   }
                 }}
