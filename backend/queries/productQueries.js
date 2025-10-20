@@ -28,15 +28,19 @@ SELECT
         JSON_ARRAY()
     ) AS ProductVariants,
     COALESCE(
-        (SELECT JSON_ARRAYAGG(
+        (
+        SELECT JSON_ARRAYAGG(
             JSON_OBJECT(
-                'id', c2.id,
-                'name', c2.name
+                'id', csub.id,
+                'name', csub.name
             )
         )
-        FROM product_categories pc2
-        LEFT JOIN categories c2 ON pc2.categoryId = c2.id
-        WHERE pc2.productId = p.id
+        FROM (
+            SELECT DISTINCT c2.id, c2.name
+            FROM product_categories pc2
+            JOIN categories c2 ON pc2.categoryId = c2.id
+            WHERE pc2.productId = p.id
+        ) AS csub
         ),
         JSON_ARRAY()
     ) AS Categories
@@ -47,44 +51,83 @@ ORDER BY p.name ASC
 `;
 
 // Get all products with pagination
+// const getAllProductsPaginated = `
+// SELECT 
+//     p.id,
+//     p.name,
+//     p.description,
+//     p.brand,
+//     COALESCE(
+//         JSON_ARRAYAGG(
+//             CASE 
+//                 WHEN pv.id IS NOT NULL THEN
+//                     JSON_OBJECT(
+//                         'id', pv.id,
+//                         'variantName', pv.variantName,
+//                         'SKU', pv.SKU,
+//                         'price', pv.price,
+//                         'stockQnt', pv.stockQnt,
+//                         'imageURL', pv.imageURL,
+//                         'status', CASE 
+//                             WHEN pv.stockQnt > 10 THEN 'In Stock'
+//                             WHEN pv.stockQnt > 0 THEN 'Low Stock'
+//                             ELSE 'Out of Stock'
+//                         END
+//                     )
+//                 ELSE NULL
+//             END
+//         ),
+//         JSON_ARRAY()
+//     ) AS ProductVariants,
+//     COALESCE(
+//         (SELECT JSON_ARRAYAGG(
+//             JSON_OBJECT(
+//                 'id', c2.id,
+//                 'name', c2.name
+//             )
+//         )
+//         FROM product_categories pc2
+//         LEFT JOIN categories c2 ON pc2.categoryId = c2.id
+//         WHERE pc2.productId = p.id
+//         ),
+//         JSON_ARRAY()
+//     ) AS Categories
+// FROM products p
+// INNER JOIN product_variants pv ON p.id = pv.productId
+// GROUP BY p.id, p.name, p.description, p.brand
+// ORDER BY p.name ASC
+// `;
 const getAllProductsPaginated = `
 SELECT 
-    p.id,
-    p.name,
-    p.description,
-    p.brand,
+    pv.id AS variantId,
+    pv.variantName,
+    pv.SKU,
+    pv.price,
+    pv.stockQnt,
+    pv.imageURL,
+    CASE 
+        WHEN pv.stockQnt > 10 THEN 'In Stock'
+        WHEN pv.stockQnt > 0 THEN 'Low Stock'
+        ELSE 'Out of Stock'
+    END AS status,
+    p.id AS productId,
+    p.name AS productName,
+    p.description AS productDescription,
+    p.brand AS productBrand,
     COALESCE(
-        JSON_ARRAYAGG(
-            CASE 
-                WHEN pv.id IS NOT NULL THEN
-                    JSON_OBJECT(
-                        'id', pv.id,
-                        'variantName', pv.variantName,
-                        'SKU', pv.SKU,
-                        'price', pv.price,
-                        'stockQnt', pv.stockQnt,
-                        'imageURL', pv.imageURL,
-                        'status', CASE 
-                            WHEN pv.stockQnt > 10 THEN 'In Stock'
-                            WHEN pv.stockQnt > 0 THEN 'Low Stock'
-                            ELSE 'Out of Stock'
-                        END
-                    )
-                ELSE NULL
-            END
-        ),
-        JSON_ARRAY()
-    ) AS ProductVariants,
-    COALESCE(
-        (SELECT JSON_ARRAYAGG(
+        (
+        SELECT JSON_ARRAYAGG(
             JSON_OBJECT(
-                'id', c2.id,
-                'name', c2.name
+                'id', csub.id,
+                'name', csub.name
             )
         )
-        FROM product_categories pc2
-        LEFT JOIN categories c2 ON pc2.categoryId = c2.id
-        WHERE pc2.productId = p.id
+        FROM (
+            SELECT DISTINCT c2.id, c2.name
+            FROM product_categories pc2
+            JOIN categories c2 ON pc2.categoryId = c2.id
+            WHERE pc2.productId = p.id
+        ) AS csub
         ),
         JSON_ARRAY()
     ) AS Categories

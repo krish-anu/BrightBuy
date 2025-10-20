@@ -1,10 +1,40 @@
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, User, Search } from "lucide-react";
+import { ShoppingCart, User, Search, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
+import { useCart } from "../../../contexts/CartContext";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "../../../contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+function CartBadge() {
+  const { itemsCount } = useCart();
+  
+  if (itemsCount === 0) return null;
+  
+  return (
+    <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
+      {itemsCount}
+    </Badge>
+  );
+}
 
 export function Navbar() {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <div className="bg-accent/40 backdrop-blur-xs border-b border-b-accent-foreground/20 sticky top-0 z-50 shadow-lg/20">
       <div className="max-w-7xl mx-auto px-4 grid grid-cols-4 h-16 items-center">
@@ -35,17 +65,54 @@ export function Navbar() {
             to="/cart"
             className="flex items-center gap-2 text-muted-foreground hover:text-accent-foreground"
           >
-            <ShoppingCart className="h-5 w-5" />
+            <div className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              <CartBadge />
+            </div>
             <span className="hidden md:block text-lg font-medium">Cart</span>
           </Link>
           <Separator orientation="vertical" />
-          <Link
-            to="/login"
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <User className="h-5 w-5" />
-            <span className="hidden md:block text-lg font-medium">Login</span>
-          </Link>
+          {isAuthenticated() ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    <span className="hidden md:block text-lg font-medium">
+                      {user?.name || 'Profile'}
+                    </span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link
+              to="/login"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <User className="h-5 w-5" />
+              <span className="hidden md:block text-lg font-medium">Login</span>
+            </Link>
+          )}
         </div>
       </div>
 

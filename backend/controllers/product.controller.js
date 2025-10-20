@@ -240,38 +240,87 @@ const getProductCount = async (req, res, next) => {
 // Get all products with pagination
 const getProductsPaginated = async (req, res, next) => {
   try {
-    console.log('Pagination request received:', req.query);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
 
-    console.log(`Fetching products - page: ${page}, limit: ${limit}, offset: ${offset}`);
 
-  // Get paginated products
-  console.log('Executing paginated products query...');
-  const paginatedSql = `${productQueries.getAllProductsPaginated} LIMIT ${limit} OFFSET ${offset}`;
-  const products = await query(paginatedSql);
-    console.log(`Products fetched: ${products.length}`);
-    
-    // Get total count
-    console.log('Executing total count query...');
-    const countResult = await query(productQueries.getTotalProductsCount);
-    console.log('Count result:', countResult);
+
+    let sql = `
+  SELECT 
+      pv.id AS variantId,
+      pv.variantName,
+      pv.SKU,
+      pv.price,
+      pv.stockQnt,
+      pv.imageURL,
+      CASE 
+          WHEN pv.stockQnt > 10 THEN 'In Stock'
+          WHEN pv.stockQnt > 0 THEN 'Low Stock'
+          ELSE 'Out of Stock'
+      END AS status,
+      p.id AS productId,
+      p.name AS productName,
+      p.description AS productDescription,
+      p.brand AS productBrand,
+      COALESCE(
+          (
+              SELECT JSON_ARRAYAGG(
+                  JSON_OBJECT('id', c.id, 'name', c.name)
+              )
+              FROM product_categories pc2
+              INNER JOIN categories c ON pc2.categoryId = c.id
+              WHERE pc2.productId = p.id
+          ),
+          JSON_ARRAY()
+      ) AS Categories
+  FROM product_variants pv
+  INNER JOIN products p ON p.id = pv.productId
+`;
+
+    const params = [];
+
+    if (categoryId) {
+      sql += `
+    WHERE p.id IN (
+      SELECT productId FROM product_categories WHERE categoryId = ?
+    )
+  `;
+      params.push(categoryId);
+    }
+
+    sql += `
+      ORDER BY p.name ASC
+      LIMIT ${limit } OFFSET ${ offset};
+    `;
+
+
+    const products = await query(sql, params);
+    console.log(products)
+
+    // --- Count query ---
+    let countSql = `
+      SELECT COUNT(DISTINCT pv.id) AS totalCount
+      FROM product_variants pv
+      INNER JOIN products p ON p.id = pv.productId
+    `;
+    const countParams = [];
+
+    if (categoryId) {
+      countSql += `
+        INNER JOIN product_categories pc ON p.id = pc.productId
+        WHERE pc.categoryId = ?
+      `;
+      countParams.push(categoryId);
+    }
+
+    const countResult = await query(countSql, countParams);
     const totalCount = countResult[0]?.totalCount || 0;
-    
-    // Calculate pagination metadata
+
     const totalPages = Math.ceil(totalCount / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
-
-    console.log('Pagination metadata:', {
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage,
-      hasPrevPage,
-      limit
-    });
 
     res.status(200).json({
       success: true,
@@ -286,10 +335,12 @@ const getProductsPaginated = async (req, res, next) => {
       }
     });
   } catch (err) {
-    console.error('Error in getProductsPaginated:', err);
+    console.error("Error in getProductsPaginated:", err);
     next(err);
   }
 };
+
+
 
 // Get inventory statistics (not affected by pagination)
 const getInventoryStats = async (req, res, next) => {
