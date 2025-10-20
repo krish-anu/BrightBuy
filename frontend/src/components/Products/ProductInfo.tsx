@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ShoppingBagIcon, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { ProductDetail, Variant } from "@/types/ProductDetail";
 import {
   checkStock,
@@ -21,6 +22,7 @@ interface ProductPageProps {
 }
 
 export default function ProductInfo({ product }: ProductPageProps) {
+  const navigate = useNavigate();
   const { variants } = product;
   const attributeNames = getUniqueAttributes(variants);
   const attributeValues = getAttributeValues(new Set(attributeNames), variants);
@@ -171,12 +173,23 @@ export default function ProductInfo({ product }: ProductPageProps) {
 
           {/* Action Buttons ( Buy Now / Add to Cart ) */}
           <div className="flex flex-row justify-start sm:gap-2 gap-6 text-md">
-            {stockStatus === "not-available" ? null : (
-              <Button
-                variant="order"
-                size="lg"
-                className="hover:bg-foreground bg-primary  "
-              >
+              {stockStatus === "not-available" ? null : (
+                <Button
+                  variant="order"
+                  size="lg"
+                  className="hover:bg-foreground bg-primary  "
+                  onClick={() => {
+                    const pid = (product as any)?.id ?? (product as any)?.productID ?? (product as any)?.productId;
+                    const vid = (displayVariant as any)?.variantId ?? (displayVariant as any)?.id;
+                    if (!pid || !vid) return;
+                    const params = new URLSearchParams({
+                      productId: String(pid),
+                      variantId: String(vid),
+                      qty: "1",
+                    });
+                    navigate(`/order/confirm?${params.toString()}`);
+                  }}
+                >
                 <ShoppingBagIcon className="inline-block mr-2" />{" "}
                 {stockStatus === "in-stock"
                   ? "Buy Now"

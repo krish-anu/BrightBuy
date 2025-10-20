@@ -27,9 +27,10 @@ export default function OrderConfirm() {
                 const product: Product = response.data;
                 let selectedVariant: Variant | undefined;
                 if (variantId && product.variants) {
-                    selectedVariant = product.variants.find((v: Variant) => {
-                        return v.variantId == String(variantId);
-                    });
+                    selectedVariant = product.variants.find((v: Variant | any) => {
+                        const vid = (v as any)?.variantId ?? (v as any)?.id;
+                        return String(vid) === String(variantId);
+                    }) as Variant | undefined;
                 }
 
                 if (!selectedVariant) {
@@ -45,8 +46,8 @@ export default function OrderConfirm() {
                 ) || [];
                 const item: OrderItem = {
                     id: variantId,
-                    name: selectedVariant.variantName,
-                    image: selectedVariant.imageURL || "/src/assets/product-placeholder.png",
+                    name: (selectedVariant as any).variantName ?? (selectedVariant as any).name ?? "Variant",
+                    image: (selectedVariant as any).imageURL || (selectedVariant as any).image || "/src/assets/product-placeholder.png",
                     unitPrice: Number(selectedVariant.price),
                     quantity: qty,
                     attributesText: uniqueAttributes.map((a: Attribute) => `${a.attributeName}: ${a.attributeValue}`).join(", ")
