@@ -162,7 +162,7 @@ export default function UserProfile() {
         ? updated.addresses
         : await listAddresses();
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
     } catch (err: any) {
       setError(
@@ -201,7 +201,7 @@ export default function UserProfile() {
           line2,
           postalCode,
           cityId,
-          isDefault: addresses.length ? 0 : 1,
+          isDefault: addresses.length === 0,
         });
       }
       const addrs = await listAddresses();
@@ -422,7 +422,7 @@ export default function UserProfile() {
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-primary mb-2">Addresses</h3>
           <div className="space-y-2">
-            {addresses.map((a) => (
+            {addresses.map((a: Address) => (
               <div
                 key={a.id}
                 className={`flex items-center justify-between border rounded p-3 ${
