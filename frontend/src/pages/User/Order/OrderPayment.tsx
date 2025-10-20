@@ -5,7 +5,8 @@ import ShippingMethod from "@/components/Order/ShippingMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
 import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 type ShippingChoice = "standard" | "pickup";
 type PaymentChoice = "online" | "cod";
@@ -18,11 +19,32 @@ export type OrderSelections = {
 };
 
 export default function OrderPayment() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const productId: string | null = searchParams.get("productId");
   const variantId: string | null = searchParams.get("variantId");
   const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
-  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
+  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, /* shippingAddressId, */ setShippingAddressId, items } = useOrderSession(sessionKey);
+
+  console.log(items);
+  // compute summary values
+  const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  
+  const shipping = 0;
+  const discount = 0;
+  const total = subtotal + shipping - discount;
+
+  // Guard against invalid direct access or missing session data
+  const isInvalid = !productId || !variantId || items.length === 0;
+  if (isInvalid) {
+    return (
+      <div className="space-y-4 p-6">
+        <h1 className="text-2xl font-bold">Invalid order session</h1>
+        <p className="text-muted-foreground">Please return to the product page and start checkout again.</p>
+        <Button onClick={() => navigate(productId ? `/products/${productId}` : "/")}>Go Back</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -38,14 +60,19 @@ export default function OrderPayment() {
         </div>
         <div className="md:col-span-1 space-y-8">
           <OrderSummaryCard
-            subtotal={400}
-            shipping={0}
-            discount={0}
-            total={400}
+            subtotal={subtotal}
+            shipping={shipping}
+            discount={discount}
+            total={total}
             onNext={() => {
-              alert(`Proceeding with:\nItems: ${items.length}\nShipping: ${shippingMethod}\nPayment: ${paymentMethod}\nAddressId: ${shippingAddressId || "(none)"}`)
+              // Navigate to summary screen; for online we'll show a Pay button, for COD a Place Order button
+              const qs = searchParams.toString();
+              const flow = paymentMethod; // "online" | "cod"
+              const extra = new URLSearchParams(qs);
+              extra.set("flow", flow);
+              navigate(`/order/success?${extra.toString()}`);
             }}
-            nextLabel="Pay Now"
+            nextLabel={paymentMethod === "online" ? "Proceed to Pay" : "Review & Confirm"}
           />
         </div>
       </div>

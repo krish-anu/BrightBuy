@@ -12,7 +12,6 @@ import { useOrderSession } from "../../../../contexts/OrderContext";
 export default function OrderConfirm() {
     const navigate = useNavigate();
     // Use a stable session key derived from URL params so multiple orders can co-exist
-    // e.g., order session: productId|variantId
     const [searchParams] = useSearchParams();
     const productId: string | null = searchParams.get("productId");
     const variantId: string | null = searchParams.get("variantId");
@@ -36,6 +35,7 @@ export default function OrderConfirm() {
                 if (!selectedVariant) {
                     console.error("Variant not found");
                     setLocalItems([]);
+                    setGlobalItems([]);
                     return;
                 }
 
@@ -51,15 +51,12 @@ export default function OrderConfirm() {
                     quantity: qty,
                     attributesText: uniqueAttributes.map((a: Attribute) => `${a.attributeName}: ${a.attributeValue}`).join(", ")
                 };
-                setLocalItems([item]);
+                const nextItems = [item];
+                setLocalItems(nextItems);
+                setGlobalItems(nextItems);
             });
         }
-    }, [productId, qty, variantId]);
-
-    // Store in global state when items are ready
-    useEffect(() => {
-        if (items.length) setGlobalItems(items);
-    }, [items, setGlobalItems]);
+    }, [productId, qty, variantId, setGlobalItems]);
 
 
     // Calculate subtotal by computing lineTotal for each item
@@ -68,8 +65,22 @@ export default function OrderConfirm() {
     const discount: number = 0; 
     const total: number = subtotal + shipping - discount;
 
+    // Guard: ensure URL has required params
+    if (!productId || !variantId) {
+        return (
+            <div className="space-y-4 p-6">
+                <h1 className="text-2xl font-bold">Invalid order session</h1>
+                <p className="text-muted-foreground">Missing product or variant. Please navigate from the product page.</p>
+            </div>
+        );
+    }
     if (!items.length) {
-        return <div>Something Went wrong</div>;
+        return (
+            <div className="space-y-4 p-6">
+                <h1 className="text-2xl font-bold">Loading order…</h1>
+                <p className="text-muted-foreground">Fetching product details. If this persists, go back and try again.</p>
+            </div>
+        );
     }
 
     return (
