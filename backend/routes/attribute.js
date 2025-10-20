@@ -5,9 +5,8 @@ const ROLES = require('../roles');
 
 const router = require('express').Router();
 
-router.get('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getAttributes);
-router.get('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN) ,getAttribute);
-
+router.get('/', getAttributes);
+router.get('/:id', getAttribute);
 
 router.post('/', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), addAttribute);
 
