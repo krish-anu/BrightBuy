@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 
 type ShippingChoice = "standard" | "pickup";
 type PaymentChoice = "online" | "cod";
@@ -47,6 +48,13 @@ export default function OrderPayment() {
     );
   }
 
+  // If user selects Store Pickup, force payment method to Online
+  useEffect(() => {
+    if (shippingMethod === "pickup" && paymentMethod === "cod") {
+      setPaymentMethod("online");
+    }
+  }, [shippingMethod, paymentMethod, setPaymentMethod]);
+
   return (
     <div className="space-y-8">
       <BackHeader title="Product Confirmation" />
@@ -56,7 +64,11 @@ export default function OrderPayment() {
           <Separator />
           <ShippingAddressSection onSelectionChange={setShippingAddressId} />
           <Separator />
-          <PaymentMethod value={paymentMethod} onChange={setPaymentMethod} />
+          <PaymentMethod
+            value={paymentMethod}
+            onChange={setPaymentMethod}
+            allowCOD={shippingMethod !== "pickup"}
+          />
 
         </div>
         <div className="md:col-span-1 space-y-8">
@@ -83,3 +95,4 @@ export default function OrderPayment() {
     </div>
   );
 }
+ 
