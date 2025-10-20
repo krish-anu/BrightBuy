@@ -26,6 +26,10 @@ import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 import UserLogin from "@/pages/Authpage/UserLogin";
 import UserProfile from "../pages/Profile/UserProfile";
+import OrderPayment from "@/pages/User/Order/OrderPayment";
+import OrderSummary from "@/pages/User/Order/OrderSummary";
+import OrderConfirm from "@/pages/User/Order/OrderConfirm";
+import OrderSuccess from "@/pages/User/Order/OrderSuccess";
 
 function App() {
   return (
@@ -37,9 +41,16 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="login" element={<UserLogin />} />
             <Route path="signup" element={<UserSignup />} />
-            <Route path="products" element={<ProductsPage />} />
+            <Route path="shop" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:productID" element={<ProductDetailPage />} />
+            <Route path="products/:productID" element={<ProductDetailPage />} />
+            <Route path="order">
+              <Route path="confirm" element={<OrderConfirm />} />
+              <Route path="summary" element={<OrderSummary />} />
+              <Route path="payment" element={<OrderPayment />} />
+              <Route path="success" element={<OrderSuccess />} />
+            </Route>
             {/* Protected user routes */}
             <Route element={<UserPrivateRoute />}>
               <Route path="profile" element={<UserProfile />} />

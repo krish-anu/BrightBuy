@@ -150,7 +150,7 @@ const getProfile = async (req, res, next) => {
     }
 
     // Return addresses list
-    const addressRows = await query(`SELECT id, userId, line1, line2, cityId, postalCode, isDefault FROM addresses WHERE userId = ? ORDER BY isDefault DESC, id ASC`, [req.user.id]);
+    const addressRows = await query(`SELECT a.id, a.userId, a.line1, a.line2, a.cityId, a.postalCode, a.isDefault, c.name AS city FROM addresses a JOIN cities c ON a.cityId = c.id WHERE userId = ? ORDER BY isDefault DESC, id ASC`, [req.user.id]);
     res.status(200).json({
       fullName: user.name,
       email: user.email,

@@ -181,3 +181,31 @@ export const getOrderStats = async (): Promise<StatsResponse> => {
     throw error;
   }
 };
+
+// ---------- Create Order (User Checkout) ----------
+export type DeliveryMode = 'Standard Delivery' | 'Store Pickup';
+export type PaymentMethodBackend = 'CashOnDelivery' | 'Card';
+
+export interface CreateOrderItemInput {
+  variantId: number | string;
+  quantity: number;
+}
+
+export interface CreateOrderInput {
+  items: CreateOrderItemInput[];
+  deliveryMode: DeliveryMode;
+  paymentMethod: PaymentMethodBackend;
+  deliveryAddressId?: number | string;
+}
+
+export const createOrder = async (
+  payload: CreateOrderInput
+): Promise<{ orderId?: number; sessionId?: string }> => {
+  try {
+    const response = await axiosInstance.post('/api/order/', payload);
+    return response.data?.data ?? {};
+  } catch (error) {
+    console.error('[orders] createOrder failed', error);
+    throw error;
+  }
+};

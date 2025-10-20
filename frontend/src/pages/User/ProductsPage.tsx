@@ -1,9 +1,9 @@
-import ProductGrid from "@/components/Products/ProductGrid";
+import PaginatedProducts from "@/components/Products/PaginatedProducts";
 
 export default function ProductsPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen min-w-full ">
-      <ProductGrid />
+    <div className="min-h-screen w-full">
+      <PaginatedProducts />
     </div>
   );
 }

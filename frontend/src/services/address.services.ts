@@ -1,27 +1,28 @@
 import axiosInstance from "@/axiosConfig";
 
-export type Address = {
-  id: number;
-  userId: number;
+export type AddressUpsertPayload = {
   line1: string;
   line2?: string | null;
-  cityId: number | null;
+  cityId: number;
   postalCode?: string | null;
-  isDefault: number; // 1 or 0
+  isDefault?: boolean;
 };
 
-export const listAddresses = async (): Promise<Address[]> => {
-  const resp = await axiosInstance.get('/api/users/addresses');
+export const listAddresses = async () => {
+  const resp = await axiosInstance.get("/api/users/addresses");
+  // backend returns { success: true, data: rows }
   return resp.data?.data || [];
 };
 
-export const addAddress = async (payload: Omit<Address, 'id' | 'userId'> & { isDefault?: number }) => {
-  const resp = await axiosInstance.post('/api/users/addresses', payload);
+export const addAddress = async (payload: AddressUpsertPayload) => {
+  const resp = await axiosInstance.post("/api/users/addresses", payload);
+  // returns { success: true, id, data: rows }
   return resp.data;
 };
 
-export const updateAddress = async (id: number, payload: Partial<Omit<Address, 'id' | 'userId'>>) => {
+export const updateAddress = async (id: number, payload: AddressUpsertPayload) => {
   const resp = await axiosInstance.put(`/api/users/addresses/${id}`, payload);
+  // returns { success: true, data: rows }
   return resp.data;
 };
 
