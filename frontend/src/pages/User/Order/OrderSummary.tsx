@@ -3,6 +3,7 @@ import { useOrderSession, type OrderItem as CtxOrderItem } from "../../../../con
 import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { createOrder } from "@/services/order.services";
 
 export default function OrderSummary() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function OrderSummary() {
   const variantId = searchParams.get("variantId");
   const flow = (searchParams.get("flow") || "online") as "online" | "cod";
   const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
-  const { items, shippingMethod, paymentMethod } = useOrderSession(sessionKey);
+  const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
 
   const subtotal = items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
   const shipping = 0;
@@ -38,8 +39,54 @@ export default function OrderSummary() {
   };
 
   const onPlaceOrder = async () => {
-    // Basic step: simulate placing order and showing confirmation
-    alert("Order placed with Cash on Delivery!");
+    try {
+      // Map frontend shipping to backend delivery mode
+      const deliveryMode = shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup";
+      const paymentMethodBackend = "CashOnDelivery" as const;
+
+      // Disallow COD + Store Pickup (backend will 400, so pre-guard here)
+      if (deliveryMode === "Store Pickup") {
+        alert("Cash on Delivery is not allowed for Store Pickup. Please choose Online payment.");
+        const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_" }).toString();
+        navigate(`/order/payment?${qs}`);
+        return;
+      }
+
+      // Build items payload
+      const payloadItems = items.map((i) => ({
+        variantId: Number(i.id) || String(i.id),
+        quantity: i.quantity,
+      }));
+
+      // Require a shipping address ID for Standard Delivery
+      if (!shippingAddressId) {
+        alert("Please select a shipping address to place a COD order.");
+        const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_" }).toString();
+        navigate(`/order/payment?${qs}`);
+        return;
+      }
+
+      // Prefer numeric ID if possible
+      const deliveryAddressId = isNaN(Number(shippingAddressId)) ? shippingAddressId : Number(shippingAddressId);
+
+      const payload = {
+        items: payloadItems,
+        deliveryMode: deliveryMode as "Standard Delivery" | "Store Pickup",
+        paymentMethod: paymentMethodBackend,
+        deliveryAddressId,
+      } as const;
+
+      await createOrder(payload as any);
+
+      // On success, redirect to success page with session params
+      const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_", flow: "cod" }).toString();
+      navigate(`/order/success?${qs}`);
+    } catch (err: any) {
+      const backend = err?.original?.response?.data || err?.response?.data;
+      const msg = (backend && (backend.message || backend.error)) || err?.message || "Failed to place order";
+      console.error("[OrderSummary] COD place order failed", backend || err);
+      alert(msg);
+    }
   };
 
   return (
