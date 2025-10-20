@@ -13,15 +13,21 @@ export default function OrderConfirm() {
     const navigate = useNavigate();
     // Use a stable session key derived from URL params so multiple orders can co-exist
     const [searchParams] = useSearchParams();
+    const sessionKeyParam: string | null = searchParams.get("sessionKey");
     const productId: string | null = searchParams.get("productId");
     const variantId: string | null = searchParams.get("variantId");
-    const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
-    const { setItems: setGlobalItems } = useOrderSession(sessionKey);
+    const sessionKey = sessionKeyParam || `order:${productId || "_"}:${variantId || "_"}`;
+    const { setItems: setGlobalItems, items: globalItems } = useOrderSession(sessionKey as string);
     const [items, setLocalItems] = useState<OrderItem[]>([]);
-    //get qty from search params
+    //get qty from search params (single-item fallback)
     const qty: number = Number(searchParams.get("qty") || "1");
     
     useEffect(() => {
+        // If global items already present (from cart selection), use them and skip fetch
+        if (globalItems && globalItems.length > 0) {
+            setLocalItems(globalItems);
+            return;
+        }
         if (productId) {
             getProductByID(productId).then((response: ProductResponse) => {
                 const product: Product = response.data;
@@ -57,7 +63,7 @@ export default function OrderConfirm() {
                 setGlobalItems(nextItems);
             });
         }
-    }, [productId, qty, variantId, setGlobalItems]);
+    }, [productId, qty, variantId, setGlobalItems, globalItems]);
 
 
     // Calculate subtotal by computing lineTotal for each item
@@ -66,8 +72,8 @@ export default function OrderConfirm() {
     const discount: number = 0; 
     const total: number = subtotal + shipping - discount;
 
-    // Guard: ensure URL has required params
-    if (!productId || !variantId) {
+    // Guard: ensure URL has required params only if no global items exist
+    if ((!productId || !variantId) && (!globalItems || globalItems.length === 0)) {
         return (
             <div className="space-y-4 p-6">
                 <h1 className="text-2xl font-bold">Invalid order session</h1>

@@ -1,10 +1,12 @@
 import { useCart, type CartItem } from "../../../contexts/CartContext";
+import { useOrderSession } from "../../../contexts/OrderContext";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import CartGuard from "@/components/Guards/CartGuard";
 import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
 import { CartItemsSection } from "@/components/Cart/CartItemsSection";
 import { useMemo, useState } from "react";
+import type { OrderItem } from "@/components/Order/OrderItemRow";
 
 interface CartPageProps {
   items: CartItem[];
@@ -16,6 +18,9 @@ interface CartPageProps {
 // Row component moved to components/Cart
 
 function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: CartPageProps) {
+  const navigate = useNavigate();
+  const [sessionKey] = useState<string>(() => `cart:${Date.now()}`);
+  const { setItems: setOrderItems } = useOrderSession(sessionKey);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(items.map((i) => Number(i.variantId)))
   );
@@ -99,9 +104,25 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
             discount={0}
             total={selectedSubtotal}
             onNext={() => {
-              // Only proceed with selected items; if none, do nothing or prompt
+              // Only proceed with selected items; if none, do nothing
               if (selectedItems.length === 0) return;
-              // TODO: navigate to checkout with selectedItems
+              // Build OrderItem[] from selected cart items and store in global order session
+              const nextItems: OrderItem[] = selectedItems.map((ci) => ({
+                id: ci.variantId,
+                name: ci.name,
+                image: ci.imageUrl || "/src/assets/product-placeholder.png",
+                unitPrice: Number(ci.price),
+                quantity: ci.quantity,
+                attributesText: [
+                  ci.color ? `Color: ${ci.color}` : undefined,
+                  ci.size ? `Size: ${ci.size}` : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(", "),
+              }));
+              setOrderItems(nextItems);
+              const params = new URLSearchParams({ sessionKey });
+              navigate(`/order/confirm?${params.toString()}`);
             }}
             nextLabel="PROCEED WITH SELECTED"
           />

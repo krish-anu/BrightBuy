@@ -8,10 +8,9 @@ import { createOrder } from "@/services/order.services";
 export default function OrderSummary() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const productId = searchParams.get("productId");
-  const variantId = searchParams.get("variantId");
+  const sessionKeyParam = searchParams.get("sessionKey");
   const flow = (searchParams.get("flow") || "online") as "online" | "cod";
-  const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
+  const sessionKey = sessionKeyParam || "order:_:_";
   const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
 
   const subtotal = items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
@@ -20,13 +19,13 @@ export default function OrderSummary() {
   const total = subtotal + shipping - discount;
 
   // Guard invalid direct access
-  const isInvalid = !productId || !variantId || items.length === 0;
+  const isInvalid = items.length === 0;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
         <h1 className="text-2xl font-bold">Invalid order session</h1>
-        <p className="text-muted-foreground">Please return to the product page and start checkout again.</p>
-        <Button onClick={() => navigate(productId ? `/products/${productId}` : "/")}>Go Back</Button>
+        <p className="text-muted-foreground">Please return to the cart or product page and start checkout again.</p>
+        <Button onClick={() => navigate("/")}>Go Back</Button>
       </div>
     );
   }
@@ -35,7 +34,10 @@ export default function OrderSummary() {
     // Basic step: simulate redirect to Stripe checkout page and back
     // In a real flow: call backend to create checkout session, then redirect to the returned URL
     // For now, just navigate back here to simulate return
-    navigate(`/order/success?${new URLSearchParams({ productId: productId || "_", variantId: variantId || "_", flow: "online" }).toString()}`);
+    const qs = new URLSearchParams(searchParams);
+    if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+    qs.set("flow", "online");
+    navigate(`/order/success?${qs.toString()}`);
   };
 
   const onPlaceOrder = async () => {
@@ -47,8 +49,9 @@ export default function OrderSummary() {
       // Disallow COD + Store Pickup (backend will 400, so pre-guard here)
       if (deliveryMode === "Store Pickup") {
         alert("Cash on Delivery is not allowed for Store Pickup. Please choose Online payment.");
-        const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_" }).toString();
-        navigate(`/order/payment?${qs}`);
+        const qs = new URLSearchParams(searchParams);
+        if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+        navigate(`/order/payment?${qs.toString()}`);
         return;
       }
 
@@ -61,8 +64,9 @@ export default function OrderSummary() {
       // Require a shipping address ID for Standard Delivery
       if (!shippingAddressId) {
         alert("Please select a shipping address to place a COD order.");
-        const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_" }).toString();
-        navigate(`/order/payment?${qs}`);
+        const qs = new URLSearchParams(searchParams);
+        if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+        navigate(`/order/payment?${qs.toString()}`);
         return;
       }
 
@@ -79,8 +83,10 @@ export default function OrderSummary() {
       await createOrder(payload as any);
 
       // On success, redirect to success page with session params
-      const qs = new URLSearchParams({ productId: productId || "_", variantId: variantId || "_", flow: "cod" }).toString();
-      navigate(`/order/success?${qs}`);
+  const qs = new URLSearchParams(searchParams);
+  if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+  qs.set("flow", "cod");
+  navigate(`/order/success?${qs.toString()}`);
     } catch (err: any) {
       const backend = err?.original?.response?.data || err?.response?.data;
       const msg = (backend && (backend.message || backend.error)) || err?.message || "Failed to place order";

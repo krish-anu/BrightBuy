@@ -8,19 +8,18 @@ import { Button } from "@/components/ui/button";
 export default function OrderSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const productId = searchParams.get("productId");
-  const variantId = searchParams.get("variantId");
-  const sessionKey = `order:${productId || "_"}:${variantId || "_"}`;
+  const sessionKeyParam = searchParams.get("sessionKey");
+  const sessionKey = sessionKeyParam || "order:_:_";
   const { items } = useOrderSession(sessionKey);
 
   // Guard invalid direct access
-  const isInvalid = !productId || !variantId || items.length === 0;
+  const isInvalid = items.length === 0;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
         <h1 className="text-2xl font-bold">Invalid order session</h1>
-        <p className="text-muted-foreground">Please return to the product page and start checkout again.</p>
-        <Button onClick={() => navigate(productId ? `/products/${productId}` : "/")}>Go Back</Button>
+        <p className="text-muted-foreground">Please return to the cart or product page and start checkout again.</p>
+        <Button onClick={() => navigate("/")}>Go Back</Button>
       </div>
     );
   }
@@ -38,7 +37,7 @@ export default function OrderSuccess() {
       </div>
       <div className="flex gap-2">
         <Button onClick={() => navigate("/")}>Continue Shopping</Button>
-        <Button variant="outline" onClick={() => navigate(`/products/${productId}`)}>View Product</Button>
+        <Button variant="outline" onClick={() => navigate(`/`)}>Back to Home</Button>
       </div>
     </div>
   );
