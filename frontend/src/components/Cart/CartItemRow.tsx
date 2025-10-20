@@ -25,8 +25,8 @@ export function CartItemRow({
     .join(" · ");
 
   return (
-    <div className="grid grid-cols-11 gap-4 border rounded-md p-4 bg-background">
-      <div className="md:col-span-6 col-span-10 flex gap-4 ">
+    <div className="grid grid-cols-11 gap-4 border rounded-md p-4 bg-background items-center">
+      <div className="md:col-span-6 col-span-10 flex items-center gap-4 ">
         <div className=" flex items-center justify-center">
           <Checkbox
             checked={selected}
@@ -55,7 +55,7 @@ export function CartItemRow({
         </div>
       </div>
 
-      <div className="flex flex-col md:items-center justify-between md:col-span-3 col-span-5">
+      <div className="flex items-center justify-center md:col-span-3 col-span-5">
         <QuantitySelector
           value={item.quantity}
           min={1}
@@ -64,11 +64,11 @@ export function CartItemRow({
         />
       </div>
 
-      <div className="flex flex-col justify-between md:col-span-2 col-span-5 text-right pr-2">
-        <p className="font-bold text-base md:text-lg">
+      <div className="flex items-center md:col-span-2 col-span-5 justify-end pr-2">
+        <p className="font-bold text-base md:text-lg mr-2">
           $ {(item.price * item.quantity).toFixed(2)}
         </p>
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"

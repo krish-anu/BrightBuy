@@ -47,7 +47,7 @@ export function OrderSummaryCard({
       {row("Discount", discount)}
       <Separator />
       {row("Total", total, true)}
-      <Button onClick={onNext} className="mt-2 font-semibold gap-2 w-full md:w-auto h-12 text-xl">
+      <Button variant="order" onClick={onNext} className="mt-2 font-semibold gap-2 w-full md:w-auto h-12 text-xl">
         {nextLabel} <CircleArrowRightIcon size={32} />
       </Button>
     </aside>
