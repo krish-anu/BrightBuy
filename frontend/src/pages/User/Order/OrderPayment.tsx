@@ -5,8 +5,10 @@ import ShippingMethod from "@/components/Order/ShippingMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
 import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { getUserProfile } from "@/services/user.services";
  
 
 type ShippingChoice = "standard" | "pickup";
@@ -21,6 +23,7 @@ export type OrderSelections = {
 
 export default function OrderPayment() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const sessionKeyParam: string | null = searchParams.get("sessionKey");
   const productId: string | null = searchParams.get("productId");
@@ -35,6 +38,25 @@ export default function OrderPayment() {
   const shipping = 0;
   const discount = 0;
   const total = subtotal + shipping - discount;
+
+  // Auth guard: check protected profile endpoint and redirect to login 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await getUserProfile();
+      } catch (err: any) {
+        if (!mounted) return;
+        const status = err?.response?.status ?? err?.status;
+        if (status === 401 || status === 403 || status == 404) {
+          navigate("/login", { state: { from: location }, replace: true });
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [navigate, location]);
 
   // Guard against invalid direct access or missing session data
   // Consider the session invalid if there are no items.
