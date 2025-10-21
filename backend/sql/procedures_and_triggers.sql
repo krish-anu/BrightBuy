@@ -49,10 +49,10 @@ BEGIN
   --   SET v_deliveryAddressId = LAST_INSERT_ID();
   -- END IF;
 
-  -- Insert order with Pending for card, Confirmed for COD (matches service logic)
+  -- Insert order with initial warehouse status = 'Pending' (payment handled separately)
   INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
   VALUES (p_userId, p_deliveryMode, p_deliveryAddressId, 0.00, p_deliveryCharge, p_paymentMethod,
-    CASE WHEN p_paymentMethod = 'CashOnDelivery' THEN 'Confirmed' ELSE 'Pending' END);
+    'Pending');
   SET v_orderId = LAST_INSERT_ID();
 
   -- Items must be inserted by caller afterwards with sp_add_order_item; totals will be recomputed
