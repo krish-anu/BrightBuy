@@ -132,28 +132,41 @@ const addOrder = async (req, res, next) => {
       const successUrl = `${FRONTEND_URL}/order/success?session_id={CHECKOUT_SESSION_ID}${qs ? `&${qs}` : ''}`;
       const cancelUrl = `${FRONTEND_URL}/order/payment/${qs ? `?${qs}` : ''}`;
 
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: orderedItems.map(item => ({
-          price_data: {
-            currency: 'usd',
-            product_data: { name: item.productName },
-            unit_amount: Math.round(item.price * 100)
-          },
-          quantity: item.quantity
-        })),
-        mode: 'payment',
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        metadata: { 
-          userId: req.user.id.toString(), 
-          orderId: order.id.toString(), 
-          sessionKey: ctx.sessionKey ? String(ctx.sessionKey) : '',
-          productId: ctx.productId ? String(ctx.productId) : '',
-          variantId: ctx.variantId ? String(ctx.variantId) : '',
-          qty: ctx.qty ? String(ctx.qty) : ''
+      let session;
+      try {
+        session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: orderedItems.map(item => ({
+            price_data: {
+              currency: 'usd',
+              product_data: { name: item.productName },
+              unit_amount: Math.round(item.price * 100)
+            },
+            quantity: item.quantity
+          })),
+          mode: 'payment',
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          metadata: { 
+            userId: req.user.id.toString(), 
+            orderId: order.id.toString(), 
+            sessionKey: ctx.sessionKey ? String(ctx.sessionKey) : '',
+            productId: ctx.productId ? String(ctx.productId) : '',
+            variantId: ctx.variantId ? String(ctx.variantId) : '',
+            qty: ctx.qty ? String(ctx.qty) : ''
+          }
+        });
+      } catch (e) {
+        // Handle transient network/DNS errors to Stripe explicitly
+        const code = e?.code;
+        const type = e?.type;
+        if (type === 'StripeConnectionError' || code === 'ECONNRESET' || code === 'EAI_AGAIN') {
+          console.error('[addOrder] Stripe connection error during session.create', { type, code, message: e?.message });
+          await connection.rollback();
+          return next(new ApiError('Payment service is temporarily unavailable. Please try again in a moment.', 503));
         }
-      });
+        throw e;
+      }
 
       await connection.commit();
       // Return both id and url so clients can redirect via URL (Stripe deprecated redirectToCheckout)
