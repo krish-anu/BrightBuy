@@ -106,20 +106,30 @@ docker compose -f docker-compose.dev.yml exec db mysql -u root -p BrightBuy
 **Backend `.env` example:**
 
 ```env
+# --- Database ---
 DB_HOST=db
 DB_USER=root
 DB_PASSWORD=brightbuy
 DB_NAME=BrightBuy
 DB_DIALECT=mysql
 DB_PORT=3306
-JWT_SECRET=FrenchFriesSecretSauceWithExtraSalt12345
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-AWS_ACCESS_KEY_ID=AKIAYB7IDXKIXUR2IZHB
-AWS_SECRET_ACCESS_KEY=hWAuney/yohTWSbfRKlbP1q7xapiotWJAscxrNRR
+
+# --- App ---
+APP_PORT=8081
+
+# --- Auth ---
+# Generate a long random string
+JWT_SECRET=replace-with-long-random-secret
+
+# --- Stripe ---
+STRIPE_SECRET_KEY=sk_test_replace
+STRIPE_WEBHOOK_SECRET=whsec_replace
+
+# --- AWS S3 (for image uploads) ---
+AWS_ACCESS_KEY_ID=AKIA_REPLACE
+AWS_SECRET_ACCESS_KEY=REPLACE_ME
 AWS_REGION=ap-south-1
 S3_BUCKET_NAME=brightbuy
-APP_PORT=8081
 ```
 
 ---
