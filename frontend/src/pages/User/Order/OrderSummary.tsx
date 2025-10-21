@@ -5,6 +5,7 @@ import { createOrder } from "@/services/order.services";
 import { BillSummary } from "@/components/Order/BillSummary";
 import { listAddresses } from "@/services/address.services";
 import { useEffect, useMemo, useState } from "react";
+// import { loadStripe } from "@stripe/stripe-js";
 
 export default function OrderSummary() {
   const navigate = useNavigate();
@@ -12,6 +13,9 @@ export default function OrderSummary() {
   const sessionKeyParam = searchParams.get("sessionKey");
   const flow = (searchParams.get("flow") || "online") as "online" | "cod";
   const sessionKey = sessionKeyParam || "order:_:_";
+  const productIdParam = searchParams.get("productId");
+  const variantIdParam = searchParams.get("variantId");
+  const qtyParam = searchParams.get("qty");
   const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
 
   // Fetch addresses to format the selected one for display
@@ -56,13 +60,62 @@ export default function OrderSummary() {
   }
 
   const onPayOnline = async () => {
-    // Basic step: simulate redirect to Stripe checkout page and back
-    // In a real flow: call backend to create checkout session, then redirect to the returned URL
-    // For now, just navigate back here to simulate return
-    const qs = new URLSearchParams(searchParams);
-    if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
-    qs.set("flow", "online");
-    navigate(`/order/success?${qs.toString()}`);
+    try {
+      const deliveryMode = shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup";
+      // Stripe checkout typically assumes shipping will be handled; if you disallow store pickup for card, guard here if needed
+
+      const payloadItems = items.map((i) => ({
+        variantId: Number(i.id) || String(i.id),
+        quantity: i.quantity,
+      }));
+
+      const deliveryAddressId = shippingMethod === "standard"
+        ? (isNaN(Number(shippingAddressId)) ? shippingAddressId : Number(shippingAddressId))
+        : undefined;
+
+      const payload = {
+        items: payloadItems,
+        deliveryMode: deliveryMode as "Standard Delivery" | "Store Pickup",
+        paymentMethod: "Card" as const,
+        ...(deliveryAddressId ? { deliveryAddressId } : {}),
+        // Include checkout context for backend to preserve in success/cancel URLs
+        sessionKey,
+        ...(productIdParam ? { productId: isNaN(Number(productIdParam)) ? productIdParam : Number(productIdParam) } : {}),
+        ...(variantIdParam ? { variantId: isNaN(Number(variantIdParam)) ? variantIdParam : Number(variantIdParam) } : {}),
+        ...(qtyParam ? { qty: isNaN(Number(qtyParam)) ? qtyParam : Number(qtyParam) } : {}),
+      } as const;
+
+      const result = await createOrder(payload as any);
+      console.log("Stripe session created", result);
+
+      // Accept possible backend keys
+      const sessionId = (result as any)?.sessionId || (result as any)?.id || (result as any)?.checkoutSessionId;
+      const url = (result as any)?.url || (result as any)?.checkoutUrl;
+      if (!sessionId && !url) {
+        throw new Error("Failed to create Stripe checkout. Please try again.");
+      }
+
+      // Preferred: redirect with server-provided Checkout URL (Stripe deprecated redirectToCheckout)
+      if (url) {
+        window.location.assign(String(url));
+        return;
+      }
+
+      // // Fallback: old flow using Stripe.js with sessionId if needed (for older backends)
+      // const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
+      // if (!publishableKey) throw new Error("Stripe publishable key missing. Set VITE_STRIPE_PUBLISHABLE_KEY");
+      // const stripe = await loadStripe(publishableKey);
+      // if (!stripe) throw new Error("Stripe failed to initialize");
+      // const res = await stripe.redirectToCheckout({ sessionId: String(sessionId) });
+      // if (res && (res as any).error) {
+      //   const error = (res as any).error;
+      //   console.error("Stripe redirect error", error);
+      //   alert(error.message || "Stripe redirection failed");
+      // }
+    } catch (err: any) {
+      console.error("[OrderSummary] online pay failed", err);
+      alert(err?.message || "Payment initialization failed");
+    }
   };
 
   const onPlaceOrder = async () => {
@@ -103,6 +156,11 @@ export default function OrderSummary() {
         deliveryMode: deliveryMode as "Standard Delivery" | "Store Pickup",
         paymentMethod: paymentMethodBackend,
         deliveryAddressId,
+        // Include checkout context for parity with Card flow
+        sessionKey,
+        ...(productIdParam ? { productId: isNaN(Number(productIdParam)) ? productIdParam : Number(productIdParam) } : {}),
+        ...(variantIdParam ? { variantId: isNaN(Number(variantIdParam)) ? variantIdParam : Number(variantIdParam) } : {}),
+        ...(qtyParam ? { qty: isNaN(Number(qtyParam)) ? qtyParam : Number(qtyParam) } : {}),
       } as const;
 
       await createOrder(payload as any);
