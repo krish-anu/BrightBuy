@@ -1191,6 +1191,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
     staffId INT DEFAULT NULL,
     status ENUM('Pending','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
     deliveryDate DATETIME DEFAULT NULL,
+    phone VARCHAR(32) DEFAULT NULL,
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -1616,13 +1617,13 @@ INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPr
 (12,7,1,2499.99,2499.99);
 
 -- Insert Deliveries
-INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate) VALUES
-(1,2,'Delivered','2024-11-16 15:00:00'),
-(3,2,'Shipped',NULL),
-(6,2,'Delivered','2025-04-19 14:30:00'),
-(7,2,'Shipped',NULL),
-(9,2,'Delivered','2025-07-09 16:00:00'),
-(10,2,'Delivered','2025-08-26 11:00:00');
+INSERT IGNORE INTO deliveries (orderId, staffId, status, deliveryDate, phone) VALUES
+(1,2,'Delivered','2024-11-16 15:00:00','9876543210'),
+(3,2,'Shipped',NULL,'9876543211'),
+(6,2,'Delivered','2025-04-19 14:30:00','9876543212'),
+(7,2,'Shipped',NULL,'9876543213'),
+(9,2,'Delivered','2025-07-09 16:00:00','9876543214'),
+(10,2,'Delivered','2025-08-26 11:00:00','9876543215');
 
 -- Insert Payments
 INSERT IGNORE INTO payments (userId, orderId, amount, paymentMethod, status) VALUES
