@@ -42,6 +42,8 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="about" element={<About />} />
             <Route path="login" element={<UserLogin />} />
+            {/* Admin-specific login path (reuses the user login component) */}
+            <Route path="admin/login" element={<UserLogin />} />
             <Route path="signup" element={<UserSignup />} />
             <Route path="shop" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />

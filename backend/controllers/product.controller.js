@@ -475,6 +475,8 @@ const getPopularProduct = async (req, res, next) => {
 
 
     const rows = await query(q);
+    console.log("My popular", rows);
+
     res.status(200).json({ success: true, data: rows });
   } catch (err) { next(err); }
 };
