@@ -1,9 +1,10 @@
 // Orders Queries
 const getAllOrders = `
   SELECT o.*, 
+         o.deliveryAddressText AS deliveryAddress,
          u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone,
          d.id AS deliveryId, d.status AS deliveryStatus, d.staffId AS deliveryStaffId
-  FROM orders o
+  FROM vw_orders_with_address o
   LEFT JOIN users u ON o.userId = u.id
   LEFT JOIN deliveries d ON d.orderId = o.id
   ORDER BY o.orderDate DESC
@@ -11,8 +12,9 @@ const getAllOrders = `
 
 const getOrderById = `
   SELECT o.*, 
+         o.deliveryAddressText AS deliveryAddress,
          u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
-  FROM orders o
+  FROM vw_orders_with_address o
   LEFT JOIN users u ON o.userId = u.id
   WHERE o.id = ?
 `;
@@ -61,7 +63,7 @@ const getCategoryWiseOrders = `
 `;
 
 const getOrderStatusById = `
-  SELECT id, status, deliveryMode, deliveryAddressId, userId, orderDate, createdAt
+  SELECT id, status, deliveryMode, userId, orderDate, createdAt
   FROM orders
   WHERE id = ?
 `;
@@ -69,8 +71,9 @@ const getOrderStatusById = `
 // Orders assigned to a delivery staff (via deliveries.staffId)
 const getOrdersAssignedToStaff = `
   SELECT o.*, 
+         o.deliveryAddressText AS deliveryAddress,
          u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone
-  FROM orders o
+  FROM vw_orders_with_address o
   JOIN deliveries d ON d.orderId = o.id
   LEFT JOIN users u ON o.userId = u.id
   WHERE d.staffId = ?
@@ -80,9 +83,10 @@ const getOrdersAssignedToStaff = `
 // Get orders with status 'Shipped' (include delivery info)
 const getShippedOrders = `
   SELECT o.*, 
+         o.deliveryAddressText AS deliveryAddress,
          u.id as customerId, u.name as customerName, u.email as customerEmail, u.phone as customerPhone,
          d.id AS deliveryId, d.status AS deliveryStatus, d.staffId AS deliveryStaffId
-  FROM orders o
+  FROM vw_orders_with_address o
   LEFT JOIN deliveries d ON d.orderId = o.id
   LEFT JOIN users u ON o.userId = u.id
   WHERE o.status = 'Shipped'

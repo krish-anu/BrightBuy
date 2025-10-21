@@ -49,8 +49,6 @@ CREATE INDEX idx_users_role ON users (role);
 CREATE INDEX idx_orders_userId ON orders (userId);
 CREATE INDEX idx_orders_status ON orders (status);
 CREATE INDEX idx_orders_orderDate ON orders (orderDate);
-CREATE INDEX idx_orders_deliveryAddressId ON orders (deliveryAddressId);
-
 CREATE INDEX idx_order_items_orderId ON order_items (orderId);
 CREATE INDEX idx_order_items_variantId ON order_items (variantId);
 
@@ -113,13 +111,34 @@ ALTER TABLE product_variant_options
 ALTER TABLE orders
   ADD CONSTRAINT fk_orders_user
     FOREIGN KEY (userId) REFERENCES users(id)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT fk_orders_address
-    FOREIGN KEY (deliveryAddressId) REFERENCES addresses(id)
-    ON UPDATE CASCADE ON DELETE SET NULL;
-  ADD CONSTRAINT chk_delivery_address
-    CHECK (deliveryMode = 'Standard Delivery' AND deliveryAddressId IS NOT NULL)
-    OR (deliveryMode='Store Pickup' AND deliveryAddressId IS NULL);
+    ON UPDATE CASCADE ON DELETE RESTRICT; 
+
+-- store order-time address snapshot in a 1:1 child table (row exists only for Standard Delivery)
+CREATE TABLE IF NOT EXISTS order_addresses (
+  orderId INT NOT NULL,
+  line1 VARCHAR(255) NOT NULL,
+  line2 VARCHAR(255) NULL,
+  city VARCHAR(120) NOT NULL,
+  postalCode VARCHAR(32) NULL,
+  PRIMARY KEY (orderId),
+  CONSTRAINT fk_order_addresses_order
+    FOREIGN KEY (orderId) REFERENCES orders(id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE INDEX idx_order_addresses_city ON order_addresses (city);
+
+-- View to simplify reading orders with their address snapshot (3NF)
+CREATE OR REPLACE VIEW vw_orders_with_address AS
+SELECT 
+  o.*, 
+  oa.line1 AS deliveryLine1,
+  oa.line2 AS deliveryLine2,
+  oa.city AS deliveryCity,
+  oa.postalCode AS deliveryPostalCode,
+  TRIM(BOTH ' ' FROM CONCAT_WS(', ', oa.line1, oa.line2, oa.city, oa.postalCode)) AS deliveryAddressText
+FROM orders o
+LEFT JOIN order_addresses oa ON oa.orderId = o.id;
 
 ALTER TABLE order_items
   ADD CONSTRAINT fk_order_items_order

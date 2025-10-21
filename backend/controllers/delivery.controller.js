@@ -19,21 +19,20 @@ const getDeliveries = async (req, res, next) => {
 const getAssignedDeliveriesForStaff = async (req, res, next) => {
   try {
     const { id: userId, role } = req.user;
-    // Normalize address using addresses table (orders now store deliveryAddressId)
-    // Build a human readable address string; fallback to 'Store Pickup' if no address
+    // Join order_addresses snapshot (3NF). For Store Pickup (no snapshot row), show 'Store Pickup'.
     const baseSelect = `
       SELECT 
         d.*, 
         o.id AS orderId, 
         o.totalPrice AS orderTotal, 
-  COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
+        COALESCE(NULLIF(CONCAT_WS(', ', oa.line1, oa.line2, oa.postalCode), ''), 'Store Pickup') AS deliveryAddress,
         DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, 
         o.status AS orderStatus, 
         cust.phone AS customerPhone,
         staff.name AS staffName
       FROM deliveries d
       JOIN orders o ON d.orderId = o.id
-      LEFT JOIN addresses a ON o.deliveryAddressId = a.id
+      LEFT JOIN order_addresses oa ON oa.orderId = o.id
       LEFT JOIN users cust ON o.userId = cust.id
       LEFT JOIN users staff ON d.staffId = staff.id
     `;

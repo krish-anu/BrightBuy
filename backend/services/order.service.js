@@ -28,7 +28,14 @@ const createOrder = async () => { throw new ApiError('createOrder is superseded 
 const addOrderItems = async () => { throw new ApiError('addOrderItems is superseded by stored procedures', 500); };
 
 const getOrderDetails = async (orderId, connection) => {
-  const [orders] = await connection.query(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+  const [orders] = await connection.query(`
+    SELECT o.*, 
+           oa.line1, oa.line2, oa.city, oa.postalCode,
+           TRIM(BOTH ' ' FROM CONCAT_WS(', ', oa.line1, oa.line2, oa.city, oa.postalCode)) AS deliveryAddress
+    FROM orders o
+    LEFT JOIN order_addresses oa ON oa.orderId = o.id
+    WHERE o.id = ?
+  `, [orderId]);
 
   if (!orders.length) {
     throw new ApiError('Order not found', 404);

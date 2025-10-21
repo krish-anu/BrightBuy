@@ -32,7 +32,10 @@ CREATE PROCEDURE sp_create_order(
 )
 BEGIN
   DECLARE v_orderId INT;
-  DECLARE v_deliveryAddressId INT;
+  DECLARE v_line1 VARCHAR(255);
+  DECLARE v_line2 VARCHAR(255);
+  DECLARE v_city VARCHAR(120);
+  DECLARE v_postal VARCHAR(32);
 
   DECLARE exit handler for sqlexception
   BEGIN
@@ -50,10 +53,18 @@ BEGIN
   -- END IF;
 
   -- Insert order with initial warehouse status = 'Pending' (payment handled separately)
-  INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
-  VALUES (p_userId, p_deliveryMode, p_deliveryAddressId, 0.00, p_deliveryCharge, p_paymentMethod,
-    'Pending');
+  INSERT INTO orders (userId, deliveryMode, totalPrice, deliveryCharge, paymentMethod, status)
+  VALUES (p_userId, p_deliveryMode, 0.00, p_deliveryCharge, p_paymentMethod, 'Pending');
   SET v_orderId = LAST_INSERT_ID();
+
+  -- For Standard Delivery, snapshot the address into 1:1 child table (3NF, historical accuracy)
+  IF p_deliveryMode = 'Standard Delivery' AND p_deliveryAddressId IS NOT NULL THEN
+    SELECT a.line1, a.line2, a.city, a.postalCode
+      INTO v_line1, v_line2, v_city, v_postal
+      FROM addresses a WHERE a.id = p_deliveryAddressId LIMIT 1;
+    INSERT INTO order_addresses (orderId, line1, line2, city, postalCode)
+    VALUES (v_orderId, v_line1, v_line2, v_city, v_postal);
+  END IF;
 
   -- Items must be inserted by caller afterwards with sp_add_order_item; totals will be recomputed
 
@@ -64,7 +75,7 @@ BEGIN
 
   COMMIT;
 
-  SELECT v_orderId AS orderId, v_deliveryAddressId AS deliveryAddressId;
+  SELECT v_orderId AS orderId;
 END $$
 
 -- Procedure: add a single order item with stock check and optional stock decrement
