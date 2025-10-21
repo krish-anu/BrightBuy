@@ -84,9 +84,16 @@ const loginUser = async (req, res, next) => {
     }
 
     // Require approval for non-customer roles (except SuperAdmin which is inherently approved)
-    if (user.role !== 'Customer' && user.role !== 'SuperAdmin' && !user.role_accepted) {
+      if (user.role !== 'Customer' && user.role !== 'SuperAdmin' && !user.role_accepted) {
       return res.status(403).json({ message: 'Account pending approval by SuperAdmin' });
     }
+
+      // Prevent admin/staff accounts from logging in through the public/customer flow unless explicitly requested
+      const adminRoles = ['Admin', 'SuperAdmin', 'WarehouseStaff', 'DeliveryStaff'];
+      const adminLoginRequested = !!req.body?.adminLogin;
+      if (adminRoles.includes(user.role) && !adminLoginRequested) {
+        return res.status(403).json({ message: 'Please use the admin login page for admin/staff accounts' });
+      }
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
