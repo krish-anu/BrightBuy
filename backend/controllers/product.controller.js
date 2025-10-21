@@ -471,7 +471,12 @@ const getInventoryStats = async (req, res, next) => {
 const getPopularProduct = async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 10;
-    const rows = await query(productQueries.getPopularProducts, [limit]);
+    const q = `${ productQueries.getPopularProducts } LIMIT ${limit}`;
+
+
+    const rows = await query(q);
+    console.log("My popular", rows);
+
     res.status(200).json({ success: true, data: rows });
   } catch (err) { next(err); }
 };

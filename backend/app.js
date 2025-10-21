@@ -18,6 +18,7 @@ const deliveryRouter = require('./routes/delivery');
 const attributeRouter = require('./routes/attribute');
 const imageRouter = require('./routes/image.upload');
 const chartRouter = require("./routes/chart");
+const cartRouter = require('./routes/cart');
 
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/delivery', deliveryRouter);
 app.use('/api/attribute', attributeRouter);
 app.use('/api/image', imageRouter);
 app.use("/api/chart", chartRouter);
+app.use('/api/cart', cartRouter);
 
 
 app.use(errorMiddleware);

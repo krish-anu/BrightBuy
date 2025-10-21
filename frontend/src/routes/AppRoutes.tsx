@@ -22,6 +22,7 @@ import Layout from "@/components/Layout/Layout";
 import HomePage from "@/pages/User/HomePage";
 import ProductsPage from "@/pages/User/ProductsPage";
 import CartPage from "@/pages/User/CartPage";
+import About from "@/pages/User/About";
 import UserSignup from "@/pages/Authpage/UserSignup";
 import ProductDetailPage from "@/pages/User/ProductDetailsPage";
 import UserLogin from "@/pages/Authpage/UserLogin";
@@ -39,7 +40,10 @@ function App() {
           {/* ========== User Routes ========== */}
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
+            <Route path="about" element={<About />} />
             <Route path="login" element={<UserLogin />} />
+            {/* Admin-specific login path (reuses the user login component) */}
+            <Route path="admin/login" element={<UserLogin />} />
             <Route path="signup" element={<UserSignup />} />
             <Route path="shop" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />

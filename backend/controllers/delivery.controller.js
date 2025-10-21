@@ -2,6 +2,8 @@ const ApiError = require('../utils/ApiError');
 const {query, pool} = require('../config/db');
 const deliveryQueries = require('../queries/deliveryQueries');
 const orderQueries = require('../queries/orderQueries');
+const { EstimateDeliveryDate } = require('../services/delivery.service');
+
 
 const getDeliveries = async (req, res, next) => {
   try {
@@ -173,10 +175,43 @@ const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
   }
 };
 
+const getEstimatedDeliveryDate = async (req, res, next) => {
+  try {
+    const { deliveryAddressId, deliveryMode, hasOutOfStock } = req.body;
+
+    if (deliveryAddressId == null || !deliveryMode || hasOutOfStock == null) {
+      throw new ApiError('deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
+    }
+
+    const connection = await pool.getConnection();
+
+    const deliveryDate = await EstimateDeliveryDate(
+      deliveryAddressId,
+      deliveryMode,
+      hasOutOfStock,
+      connection
+    );
+
+    connection.release();
+
+    return res.status(200).json({
+      success: true,
+      data: deliveryDate,
+    });
+  } catch (error) {
+    console.error("Error in getEstimatedDeliveryDate:", error);
+    next(error);
+  }
+};
+
+
+
+
 module.exports = {
   assignDeliveryStaff,
   getDeliveries, 
   getAssignedDeliveriesForStaff,
   updateDeliveryStatusController,
-  getDeliveryStaffAssignmentSummary
+  getDeliveryStaffAssignmentSummary,
+  getEstimatedDeliveryDate
 };

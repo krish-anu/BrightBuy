@@ -84,9 +84,9 @@ const addOrder = async (req, res, next) => {
       throw new ApiError('Delivery address is required for Standard Delivery', 400);
     }
 
-    if (deliveryMode === 'Store Pickup' && paymentMethod === 'CashOnDelivery') {
-      throw new ApiError('Invalid payment method', 400);
-    }
+    // if (deliveryMode === 'Store Pickup' && paymentMethod === 'CashOnDelivery') {
+    //   throw new ApiError('Invalid payment method', 400);
+    // }
 
     const { totalPrice, deliveryCharge, deliveryDate, orderedItems } =
       await calculateOrderDetails(items, deliveryMode, req.user, connection);
