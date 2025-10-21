@@ -11,11 +11,11 @@ const EstimateDeliveryDate = async (deliveryAddressId, deliveryMode, hasOutOfSto
 
         // Check if main city
         const [rows] = await connection.query(
-            `SELECT isMainCity FROM cities WHERE id = ?`,
+            `SELECT isMainCategory FROM cities WHERE id = ?`,
             [deliveryAddressId]
         );
 
-        if (rows.length > 0 && rows[0].isMainCity) {
+        if (rows.length > 0 && rows[0].isMainCategory) {
             deliveryDays = 5;
         }
 

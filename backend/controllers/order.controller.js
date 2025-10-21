@@ -89,7 +89,7 @@ const addOrder = async (req, res, next) => {
     // }
 
     const { totalPrice, deliveryCharge, deliveryDate, orderedItems } =
-      await calculateOrderDetails(items, deliveryMode, req.user, connection);
+      await calculateOrderDetails(items, deliveryMode, req.user, connection, deliveryAddressId);
 
     const order = await saveOrderToDatabase(
       orderedItems,
