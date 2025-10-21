@@ -207,9 +207,18 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {featuredForCard.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
+          {featuredForCard.map((p) => {
+            const productForCard = {
+              id: p.id,
+              name: p.name,
+              category: p.category,
+              description: "",
+              ProductVariants: [{ price: p.price, imageUrl: p.imageUrl }],
+              variants: [],
+            } as any;
+
+            return <ProductCard key={p.id} product={productForCard} />;
+          })}
         </div>
       </section>
 
