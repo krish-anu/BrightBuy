@@ -113,19 +113,6 @@ ALTER TABLE orders
     FOREIGN KEY (userId) REFERENCES users(id)
     ON UPDATE CASCADE ON DELETE RESTRICT; 
 
--- store order-time address snapshot in a 1:1 child table (row exists only for Standard Delivery)
-CREATE TABLE IF NOT EXISTS order_addresses (
-  orderId INT NOT NULL,
-  line1 VARCHAR(255) NOT NULL,
-  line2 VARCHAR(255) NULL,
-  city VARCHAR(120) NOT NULL,
-  postalCode VARCHAR(32) NULL,
-  PRIMARY KEY (orderId),
-  CONSTRAINT fk_order_addresses_order
-    FOREIGN KEY (orderId) REFERENCES orders(id)
-    ON UPDATE CASCADE ON DELETE CASCADE
-);
-
 CREATE INDEX idx_order_addresses_city ON order_addresses (city);
 
 -- View to simplify reading orders with their address snapshot (3NF)
