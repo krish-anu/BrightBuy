@@ -210,6 +210,23 @@ BEGIN
   WHERE id = OLD.orderId;
 END $$
 
+-- Trigger: only allow snapshot rows for Standard Delivery orders
+DROP TRIGGER IF EXISTS trg_order_addresses_only_for_standard $$
+CREATE TRIGGER trg_order_addresses_only_for_standard
+AFTER INSERT ON order_addresses
+FOR EACH ROW
+BEGIN
+  DECLARE v_mode VARCHAR(32);
+  SELECT deliveryMode INTO v_mode FROM orders WHERE id = NEW.orderId;
+  IF v_mode IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Parent order not found for address snapshot';
+  END IF;
+  IF v_mode <> 'Standard Delivery' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Address snapshot is only allowed for Standard Delivery orders';
+  END IF;
+END $$
+
+
 DELIMITER ;
 
 -- End of procedures_and_triggers.sql

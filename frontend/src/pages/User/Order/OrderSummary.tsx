@@ -64,6 +64,15 @@ export default function OrderSummary() {
       const deliveryMode = shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup";
       // Stripe checkout typically assumes shipping will be handled; if you disallow store pickup for card, guard here if needed
 
+      // Guard: Standard Delivery requires a selected/default delivery address
+      if (deliveryMode === "Standard Delivery" && !shippingAddressId) {
+        alert("Please select a delivery address before continuing to payment.");
+        const qs = new URLSearchParams(searchParams);
+        if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+        navigate(`/order/payment?${qs.toString()}`);
+        return;
+      }
+
       const payloadItems = items.map((i) => ({
         variantId: Number(i.id) || String(i.id),
         quantity: i.quantity,

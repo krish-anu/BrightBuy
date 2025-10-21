@@ -118,20 +118,7 @@ export default function OrderSuccess() {
       // 1) Backend may provide a composed address string
       const backendAddress = (backendOrder as any)?.deliveryAddress;
       if (backendAddress && typeof backendAddress === 'string') return backendAddress;
-
-      // 2) Backend may only provide an address ID; try to resolve via loaded addresses
-      const backendAddressId = (backendOrder as any)?.deliveryAddressId;
-      if (backendAddressId != null) {
-        const addrById = addresses.find((a) => String(a.id) === String(backendAddressId));
-        if (addrById) {
-          const parts = [addrById.line1, addrById.line2, addrById.city, addrById.postalCode].filter(Boolean);
-          return parts.join(', ');
-        }
-        // At least show a placeholder with the ID
-        return `Address #${backendAddressId}`;
-      }
-
-      // 3) Fallback to selected address from session (if still available)
+      // 2) Fallback to selected address from session (if still available)
       if (!shippingAddressId) return undefined;
       const addr = addresses.find((a) => String(a.id) === String(shippingAddressId));
       if (!addr) return undefined;

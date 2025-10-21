@@ -26,7 +26,7 @@ export default function OrderPayment() {
   const productId: string | null = searchParams.get("productId");
   const variantId: string | null = searchParams.get("variantId");
   const sessionKey = sessionKeyParam || `order:${productId || "_"}:${variantId || "_"}`;
-  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, /* shippingAddressId, */ setShippingAddressId, items } = useOrderSession(sessionKey);
+  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
 
   console.log(items);
   // compute summary values
@@ -66,7 +66,6 @@ export default function OrderPayment() {
           <PaymentMethod
             value={paymentMethod}
             onChange={setPaymentMethod}
-            // COD is allowed for Store Pickup as well
           />
 
         </div>
@@ -77,6 +76,11 @@ export default function OrderPayment() {
             discount={discount}
             total={total}
             onNext={() => {
+              // Guard: Standard Delivery requires a selected/default delivery address
+              if (shippingMethod === "standard" && !shippingAddressId) {
+                alert("Please add and select a delivery address to continue with Standard Delivery.");
+                return;
+              }
               // Navigate to summary screen; for online we'll show a Pay button, for COD a Place Order button
               const qs = new URLSearchParams(searchParams);
               const flow = paymentMethod; // "online" | "cod"
