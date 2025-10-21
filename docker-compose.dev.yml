@@ -7,7 +7,9 @@ services:
       MYSQL_DATABASE: BrightBuy
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
+      - ./backend/sql/procedures_and_triggers.sql:/docker-entrypoint-initdb.d/02_procedures_and_triggers.sql:ro
+      - ./backend/sql/constraints_and_indexes.sql:/docker-entrypoint-initdb.d/03_constraints_and_indexes.sql:ro
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     healthcheck:

@@ -91,7 +91,7 @@ const { query } = require('../config/db');
 const ApiError = require('../utils/ApiError');
 const { estimateDeliveryDate } = require('../utils/estimateDeliveryDate');
 
-const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user, connection) => {
+const calculateOrderDetails = async (items, deliveryMode, user, connection) => {
     let totalPrice = 0;
     let hasOutOfStock = false;
     let orderedItems = [];
@@ -158,27 +158,27 @@ const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user,
 
     let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
 
-    let finalAddress = deliveryAddress;
-    if (deliveryMode === 'Standard Delivery') {
-        if (!finalAddress?.city) {
-            if (!user.address || !user.address.line1 || !user.address.city) throw new ApiError('Delivery address is required', 400);
-            finalAddress = { ...user.address };
-        }
+    // let finalAddress = deliveryAddress;
+    // if (deliveryMode === 'Standard Delivery') {
+    //     if (!finalAddress?.city) {
+    //         if (!user.address || !user.address.line1 || !user.address.city) throw new ApiError('Delivery address is required', 400);
+    //         finalAddress = { ...user.address };
+    //     }
 
-        const cities = await connection.query(`SELECT * FROM cities WHERE name = ?`, [finalAddress.city]);
-        let city;
-        if (cities.length === 0) {
-            const result = await connection.query(
-                `INSERT INTO cities (name, isMainCity) VALUES (?, ?)`,
-                [finalAddress.city, 0]
-            );
-            city = { id: result.insertId, name: finalAddress.city, isMainCity: 0 };
-        } else {
-            city = cities[0];
-        }
+    //     const cities = await connection.query(`SELECT * FROM cities WHERE name = ?`, [finalAddress.city]);
+    //     let city;
+    //     if (cities.length === 0) {
+    //         const result = await connection.query(
+    //             `INSERT INTO cities (name, isMainCity) VALUES (?, ?)`,
+    //             [finalAddress.city, 0]
+    //         );
+    //         city = { id: result.insertId, name: finalAddress.city, isMainCity: 0 };
+    //     } else {
+    //         city = cities[0];
+    //     }
 
-        if (city.isMainCity) deliveryDays = 5;
-    }
+    //     if (city.isMainCity) deliveryDays = 5;
+    // }
 
     if (hasOutOfStock) deliveryDays += 3;
 
@@ -197,7 +197,6 @@ const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user,
         deliveryCharge,
         totalAmount,
         deliveryDate,
-        finalAddress,
         orderedItems,
         hasOutOfStock
     };

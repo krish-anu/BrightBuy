@@ -13,12 +13,13 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   return (
     <Card className="product-card rounded-md p-4 w-64">
-      <CardContent className="px-0">
+      <CardContent className="px-0 group">
         <AspectRatio ratio={9 / 11} className="">
           <img
             src={product.ProductVariants?.[0]?.imageUrl || "/src/assets/product-placeholder.png"}
             alt={product.name}
-            className="object-cover h-full w-full rounded-sm"
+            className="object-cover h-full w-full rounded-sm transition-transform duration-300 group-hover:scale-105" 
+            loading="lazy"
           />
         </AspectRatio>
         <CardTitle className="pt-4 text-lg">{product.name}</CardTitle>

@@ -23,10 +23,11 @@ CREATE PROCEDURE sp_create_order(
   IN p_userId INT,
   IN p_deliveryMode VARCHAR(32),
   IN p_paymentMethod VARCHAR(32),
-  IN p_addressLine1 VARCHAR(255),
-  IN p_addressLine2 VARCHAR(255),
-  IN p_city VARCHAR(120),
-  IN p_postalCode VARCHAR(32),
+  -- IN p_addressLine1 VARCHAR(255),
+  -- IN p_addressLine2 VARCHAR(255),
+  -- IN p_city VARCHAR(120),
+  -- IN p_postalCode VARCHAR(32),
+  IN p_deliveryAddressId INT,
   IN p_deliveryCharge DECIMAL(10,2)
 )
 BEGIN
@@ -41,16 +42,16 @@ BEGIN
 
   START TRANSACTION;
 
-  -- Optional address insert for Standard Delivery
-  SET v_deliveryAddressId = NULL;
-  IF p_deliveryMode = 'Standard Delivery' AND p_addressLine1 IS NOT NULL AND p_city IS NOT NULL THEN
-    INSERT INTO addresses (line1, line2, city, postalCode) VALUES (p_addressLine1, p_addressLine2, p_city, p_postalCode);
-    SET v_deliveryAddressId = LAST_INSERT_ID();
-  END IF;
+  -- -- Optional address insert for Standard Delivery
+  -- SET v_deliveryAddressId = NULL;
+  -- IF p_deliveryMode = 'Standard Delivery' AND p_addressLine1 IS NOT NULL AND p_city IS NOT NULL THEN
+  --   INSERT INTO addresses (line1, line2, city, postalCode) VALUES (p_addressLine1, p_addressLine2, p_city, p_postalCode);
+  --   SET v_deliveryAddressId = LAST_INSERT_ID();
+  -- END IF;
 
   -- Insert order with Pending for card, Confirmed for COD (matches service logic)
   INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
-  VALUES (p_userId, p_deliveryMode, v_deliveryAddressId, 0.00, p_deliveryCharge, p_paymentMethod,
+  VALUES (p_userId, p_deliveryMode, p_deliveryAddressId, 0.00, p_deliveryCharge, p_paymentMethod,
     CASE WHEN p_paymentMethod = 'CashOnDelivery' THEN 'Confirmed' ELSE 'Pending' END);
   SET v_orderId = LAST_INSERT_ID();
 
@@ -94,19 +95,20 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Variant not found';
   END IF;
 
-  IF p_backordered = 0 AND (v_stock IS NULL OR v_stock < p_quantity) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock';
-  END IF;
-
-  INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice, isBackOrdered)
-  VALUES (p_orderId, p_variantId, p_quantity, v_price, v_price * p_quantity, p_backordered);
-
-  -- Decrement stock only when not backordered
-  IF p_backordered = 0 THEN
+  IF v_stock IS NULL OR v_stock < p_quantity THEN
+    -- Mark as backordered if stock is insufficient
+    SET p_backordered = 1;
+  ELSE
+    -- Deduct stock if available
     UPDATE product_variants
     SET stockQnt = stockQnt - p_quantity
     WHERE id = p_variantId;
+    SET p_backordered = 0;
   END IF;
+
+  -- Insert the order item
+  INSERT INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice, isBackOrdered)
+  VALUES (p_orderId, p_variantId, p_quantity, v_price, v_price * p_quantity, p_backordered);
 
   -- Recompute order total (excluding deliveryCharge; controller still sets final price if needed)
   UPDATE orders SET totalPrice = fn_calculate_order_total(p_orderId)

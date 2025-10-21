@@ -1,16 +1,12 @@
 const ApiError = require('../utils/ApiError');
 
 // Use DB stored procedures for atomic order creation and item handling
-const saveOrderToDatabase = async (items, userId, deliveryMode, finalAddress, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
+const saveOrderToDatabase = async (items, userId, deliveryMode, deliveryAddressId, deliveryDate, totalPrice, deliveryCharge, paymentMethod, connection, paymentIntentId = null) => {
   // Call sp_create_order to insert optional address (for Standard Delivery), order, and delivery row
-  const line1 = finalAddress?.line1 || null;
-  const line2 = finalAddress?.line2 || null;
-  const city = finalAddress?.city || null;
-  const postalCode = finalAddress?.postalCode || null;
 
   const [spOrderRows] = await connection.query(
-    `CALL sp_create_order(?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, deliveryMode, paymentMethod, line1, line2, city, postalCode, deliveryCharge]
+    `CALL sp_create_order(?, ?, ?, ?, ?)`,
+    [userId, deliveryMode, paymentMethod, deliveryAddressId, deliveryCharge]
   );
   // CALL returns multiple result sets; first set contains our SELECT with orderId
   // Depending on mysql2 version: spOrderRows[0] or spOrderRows[0][0]
