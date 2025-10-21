@@ -124,14 +124,7 @@ export default function OrderSummary() {
       const deliveryMode = shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup";
       const paymentMethodBackend = "CashOnDelivery" as const;
 
-      // Disallow COD + Store Pickup (backend will 400, so pre-guard here)
-      if (deliveryMode === "Store Pickup") {
-        alert("Cash on Delivery is not allowed for Store Pickup. Please choose Online payment.");
-        const qs = new URLSearchParams(searchParams);
-        if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
-        navigate(`/order/payment?${qs.toString()}`);
-        return;
-      }
+      // COD is allowed for Store Pickup now; no pre-guard needed
 
       // Build items payload
       const payloadItems = items.map((i) => ({
@@ -139,8 +132,8 @@ export default function OrderSummary() {
         quantity: i.quantity,
       }));
 
-      // Require a shipping address ID for Standard Delivery
-      if (!shippingAddressId) {
+      // Require a shipping address ID only for Standard Delivery
+      if (deliveryMode === "Standard Delivery" && !shippingAddressId) {
         alert("Please select a shipping address to place a COD order.");
         const qs = new URLSearchParams(searchParams);
         if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
@@ -149,13 +142,15 @@ export default function OrderSummary() {
       }
 
       // Prefer numeric ID if possible
-      const deliveryAddressId = isNaN(Number(shippingAddressId)) ? shippingAddressId : Number(shippingAddressId);
+      const deliveryAddressId = shippingMethod === "standard"
+        ? (isNaN(Number(shippingAddressId)) ? shippingAddressId : Number(shippingAddressId))
+        : undefined;
 
       const payload = {
         items: payloadItems,
         deliveryMode: deliveryMode as "Standard Delivery" | "Store Pickup",
         paymentMethod: paymentMethodBackend,
-        deliveryAddressId,
+  ...(deliveryAddressId ? { deliveryAddressId } : {}),
         // Include checkout context for parity with Card flow
         sessionKey,
         ...(productIdParam ? { productId: isNaN(Number(productIdParam)) ? productIdParam : Number(productIdParam) } : {}),

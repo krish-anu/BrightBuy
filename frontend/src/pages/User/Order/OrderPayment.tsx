@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+ 
 
 type ShippingChoice = "standard" | "pickup";
 type PaymentChoice = "online" | "cod";
@@ -37,7 +37,9 @@ export default function OrderPayment() {
   const total = subtotal + shipping - discount;
 
   // Guard against invalid direct access or missing session data
-  const isInvalid = items.length === 0;
+  // Consider the session invalid if there are no items.
+  // Use a null-safe check in case `items` is undefined/null from the context.
+  const isInvalid = !items || items.length === 0;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
@@ -48,12 +50,7 @@ export default function OrderPayment() {
     );
   }
 
-  // If user selects Store Pickup, force payment method to Online
-  useEffect(() => {
-    if (shippingMethod === "pickup" && paymentMethod === "cod") {
-      setPaymentMethod("online");
-    }
-  }, [shippingMethod, paymentMethod, setPaymentMethod]);
+  // No forced payment change; COD is allowed for Store Pickup now
 
   return (
     <div className="space-y-8">
@@ -62,12 +59,14 @@ export default function OrderPayment() {
         <div className="md:col-span-3 space-y-8">
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
-          <ShippingAddressSection onSelectionChange={setShippingAddressId} />
+          {shippingMethod === "standard" ? (
+            <ShippingAddressSection onSelectionChange={setShippingAddressId} />
+          ) : null}
           <Separator />
           <PaymentMethod
             value={paymentMethod}
             onChange={setPaymentMethod}
-            allowCOD={shippingMethod !== "pickup"}
+            // COD is allowed for Store Pickup as well
           />
 
         </div>
@@ -95,4 +94,4 @@ export default function OrderPayment() {
     </div>
   );
 }
- 
+
