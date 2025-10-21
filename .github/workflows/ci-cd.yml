@@ -100,31 +100,44 @@ jobs:
           BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
         run: |
           missing=0
-          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD; do
+          for v in SERVER_HOST SERVER_USER SERVER_SSH_KEY DOCKER_USERNAME DOCKER_PASSWORD BACKEND_ENV; do
             if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi
           done
           if [ "$missing" -eq 1 ]; then
             echo "❌ One or more required secrets are missing."; exit 1; fi
 
-      - name: Prepare deployment bundle
+      - name: Create backend .env locally
         run: |
-          set -e
-          mkdir -p deploy_bundle/backend
-          cp docker-compose.prod.yml deploy_bundle/
-          cp seed.sql deploy_bundle/
-          # write backend .env from secret if it exists
-          if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
-            printf "%s\n" "${{ secrets.BACKEND_ENV }}" > deploy_bundle/backend/.env
-          fi
+          mkdir -p backend
+          echo "${{ secrets.BACKEND_ENV }}" > backend/.env
 
-      - name: Upload deployment bundle to server
+      - name: Verify files exist before upload
+        run: |
+          echo "Listing repository root:" && ls -la
+          echo "Listing backend directory:" && ls -la backend || true
+          echo "Check specific files:" 
+          for f in docker-compose.prod.yml seed.sql backend/.env; do
+            if [ -f "$f" ]; then echo "✔ exists: $f"; else echo "✖ missing: $f"; fi
+          done
+
+      - name: Ensure remote target directory exists
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            mkdir -p ~/brightbuy
+
+      - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy_bundle/*"
-          target: "~/brightbuy"
+          source: "./docker-compose.prod.yml,./seed.sql,./backend/.env"
+          target: "~/brightbuy/"
+          overwrite: true
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -132,36 +145,40 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          timeout: '90s'
+          timeout: '120s'
           debug: true
           script: |
             set -e
-            export PATH=$PATH:/usr/bin
-
             PROJECT_DIR="$HOME/brightbuy"
-            mkdir -p "$PROJECT_DIR/backend"
             cd "$PROJECT_DIR"
 
-            # Ensure backend/.env exists
-            if [ ! -f backend/.env ]; then
-              echo "❌ Missing backend/.env! Please set BACKEND_ENV secret."
-              exit 1
-            fi
+            echo "=== Verify uploaded files ==="
+            ls -la
 
-            # Docker login (inline secrets)
+            echo "=== Logging into Docker Hub ==="
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # Pull and retag images (inline contexts)
             IMAGE_BASE="${{ env.IMAGE_BASE }}"
             BACKEND_SHA="${{ github.sha }}"
             FRONTEND_SHA="${{ github.sha }}"
+
+            echo "=== Pulling Docker images ==="
             docker pull ${IMAGE_BASE}-backend:$BACKEND_SHA || docker pull ${IMAGE_BASE}-backend:latest
             docker pull ${IMAGE_BASE}-frontend:$FRONTEND_SHA || docker pull ${IMAGE_BASE}-frontend:latest
+
             docker tag ${IMAGE_BASE}-backend:$BACKEND_SHA ${IMAGE_BASE}-backend:latest || true
             docker tag ${IMAGE_BASE}-frontend:$FRONTEND_SHA ${IMAGE_BASE}-frontend:latest || true
 
-            # Deploy with docker-compose
+            echo "=== Deploying containers ==="
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             echo "🚀 Deployment completed successfully on $(hostname)"
+
+            echo "=== Post-deploy diagnostics ==="
+            echo "Docker compose ps:" && docker compose -f docker-compose.prod.yml ps || true
+            echo "Listening ports (80,8081):" && (ss -tulpn | grep -E ":(80|8081)\s" || true)
+            echo "Frontend logs (last 100 lines):" && docker compose -f docker-compose.prod.yml logs --no-color --tail=100 frontend || true
+            echo "Backend logs (last 100 lines):" && docker compose -f docker-compose.prod.yml logs --no-color --tail=100 backend || true
+            echo "Curl localhost:80 headers:" && (curl -sI http://localhost/ || true)
+            echo "Curl backend root:" && (curl -s http://localhost:8081/ || true)

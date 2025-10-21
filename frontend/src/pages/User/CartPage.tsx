@@ -1,26 +1,53 @@
 import { useCart, type CartItem } from "../../../contexts/CartContext";
+import { useOrderSession } from "../../../contexts/OrderContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Trash2, MinusCircle, PlusCircle } from "lucide-react";
-import { Link } from "react-router-dom";
-import { formatCurrencyUSD } from "@/lib/utils";
+import { Link, useNavigate } from "react-router-dom";
 import CartGuard from "@/components/Guards/CartGuard";
+import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
+import { CartItemsSection } from "@/components/Cart/CartItemsSection";
+import { useMemo, useState } from "react";
+import type { OrderItem } from "@/components/Order/OrderItemRow";
 
 interface CartPageProps {
   items: CartItem[];
   removeItem: (variantId: number) => void;
   updateQuantity: (variantId: number, quantity: number) => void;
-  total: number;
   itemsCount: number;
 }
 
-function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount }: CartPageProps) {
+
+function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: CartPageProps) {
+  const navigate = useNavigate();
+  const [sessionKey] = useState<string>(() => `cart:${Date.now()}`);
+  const { setItems: setOrderItems } = useOrderSession(sessionKey);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+    () => new Set(items.map((i) => Number(i.variantId)))
+  );
 
   const handleQuantityChange = (variantId: number, newQuantity: number) => {
     if (newQuantity > 0) {
       updateQuantity(variantId, newQuantity);
     }
   };
+
+  const toggleSelect = (variantId: number, next: boolean) => {
+    setSelectedIds((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(Number(variantId));
+      else copy.delete(Number(variantId));
+      return copy;
+    });
+  };
+
+  const selectedItems = useMemo(
+    () => items.filter((i) => selectedIds.has(Number(i.variantId))),
+    [items, selectedIds]
+  );
+
+  const selectedSubtotal = useMemo(
+    () => selectedItems.reduce((s, it) => s + it.price * it.quantity, 0),
+    [selectedItems]
+  );
 
   if (items.length === 0) {
     return (
@@ -30,7 +57,7 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
           <p className="text-muted-foreground mb-6">
             Looks like you haven't added anything to your cart yet.
           </p>
-          <Link to="/products">
+          <Link to="/shop">
             <Button variant="outline" size="lg">
               Continue Shopping
             </Button>
@@ -41,10 +68,10 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">My Cart</h1>
+          <h1 className="text-3xl md:text-5xl font-black">My Cart</h1>
           <p className="text-muted-foreground">Number of Items: {itemsCount}</p>
         </div>
         <Button
@@ -52,111 +79,55 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
           asChild
           className="text-muted-foreground hover:text-foreground"
         >
-          <Link to="/products">Continue Shopping</Link>
+          <Link to="/shop">Continue Shopping</Link>
         </Button>
       </div>
+      <div className="grid md:grid-cols-4">  
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Cart Items */}
-          <div className="lg:col-span-2 space-y-4">
-          {items.map((item: CartItem) => (
-            <div
-              key={item.variantId}
-              className="flex gap-4 bg-card p-4 rounded-lg shadow-sm"
-            >
-              <div className="w-24 h-24 bg-muted rounded-md overflow-hidden">
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    No Image
-                  </div>
-                )}
-              </div>
+      </div>
 
-              <div className="flex-1">
-                <div className="flex justify-between">
-                  <div>
-                    <h3 className="font-semibold">{item.name}</h3>
-                    {item.color && <p className="text-sm">Color: {item.color}</p>}
-                    {item.size && <p className="text-sm">Size: {item.size}</p>}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrencyUSD(item.price)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Total: {formatCurrencyUSD(item.price * item.quantity)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        handleQuantityChange(item.variantId, item.quantity - 1)
-                      }
-                      disabled={item.quantity <= 1}
-                    >
-                      <MinusCircle className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleQuantityChange(
-                          item.variantId,
-                          parseInt(e.target.value) || 1
-                        )
-                      }
-                      className="w-16 text-center"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        handleQuantityChange(item.variantId, item.quantity + 1)
-                      }
-                    >
-                      <PlusCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(item.variantId)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        {/* Cart Items using shared cart section to mirror order page */}
+        <div className="lg:col-span-3 space-y-4">
+          <CartItemsSection
+            items={items}
+            onRemove={removeItem}
+            onUpdateQuantity={handleQuantityChange}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+          />
         </div>
 
         {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-card p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span>Total Price</span>
-                <span>{formatCurrencyUSD(total)}</span>
-              </div>
-
-              <Button className="w-full" size="lg">
-                PROCEED TO CHECKOUT
-              </Button>
-            </div>
-          </div>
+        <div className="md:col-span-1">
+          <OrderSummaryCard
+            subtotal={selectedSubtotal}
+            shipping={0}
+            discount={0}
+            total={selectedSubtotal}
+            onNext={() => {
+              // Only proceed with selected items; if none, do nothing
+              if (selectedItems.length === 0) return;
+              // Build OrderItem[] from selected cart items and store in global order session
+              const nextItems: OrderItem[] = selectedItems.map((ci) => ({
+                id: ci.variantId,
+                name: ci.name,
+                image: ci.imageUrl || "/src/assets/product-placeholder.png",
+                unitPrice: Number(ci.price),
+                quantity: ci.quantity,
+                attributesText: [
+                  ci.color ? `Color: ${ci.color}` : undefined,
+                  ci.size ? `Size: ${ci.size}` : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(", "),
+              }));
+              setOrderItems(nextItems);
+              const params = new URLSearchParams({ sessionKey });
+              navigate(`/order/confirm?${params.toString()}`);
+            }}
+            nextLabel="Proceed with Selected"
+          />
         </div>
       </div>
     </div>
@@ -164,17 +135,11 @@ function CartPageContent({ items, removeItem, updateQuantity, total, itemsCount 
 }
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, total, itemsCount } = useCart();
+  const { items, removeItem, updateQuantity, itemsCount } = useCart();
   
   return (
     <CartGuard>
-      <CartPageContent
-        items={items}
-        removeItem={removeItem}
-        updateQuantity={updateQuantity}
-        total={total}
-        itemsCount={itemsCount}
-      />
+      <CartPageContent items={items} removeItem={removeItem} updateQuantity={updateQuantity} itemsCount={itemsCount} />
     </CartGuard>
   );
 }

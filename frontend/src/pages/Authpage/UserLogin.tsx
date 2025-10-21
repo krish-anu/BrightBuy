@@ -26,7 +26,13 @@ const IconComponent: React.FC<IconComponentProps> = ({
 
 const UserLogin: React.FC = () => {
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
+  
+  const fromLocation = location.state?.from ?? { pathname: "/" };
+  const fromPath =
+    typeof fromLocation === "string"
+      ? fromLocation
+      : `${fromLocation.pathname || "/"}${fromLocation.search ?? ""}`;
+
   const navigate = useNavigate();
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState<string>("");
@@ -45,14 +51,19 @@ const UserLogin: React.FC = () => {
 
     try {
       const result = await login(email, password);
-      // console.debug('Login result:', result);
 
       if (result?.success === true) {
         const returnedRole = result.user?.role || null;
-        const wantsAdmin = from && from.startsWith('/admin');
+        const wantsAdmin = fromPath && fromPath.startsWith("/admin");
 
+        // safe return path for "payment" 
+        if (fromPath.startsWith("/order/payment")) {
+          navigate(fromPath, { replace: true });
+          return;
+        }
+
+        // console.log('Post-login navigation:', { from: fromPath, returnedRole, wantsAdmin });
         if (returnedRole === 'SuperAdmin') {
-          // SuperAdmin uses the same /admin dashboard route
           navigate('/admin', { replace: true });
           return;
         }
@@ -73,7 +84,7 @@ const UserLogin: React.FC = () => {
         if (wantsAdmin) {
           navigate('/', { replace: true });
         } else {
-          navigate(from, { replace: true });
+          navigate(fromPath, { replace: true });
         }
       } else {
         setError(result?.error || "Login failed");
@@ -194,7 +205,7 @@ const UserLogin: React.FC = () => {
           Don’t have an account?{" "}
           {(() => {
             // If user was redirected here from an admin route, pass admin=true to signup so role dropdown is shown
-            const signupUrl = from && from.startsWith('/admin') ? '/signup?admin=true' : '/signup';
+            const signupUrl = fromPath && fromPath.startsWith('/admin') ? '/signup?admin=true' : '/signup';
             return (
               <Link to={signupUrl} className="text-primary hover:underline font-medium">
                 Create one

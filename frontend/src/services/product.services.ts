@@ -46,6 +46,7 @@ interface InventoryStats {
 export const getProductsPaginated = async (page: number = 1, limit: number = 10, categoryId?: number): Promise<PaginationResponse<any>> => {
   try {
     console.log(`Calling paginated products API - page: ${page}, limit: ${limit}`);
+    // Admin-oriented endpoint (variant-centric)
     const response = await axiosInstance.get(`/api/product/paginated`, {
       params: { page, limit, ...(categoryId ? { categoryId } : {}) },
     });
@@ -59,6 +60,26 @@ export const getProductsPaginated = async (page: number = 1, limit: number = 10,
     return data;
   } catch (error) {
     console.error('Error in getProductsPaginated service:', error);
+    throw error;
+  }
+}
+
+// Frontend storefront: one row per product with a representative variant
+export const getProductsPaginatedFrontend = async (page: number = 1, limit: number = 10, categoryId?: number, parentCategoryId?: number): Promise<PaginationResponse<any>> => {
+  try {
+    console.log(`Calling frontend paginated products API - page: ${page}, limit: ${limit}`);
+    const response = await axiosInstance.get(`/api/product/paginated/frontend`, {
+      params: { page, limit, ...(categoryId ? { categoryId } : {}), ...(parentCategoryId ? { parentCategoryId } : {}) },
+    });
+    console.log('Frontend paginated product service response:', response);
+    if (response.status !== 200) {
+      throw new Error('Failed to fetch paginated products (frontend)');
+    }
+    const data = response.data;
+    console.log('Frontend paginated product service data:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in getProductsPaginatedFrontend service:', error);
     throw error;
   }
 }

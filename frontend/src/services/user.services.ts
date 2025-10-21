@@ -50,3 +50,26 @@ export const approveUser = async (userId: number) => {
         throw error;
     }
 };
+
+
+
+export const getUserProfile = async () => {
+    try{
+        const response = await axiosInstance.get(`/api/users/profile/`);
+        return response.data;
+    } catch(error){
+        console.error("Error fetching user profile:",error);
+        throw error;
+    }
+};
+
+
+export const updateUserProfile = async (profileData: any) => {
+    try{
+        const response = await axiosInstance.patch("/api/users/profile",profileData);
+        return response.data;
+    } catch(error){
+        console.error("Error updating user profile:",error);
+        throw error;
+    }
+}

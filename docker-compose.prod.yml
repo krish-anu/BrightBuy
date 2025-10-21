@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   backend:
     image: anusan2003/brightbuy-backend:latest
@@ -5,17 +7,21 @@ services:
       - ./backend/.env
     ports:
       - "8081:8081"
-    # Ensure backend waits for DB to be healthy before starting
     depends_on:
       db:
         condition: service_healthy
-    # Run production start command (no nodemon)
     command: npm start
+    networks:
+      - brightbuy-network
 
   frontend:
     image: anusan2003/brightbuy-frontend:latest
     ports:
       - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - brightbuy-network
 
   db:
     image: mysql:8
@@ -30,6 +36,12 @@ services:
       interval: 5s
       retries: 10
       start_period: 30s
+    networks:
+      - brightbuy-network
 
 volumes:
   mysql_data:
+
+networks:
+  brightbuy-network:
+    driver: bridge

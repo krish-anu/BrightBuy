@@ -67,10 +67,12 @@ const getOrder = async (req, res, next) => {
 // Add order
 const addOrder = async (req, res, next) => {
   const connection = await pool.getConnection();
+
   await connection.beginTransaction();
+  console.log(query);
 
   try {
-    const { items, paymentMethod, deliveryMode, deliveryAddress } = req.body;
+    const { items, paymentMethod, deliveryMode, deliveryAddressId } = req.body;
 
     // Validation
     if (!items || !deliveryMode || !paymentMethod) {
@@ -78,7 +80,7 @@ const addOrder = async (req, res, next) => {
     }
 
     // Validate delivery address for Standard Delivery
-    if (deliveryMode === 'Standard Delivery' && !deliveryAddress) {
+    if (deliveryMode === 'Standard Delivery' && !deliveryAddressId) {
       throw new ApiError('Delivery address is required for Standard Delivery', 400);
     }
 
@@ -86,15 +88,14 @@ const addOrder = async (req, res, next) => {
       throw new ApiError('Invalid payment method', 400);
     }
 
-    const address = deliveryAddress || null;
-    const { totalPrice, deliveryCharge, deliveryDate, finalAddress, orderedItems } =
-      await calculateOrderDetails(items, deliveryMode, address, req.user, connection);
+    const { totalPrice, deliveryCharge, deliveryDate, orderedItems } =
+      await calculateOrderDetails(items, deliveryMode, req.user, connection);
 
     const order = await saveOrderToDatabase(
       orderedItems,
       req.user.id,
       deliveryMode,
-      finalAddress,
+      deliveryAddressId,
       deliveryDate,
       totalPrice,
       deliveryCharge,

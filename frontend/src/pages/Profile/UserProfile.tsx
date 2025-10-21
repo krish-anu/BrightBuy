@@ -7,8 +7,16 @@ import {
   updateAddress as apiUpdateAddress,
   deleteAddress as apiDeleteAddress,
   makeDefaultAddress,
-  type Address,
 } from "@/services/address.services";
+type Address = {
+  id: number;
+  userId?: number;
+  line1?: string;
+  line2?: string | null;
+  cityId?: number | null;
+  postalCode?: string | null;
+  isDefault?: number | boolean;
+};
 
 /**
  * UserProfile
@@ -79,7 +87,7 @@ export default function UserProfile() {
         addrs = await listAddresses();
       }
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+  const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) {
         setEditingId(def.id);
         setLine1(def.line1 || "");
@@ -154,7 +162,7 @@ export default function UserProfile() {
         ? updated.addresses
         : await listAddresses();
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+      const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
     } catch (err: any) {
       setError(
@@ -193,12 +201,12 @@ export default function UserProfile() {
           line2,
           postalCode,
           cityId,
-          isDefault: addresses.length ? 0 : 1,
+          isDefault: addresses.length === 0,
         });
       }
       const addrs = await listAddresses();
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+  const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
       setSuccess(editingId ? "Address updated" : "Address added");
       setEditingId(null);
@@ -216,7 +224,7 @@ export default function UserProfile() {
       await apiDeleteAddress(id);
       const addrs = await listAddresses();
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+  const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
       setSuccess("Address deleted");
       setTimeout(() => setSuccess(null), 3000);
@@ -235,7 +243,7 @@ export default function UserProfile() {
       await makeDefaultAddress(id);
       const addrs = await listAddresses();
       setAddresses(addrs);
-      const def = addrs.find((a) => a.isDefault === 1) || addrs[0];
+  const def = addrs.find((a: Address) => Number(a.isDefault) === 1) || addrs[0];
       if (def) await handleSelectForEdit(def);
       setSuccess("Default address updated");
       setTimeout(() => setSuccess(null), 3000);
@@ -414,7 +422,7 @@ export default function UserProfile() {
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-primary mb-2">Addresses</h3>
           <div className="space-y-2">
-            {addresses.map((a) => (
+            {addresses.map((a: Address) => (
               <div
                 key={a.id}
                 className={`flex items-center justify-between border rounded p-3 ${

@@ -42,7 +42,7 @@ const updateOrderStatus = `
 
 // Get order items for an order
 const getOrderItemsByOrderId = `
-  SELECT oi.id, oi.quantity, oi.preOrdered, oi.variantId, pv.stockQnt
+  SELECT oi.id, oi.quantity, oi.isBackOrdered, oi.variantId, pv.stockQnt
   FROM order_items oi
   JOIN product_variants pv ON oi.variantId = pv.id
   WHERE oi.orderId = ?;
@@ -51,7 +51,7 @@ const getOrderItemsByOrderId = `
 // Update order item preOrdered flag
 const markItemsProcessed = (itemIds) => {
   const placeholders = itemIds.map(() => '?').join(',');
-  return `UPDATE order_items SET isBackordered = FALSE WHERE id IN (${placeholders});`;
+  return `UPDATE order_items SET isBackOrdered = FALSE WHERE id IN (${placeholders});`;
 };
 
 module.exports = {

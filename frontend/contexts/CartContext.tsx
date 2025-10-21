@@ -43,7 +43,24 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
-      setItems(JSON.parse(savedCart));
+      try {
+        const parsed: CartItem[] = JSON.parse(savedCart) || [];
+        // Sanitize: drop invalid (NaN) ids and coerce numeric fields
+        const cleaned = parsed
+          .filter(it => Number.isFinite(Number(it.variantId)) && Number.isFinite(Number(it.productId)))
+          .map(it => ({
+            ...it,
+            variantId: Number(it.variantId),
+            productId: Number(it.productId),
+            price: Number(it.price),
+            quantity: Math.max(1, Number(it.quantity) || 1),
+          }));
+        setItems(cleaned);
+      } catch {
+        // Corrupt cart; clear it
+        localStorage.removeItem('cart');
+        setItems([]);
+      }
     }
   }, []);
 
@@ -54,19 +71,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   const addItem = (newItem: CartItem) => {
     setItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) => item.variantId === newItem.variantId
-      );
+      // Normalize incoming item
+      const variantId = Number(newItem.variantId);
+      const productId = Number(newItem.productId);
+      const price = Number(newItem.price);
+      const quantity = Math.max(1, Number(newItem.quantity) || 1);
+      if (!Number.isFinite(variantId) || !Number.isFinite(productId)) {
+        console.warn('[cart] Ignoring addItem with invalid ids', newItem);
+        return currentItems;
+      }
+      const normalized: CartItem = { ...newItem, variantId, productId, price, quantity };
+
+      const existingItem = currentItems.find((item) => Number(item.variantId) === variantId);
 
       if (existingItem) {
         return currentItems.map((item) =>
-          item.variantId === newItem.variantId
-            ? { ...item, quantity: item.quantity + newItem.quantity }
+          Number(item.variantId) === variantId
+            ? { ...item, quantity: item.quantity + normalized.quantity }
             : item
         );
       }
 
-      return [...currentItems, newItem];
+      return [...currentItems, normalized];
     });
   };
 
@@ -93,7 +119,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     0
   );
 
-  const itemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Number of displayed variants (distinct rows), not the sum of quantities
+  const itemsCount = items.filter(it => Number.isFinite(Number(it.variantId))).length;
 
   return (
     <CartContext.Provider
