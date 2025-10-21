@@ -45,8 +45,9 @@ const getAssignedDeliveriesForStaff = async (req, res, next) => {
       where.push('d.staffId = ?');
       params.push(userId);
     }
-    // Only show assigned deliveries for this endpoint
-    where.push("d.status = 'Assigned'");
+  // Only show deliveries that are actionable for staff: Assigned or Shipped (in_transit).
+  // Delivered or Cancelled should not be returned so they disappear from staff view after delivery.
+  where.push("d.status IN ('Assigned','Shipped')");
     if (where.length) {
       sql += `WHERE ${where.join(' AND ')}\n`;
     }

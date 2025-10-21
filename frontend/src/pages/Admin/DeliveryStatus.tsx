@@ -30,6 +30,7 @@ const DeliveryStatus: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const IconComponent: React.FC<IconComponentProps> = ({
     iconName,
@@ -151,6 +152,77 @@ const DeliveryStatus: React.FC = () => {
     loadAssigned();
   }, []);
 
+  // Try to open tel: or sms: URIs and provide a clipboard fallback & UI notice so desktop users get feedback
+  const tryOpenUriWithFallback = async (uri: string, fallbackText?: string) => {
+    try {
+      // Attempt navigation which on mobile should open phone/sms handler
+      window.location.href = uri;
+      // Also copy fallback text (phone number) to clipboard for desktop users
+      if (fallbackText && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(fallbackText);
+      }
+      setActionNotice('Opened phone app (or copied number to clipboard)');
+    } catch (err) {
+      // Clipboard or navigation failed — still attempt to copy if possible
+      try {
+        if (fallbackText && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(fallbackText);
+          setActionNotice('Number copied to clipboard');
+        } else {
+          setActionNotice('Action attempted — please try on a mobile device');
+        }
+      } catch (err2) {
+        setActionNotice('Unable to open dialer or copy number');
+      }
+    }
+
+    // Clear notice after 3 seconds
+    setTimeout(() => setActionNotice(null), 3000);
+  };
+
+  const handleCall = async (phone: string) => {
+    const normal = (phone || '').replace(/[^+0-9]/g, '');
+    if (!normal) {
+      setActionNotice('No valid phone number');
+      setTimeout(() => setActionNotice(null), 2000);
+      return;
+    }
+    // Copy to clipboard first for desktop users, then attempt to open tel: URI
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(normal);
+        setActionNotice('Number copied to clipboard');
+      }
+    } catch (err) {
+      // ignore
+    }
+    // small delay to ensure clipboard action is complete for UX
+    setTimeout(() => {
+      tryOpenUriWithFallback(`tel:${normal}`, normal);
+    }, 150);
+  };
+
+  const handleMessage = async (phone: string, deliveryId?: string) => {
+    const normal = (phone || '').replace(/[^+0-9]/g, '');
+    if (!normal) {
+      setActionNotice('No valid phone number');
+      setTimeout(() => setActionNotice(null), 2000);
+      return;
+    }
+    const body = `Hello, this is BrightBuy regarding your delivery ${deliveryId ? `#${deliveryId}` : ''}`.trim();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(normal);
+        setActionNotice('Number copied to clipboard');
+      }
+    } catch (err) {
+      // ignore
+    }
+    setTimeout(() => {
+      tryOpenUriWithFallback(`sms:${normal}?body=${encodeURIComponent(body)}`, normal);
+    }, 150);
+  };
+
   // handled by API call in the Update Status button; old handler removed
 
   return (
@@ -163,6 +235,9 @@ const DeliveryStatus: React.FC = () => {
           Update the status of your assigned deliveries
         </p>
       </div>
+        {actionNotice && (
+          <div className="mb-4 rounded-md bg-indigo-50 text-indigo-800 p-3">{actionNotice}</div>
+        )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Deliveries List */}
@@ -264,7 +339,7 @@ const DeliveryStatus: React.FC = () => {
                   )}
                   {selectedDelivery.status === "in_transit" && (
                     <>
-                      <option value="delivered">Mark as Delivered</option>
+                      <option value="delivered">Mark as jkn Delivered</option>
                       <option value="failed">Mark as Failed</option>
                     </>
                   )}
@@ -335,11 +410,11 @@ const DeliveryStatus: React.FC = () => {
                   Quick Actions
                 </h5>
                 <div className="grid grid-cols-2 gap-2">
-                  <button className="flex items-center justify-center px-3 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200">
-                    <IconComponent iconName="Navigation" size={16} />
-                    <span className="ml-2 text-sm">Get Directions</span>
+                  <button className="flex items-center justify-center px-3 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200" onClick={() => handleMessage(selectedDelivery.customerPhone, selectedDelivery.id)}>
+                    <IconComponent iconName="MessageCircle" size={16} />
+                    <span className="ml-2 text-sm">Send message</span>
                   </button>
-                  <button className="flex items-center justify-center px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                  <button className="flex items-center justify-center px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200" onClick={() => handleCall(selectedDelivery.customerPhone)}>
                     <IconComponent iconName="Phone" size={16} />
                     <span className="ml-2 text-sm">Call Customer</span>
                   </button>
