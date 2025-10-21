@@ -86,7 +86,7 @@ cd BrightBuy
 ### 2. Development with Docker Compose
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+s
 ```
 
 - Backend runs on: `http://localhost:8081`

@@ -71,12 +71,30 @@ export function AddressEditForm({
               <label htmlFor="address-line1" className="text-sm font-medium">
                 Address Line 1
               </label>
-              <Input id="address-line1" value={line1} onChange={(e) => { setLine1(e.target.value); commitAddressChange() }} />
+              <Input
+                id="address-line1"
+                value={line1}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setLine1(v)
+                  // pass the new combined address so we don't rely on state which updates asynchronously
+                  commitAddressChange({ address: `${v}${line2 ? `, ${line2}` : ""}` })
+                }}
+              />
 
               <label htmlFor="address-line2" className="text-sm font-medium mt-2 block">
                 Address Line 2
               </label>
-              <Input id="address-line2" value={line2} onChange={(e) => { setLine2(e.target.value); commitAddressChange() }} />
+              <Input
+                id="address-line2"
+                value={line2}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setLine2(v)
+                  // include the updated line2 when committing
+                  commitAddressChange({ address: `${line1}${v ? `, ${v}` : ""}` })
+                }}
+              />
             </FieldContent>
           </Field>
           <Field>
