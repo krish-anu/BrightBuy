@@ -76,7 +76,7 @@ const variantQueries = {
     FROM product_variants
     WHERE id = ?
   `,
-  // Get preordered order items for a variant, ordered by createdAt
+  // Get backordered order items for a variant, ordered by createdAt
   getPreOrderedItems: `
    SELECT oi.id, oi.orderId, oi.quantity
    FROM order_items oi
@@ -90,7 +90,7 @@ const variantQueries = {
     FROM product_variants
     WHERE stockQnt <= ?
   `,
-  // Update preOrdered flag for order items
+  // Mark backordered items as processed (set isBackOrdered = FALSE)
   markItemsAsProcessed: (itemIds) => {
     const placeholders = itemIds.map(() => '?').join(',');
     const sql = `UPDATE order_items SET isBackOrdered = FALSE WHERE id IN (${ placeholders })`;
@@ -113,7 +113,7 @@ const variantQueries = {
 
   // Get all items for an order
   getOrderItemsByOrderId: `
-  SELECT id, quantity, preOrdered, variantId
+  SELECT id, quantity, isBackOrdered, variantId
   FROM order_items
   WHERE orderId = ?;
 `
