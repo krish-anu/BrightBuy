@@ -28,8 +28,17 @@ const successPayment = async (req, res, next) => {
 
       if (!orderRows.length) throw new ApiError('Order not found', 404);
 
+      // Mark payment as Paid and persist paymentIntentId/session id
+      const paymentRows = await query(orderQueries.getPaymentByOrderId, [orderId]);
+      if (paymentRows.length) {
+        const paymentId = paymentRows[0].id;
+        const intent = session.payment_intent || session.id || null;
+        await query(orderQueries.updatePaymentStatus, ['Paid', intent, paymentId]);
+      }
+
+      // Keep order status as Pending (no change) per current business rule
       const order = orderRows[0];
-      return res.status(200).json({ success: true, data: { paymentStatus: session.payment_status, order } });
+      return res.status(200).json({ success: true, data: { paymentStatus: 'paid', order } });
     }
 
     return res.status(200).json({ success: true, data: { paymentStatus: session.payment_status } });
@@ -62,7 +71,8 @@ const cancelledPayment = async (req, res, next) => {
 
       const paymentRows = await query(orderQueries.getPaymentByOrderId, [orderId]);
       if (paymentRows.length) {
-        await query(orderQueries.updatePaymentStatus, ['Cancelled', paymentRows[0].id]);
+        // updatePaymentStatus expects (status, paymentIntentId, id)
+        await query(orderQueries.updatePaymentStatus, ['Cancelled', null, paymentRows[0].id]);
       }
 
       // Restock items

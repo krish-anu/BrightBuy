@@ -110,7 +110,7 @@ const updateOrderStatus = `
 // `;
 const updatePaymentStatus = `
   UPDATE payments
-  SET status = ?, paymentIntentId = ?
+  SET status = ?, paymentIntentId = ?, updatedAt = NOW()
   WHERE id = ?
 `;
 
