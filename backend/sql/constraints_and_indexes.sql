@@ -117,6 +117,9 @@ ALTER TABLE orders
   ADD CONSTRAINT fk_orders_address
     FOREIGN KEY (deliveryAddressId) REFERENCES addresses(id)
     ON UPDATE CASCADE ON DELETE SET NULL;
+  ADD CONSTRAINT chk_delivery_address
+    CHECK (deliveryMode = 'Standard Delivery' AND deliveryAddressId IS NOT NULL)
+    OR (deliveryMode='Store Pickup' AND deliveryAddressId IS NULL);
 
 ALTER TABLE order_items
   ADD CONSTRAINT fk_order_items_order
