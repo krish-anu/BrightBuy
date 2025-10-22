@@ -98,23 +98,13 @@ export default function ShippingAddressSection({
 						? (res as { data: unknown }).data
 						: res;
 				
-				console.log("Fetched profile payload:", payload);
-
 				const rawAddresses = Array.isArray((payload as any)?.addresses)
                     ? ((payload as any).addresses as any[])
                     : [];
 
 				const mapped = rawAddresses.map(mapToAddress);
 				if (ignore) return;
-								setAddresses(mapped);
-				console.log("Mapped addresses:", mapped);
-								// load cities once to power the city selector
-								try {
-									const allCities = await getAllCities();
-									setCities(allCities);
-								} catch (e) {
-									console.warn("Failed to load cities", e);
-								}
+				setAddresses(mapped);
 				if (!mapped.length) {
 					setSelectedId("");
 					return;
@@ -128,14 +118,12 @@ export default function ShippingAddressSection({
 				});
 			} catch (error) {
 				const status = (error as any)?.response?.status ?? (error as any)?.status;
-				console.log("Fetch profile error status:", status, "typeof:", typeof status);
 				if (status === 401) {
 					// pass current location so login can return the user here
 					navigate("/login", { state: { from: location }, replace: true });
 					return;
 				}
                  if (!ignore) setProfileError(error);
-                 console.log("Error while fetching address data: ",error);
              } finally {
                  if (!ignore) setProfileLoading(false);
              }
@@ -147,6 +135,22 @@ export default function ShippingAddressSection({
 			ignore = true;
 		};
 	}, []);
+
+	// Lazy-load cities only when entering edit mode to reduce initial work
+	useEffect(() => {
+		let cancelled = false;
+		if (isEditing && cities.length === 0) {
+			(async () => {
+				try {
+					const allCities = await getAllCities();
+					if (!cancelled) setCities(allCities);
+				} catch (e) {
+					console.warn("Failed to load cities", e);
+				}
+			})();
+		}
+		return () => { cancelled = true; };
+	}, [isEditing, cities.length]);
 
 	useEffect(() => {
 		if (!addresses.length) {			
@@ -247,8 +251,13 @@ export default function ShippingAddressSection({
 		let resolvedCityId = next.cityId ?? null;
 		if ((resolvedCityId === null || resolvedCityId === undefined) && next.city) {
 			try {
-				const cities = await getAllCities();
-				const match = cities.find((c) => String(c.name).toLowerCase() === String(next.city).toLowerCase());
+				// Prefer already loaded cities; fetch if missing
+				let lookup = cities;
+				if (!lookup || lookup.length === 0) {
+					lookup = await getAllCities();
+					setCities(lookup);
+				}
+				const match = lookup.find((c) => String(c.name).toLowerCase() === String(next.city).toLowerCase());
 				if (match) resolvedCityId = match.id;
 			} catch (e) {
 				console.warn("Unable to resolve cityId from city name", e);
@@ -333,8 +342,12 @@ export default function ShippingAddressSection({
 			} else {
 				const resp = await apiAddAddress(payload as any);
 				const createdId = resp?.id;
-				if (createdId && next.isDefault) {
-					await apiMakeDefault(Number(createdId));
+				if (createdId) {
+					// ensure UI selects the newly created address
+					setSelectedId(String(createdId));
+					if (next.isDefault) {
+						await apiMakeDefault(Number(createdId));
+					}
 				}
 			}
 			// refetch to align with backend truth
@@ -476,7 +489,7 @@ export default function ShippingAddressSection({
 													className="mt-4 text-primary border-primary hover:text-background w-full"
 													onClick={handleAddNew}
 												>
-													Check your details
+													Add new address
 												</Button>
 										</div>
 									</>

@@ -25,16 +25,19 @@ export function AddressEditForm({
   const [line1, setLine1] = useState("")
   const [line2, setLine2] = useState("")
 
+  // Initialize local fields when starting to edit a specific address.
+  // Avoid resetting on every keystroke by depending on the address identity only.
   useEffect(() => {
-    if (!a?.address) {
+    const addr = a?.address ?? ""
+    if (!addr) {
       setLine1("")
       setLine2("")
       return
     }
-    const parts = String(a.address).split(",").map((p) => p.trim()).filter(Boolean)
+    const parts = String(addr).split(",").map((p) => p.trim()).filter(Boolean)
     setLine1(parts[0] || "")
     setLine2(parts.slice(1).join(", ") || "")
-  }, [a?.address])
+  }, [a?.id])
 
   const commitAddressChange = (newPartial: Partial<Address> = {}) => {
     const combinedAddress = [newPartial.address ?? `${line1}${line2 ? `, ${line2}` : ""}`].filter(Boolean)[0]
