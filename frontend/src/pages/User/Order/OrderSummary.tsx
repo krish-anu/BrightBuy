@@ -18,7 +18,12 @@ export default function OrderSummary() {
   const storedKey = (() => {
     try { return sessionStorage.getItem("bb:lastOrderSessionKey"); } catch { return null; }
   })();
-  const sessionKey = sessionKeyParam || storedKey || "order:_:_";
+  const productIdParam = searchParams.get("productId");
+  const variantIdParam = searchParams.get("variantId");
+  const qtyParam = searchParams.get("qty");
+  const derivedKey = `order:${productIdParam || "_"}:${variantIdParam || "_"}`;
+  // Prefer explicit URL param, then key derived from current params, then stored key
+  const sessionKey = sessionKeyParam || derivedKey || storedKey || "order:_:_";
 
   // Normalize URL to keep sessionKey present and remember last key for returns
   useEffect(() => {
@@ -30,9 +35,6 @@ export default function OrderSummary() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
-  const productIdParam = searchParams.get("productId");
-  const variantIdParam = searchParams.get("variantId");
-  const qtyParam = searchParams.get("qty");
   const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
 
   // Fetch addresses to format the selected one for display

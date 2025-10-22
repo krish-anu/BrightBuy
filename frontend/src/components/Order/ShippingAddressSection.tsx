@@ -374,9 +374,7 @@ export default function ShippingAddressSection({
 		if (!selectedAddress) return false;
 		// Prefer id match, fallback to name
 		if (selectedAddress.cityId != null) {
-			console.log(cities)
 			const match = cities.find((c) => String(c.id) === String(selectedAddress.cityId));
-			console.log(match)
 			const flag = match ? (match as any).isMainCategory : undefined;
 			return !!(typeof flag === 'number' ? flag === 1 : flag);
 		}

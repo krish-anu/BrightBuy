@@ -34,7 +34,8 @@ export default function OrderPayment() {
     try { return sessionStorage.getItem("bb:lastOrderSessionKey"); } catch { return null; }
   })();
   const derivedKey = `order:${productId || "_"}:${variantId || "_"}`;
-  const sessionKey = sessionKeyParam || storedKey || derivedKey;
+  // Prefer explicit URL param, then key derived from current params, and only then fall back to stored key
+  const sessionKey = sessionKeyParam || derivedKey || storedKey || "order:_:_";
 
   // Keep last used key in sessionStorage and keep URL in sync for smoother returns
   useEffect(() => {
@@ -81,7 +82,7 @@ export default function OrderPayment() {
     })();
     return () => { ignore = true; };
   }, [items]);
-  console.log(items);
+  
   // compute summary values
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
   
@@ -133,7 +134,7 @@ export default function OrderPayment() {
         <div className="md:col-span-3 space-y-8">
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
-          {shippingMethod === "standard" && paymentMethod !== "cod" ? (
+          {shippingMethod === "standard" ? (
             <ShippingAddressSection
               onSelectionChange={setShippingAddressId}
               initialSelectedId={shippingAddressId}

@@ -23,16 +23,12 @@ export default function OrderConfirm() {
     const qty: number = Number(searchParams.get("qty") || "1");
     
     useEffect(() => {
-        // If global items already present (from cart selection), use them and skip fetch
-        if (globalItems && globalItems.length > 0) {
-            setLocalItems(globalItems);
-            return;
-        }
-        if (productId) {
+        // If URL carries product + variant, treat it as the source of truth for this session
+        if (productId && variantId) {
             getProductByID(productId).then((response: ProductResponse) => {
                 const product: Product = response.data;
                 let selectedVariant: Variant | undefined;
-                if (variantId && product.variants) {
+                if (product.variants) {
                     selectedVariant = product.variants.find((v: Variant | any) => {
                         const vid = (v as any)?.variantId ?? (v as any)?.id;
                         return String(vid) === String(variantId);
@@ -60,10 +56,25 @@ export default function OrderConfirm() {
                 };
                 const nextItems = [item];
                 setLocalItems(nextItems);
-                setGlobalItems(nextItems);
+                // Only update global if there is a meaningful difference
+                const same = (
+                    Array.isArray(globalItems) &&
+                    globalItems.length === 1 &&
+                    String(globalItems[0]?.id) === String(variantId) &&
+                    Number(globalItems[0]?.quantity) === Number(qty) &&
+                    Number(globalItems[0]?.unitPrice) === Number(selectedVariant?.price)
+                );
+                if (!same) setGlobalItems(nextItems);
             });
+            return;
         }
-    }, [productId, qty, variantId, setGlobalItems, globalItems]);
+        // Fallback: if no URL product context, use what we have in session (e.g., cart flow)
+        if (globalItems && globalItems.length > 0) {
+            setLocalItems(globalItems);
+        } else {
+            setLocalItems([]);
+        }
+    }, [productId, variantId, qty, globalItems, setGlobalItems]);
 
 
     // Calculate subtotal by computing lineTotal for each item
@@ -103,9 +114,10 @@ export default function OrderConfirm() {
                     discount={discount}
                     total={total}
                     onNext={() => {
-                        // computes the same session key
-                        const qs = searchParams.toString();
-                        navigate(`/order/payment/${qs ? `?${qs}` : ""}`);
+                        // Ensure sessionKey is included so next pages bind to the same session
+                        const qs = new URLSearchParams(searchParams);
+                        if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey as string);
+                        navigate(`/order/payment?${qs.toString()}`);
                     }}
                     className="mt-12"
                 />
