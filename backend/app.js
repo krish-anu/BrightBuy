@@ -5,6 +5,7 @@ const errorMiddleware = require("./middlewares/error.middleware");
 // Routers
 const webhookRouter = require('./routes/webhook');
 const authRouter = require('./routes/auth');
+const adminRouter = require('./routes/admin');
 const categoryRouter = require('./routes/category');
 const productRouter = require('./routes/product');
 const variantRouter = require('./routes/variant');

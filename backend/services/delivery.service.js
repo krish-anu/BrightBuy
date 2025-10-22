@@ -18,7 +18,7 @@ const EstimateDeliveryDate = async (orderId = null, deliveryAddressId = null, de
         if (rows.length > 0 && rows[0].isMainCategory) {
             deliveryDays = 5;
         }
-        }
+        
 
         
 
