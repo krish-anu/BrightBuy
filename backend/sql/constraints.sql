@@ -60,8 +60,6 @@ ALTER TABLE orders
     FOREIGN KEY (userId) REFERENCES users(id)
     ON UPDATE CASCADE ON DELETE RESTRICT; 
 
-CREATE INDEX idx_order_addresses_city ON order_addresses (city);
-
 -- View to simplify reading orders with their address snapshot (3NF)
 CREATE OR REPLACE VIEW vw_orders_with_address AS
 SELECT 
