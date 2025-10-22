@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, useCallback, useEffect, type ReactNode } from "react";
 export type OrderItem = {
   id: string | number | null;
   name: string;
@@ -32,8 +32,31 @@ const defaultSelection: OrderSelection = {
   shippingAddressId: undefined,
 };
 
+const STORAGE_KEY = "bb:order:selections";
+
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Record<string, OrderSelection>>({});
+  // Rehydrate from sessionStorage to survive refresh/redirects within the same tab
+  const [orders, setOrders] = useState<Record<string, OrderSelection>>(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed as Record<string, OrderSelection>;
+    } catch {
+      // ignore parse errors
+    }
+    return {};
+  });
+
+  // Persist on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+    } catch {
+      // storage may be unavailable; fail silently
+    }
+  }, [orders]);
+
   const value = useMemo<OrderContextValue>(() => ({ orders, setOrders }), [orders]);
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
 }

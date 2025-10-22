@@ -1,4 +1,4 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useOrderSession, type OrderItem as CtxOrderItem } from "../../../../contexts/OrderContext";
 import { Button } from "@/components/ui/button";
 import { createOrder } from "@/services/order.services";
@@ -9,10 +9,25 @@ import { useEffect, useMemo, useState } from "react";
 
 export default function OrderSummary() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const sessionKeyParam = searchParams.get("sessionKey");
   const flow = (searchParams.get("flow") || "online") as "online" | "cod";
-  const sessionKey = sessionKeyParam || "order:_:_";
+  const storedKey = (() => {
+    try { return sessionStorage.getItem("bb:lastOrderSessionKey"); } catch { return null; }
+  })();
+  const sessionKey = sessionKeyParam || storedKey || "order:_:_";
+
+  // Normalize URL to keep sessionKey present and remember last key for returns
+  useEffect(() => {
+    try { sessionStorage.setItem("bb:lastOrderSessionKey", sessionKey); } catch {}
+    if (!sessionKeyParam) {
+      const qs = new URLSearchParams(searchParams);
+      qs.set("sessionKey", sessionKey);
+      navigate({ pathname: location.pathname, search: `?${qs.toString()}` }, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
   const productIdParam = searchParams.get("productId");
   const variantIdParam = searchParams.get("variantId");
   const qtyParam = searchParams.get("qty");

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -20,10 +20,12 @@ export default function ShippingAddressSection({
 	onSelectionChange,
 	shippingMethod,
 	hasOutOfStock,
+	initialSelectedId,
 }: {
 	onSelectionChange?: (addressId: string | undefined, address?: Address) => void;
 	shippingMethod?: "standard" | "pickup";
 	hasOutOfStock?: boolean;
+	initialSelectedId?: string;
 }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -59,12 +61,6 @@ export default function ShippingAddressSection({
 					isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
 				}));
 				setAddresses(mapped);
-				if (mapped.length) {
-					const fallback = mapped.find((a) => a.isDefault) ?? mapped[0];
-					setSelectedId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : fallback.id));
-				} else {
-					setSelectedId("");
-				}
 			} catch (e) {
 				// bubble to caller normally
 				throw e;
@@ -105,17 +101,6 @@ export default function ShippingAddressSection({
 				const mapped = rawAddresses.map(mapToAddress);
 				if (ignore) return;
 				setAddresses(mapped);
-				if (!mapped.length) {
-					setSelectedId("");
-					return;
-				}
-
-				// Try to retain previously selected address 
-				setSelectedId((prev) => {
-					if (prev && mapped.some((addr) => addr.id === prev)) return prev;
-					const fallback = mapped.find((addr) => addr.isDefault) ?? mapped[0];
-					return fallback ? fallback.id : "";
-				});
 			} catch (error) {
 				const status = (error as any)?.response?.status ?? (error as any)?.status;
 				if (status === 401) {
@@ -152,25 +137,36 @@ export default function ShippingAddressSection({
 		return () => { cancelled = true; };
 	}, [isEditing, cities.length]);
 
+	// Establish/restore selection when address list or initialSelectedId changes
 	useEffect(() => {
-		if (!addresses.length) {			
+		if (!addresses.length) {
 			setSelectedId("");
 			return;
 		}
+		setSelectedId((prev) => {
+			// If parent provided a selection and it's valid, prefer it unless current prev is already valid
+			if (initialSelectedId && addresses.some((a) => a.id === initialSelectedId)) {
+				if (prev && addresses.some((a) => a.id === prev)) return prev; // keep current valid selection
+				return initialSelectedId;
+			}
+			// Else, keep current if still valid; otherwise fall back to default/first
+			if (prev && addresses.some((a) => a.id === prev)) return prev;
+			const fb = addresses.find((a) => a.isDefault) ?? addresses[0];
+			return fb ? fb.id : "";
+		});
+	}, [addresses, initialSelectedId]);
 
-		if (!selectedId || !addresses.some((addr) => addr.id === selectedId)) {
-			const fallback = addresses.find((addr) => addr.isDefault) ?? addresses[0];
-			if (fallback) setSelectedId(fallback.id);
-		}
-	}, [addresses, selectedId]);
-
-	// bubble selection changes up
+	// bubble selection changes up, but avoid redundant emits to prevent parent-child loops
+	const lastEmittedIdRef = useRef<string | undefined>(undefined);
 	useEffect(() => {
-		if (onSelectionChange) {
-			const selected = addresses.find((a) => a.id === selectedId);
-			onSelectionChange(selectedId || undefined, selected);
-		}
-	}, [selectedId, addresses, onSelectionChange]);
+		if (!onSelectionChange) return;
+		if (lastEmittedIdRef.current === selectedId) return;
+		const selected = addresses.find((a) => a.id === selectedId);
+		onSelectionChange(selectedId || undefined, selected);
+		lastEmittedIdRef.current = selectedId;
+		// Only depend on selectedId/onSelectionChange; addresses is used for lookup but doesn't affect emitted id
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedId, onSelectionChange]);
 
 	useEffect(() => {
 		if (!open) {

@@ -29,7 +29,23 @@ export default function OrderPayment() {
   const sessionKeyParam: string | null = searchParams.get("sessionKey");
   const productId: string | null = searchParams.get("productId");
   const variantId: string | null = searchParams.get("variantId");
-  const sessionKey = sessionKeyParam || `order:${productId || "_"}:${variantId || "_"}`;
+  // Restore the session key if it's missing after refresh/redirect within same tab
+  const storedKey = (() => {
+    try { return sessionStorage.getItem("bb:lastOrderSessionKey"); } catch { return null; }
+  })();
+  const derivedKey = `order:${productId || "_"}:${variantId || "_"}`;
+  const sessionKey = sessionKeyParam || storedKey || derivedKey;
+
+  // Keep last used key in sessionStorage and keep URL in sync for smoother returns
+  useEffect(() => {
+    try { sessionStorage.setItem("bb:lastOrderSessionKey", sessionKey); } catch {}
+    if (!sessionKeyParam) {
+      const qs = new URLSearchParams(searchParams);
+      qs.set("sessionKey", sessionKey);
+      navigate({ pathname: location.pathname, search: `?${qs.toString()}` }, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
   const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
   // Derive delivery mode from user selection
   const deliveryMode = useMemo(() => (shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup"), [shippingMethod]);
@@ -122,6 +138,7 @@ export default function OrderPayment() {
           {shippingMethod === "standard" ? (
             <ShippingAddressSection
               onSelectionChange={setShippingAddressId}
+              initialSelectedId={shippingAddressId}
               shippingMethod={shippingMethod}
               hasOutOfStock={hasOutOfStock}
             />
