@@ -1181,7 +1181,6 @@ CREATE TABLE IF NOT EXISTS orders (
     orderDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     totalPrice DECIMAL(10,2) NOT NULL,
     deliveryMode ENUM('Store Pickup','Standard Delivery') NOT NULL,
-    deliveryAddressId INT DEFAULT NULL,
     deliveryCharge DECIMAL(10,2) NOT NULL DEFAULT '0.00',
     status ENUM('Pending','Confirmed','Assigned','Shipped','Delivered','Cancelled') NOT NULL DEFAULT 'Pending',
     paymentMethod ENUM('Card','CashOnDelivery') NOT NULL,
@@ -1219,6 +1218,19 @@ CREATE TABLE IF NOT EXISTS payments (
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- store order-time address snapshot in a 1:1 child table (row exists only for Standard Delivery)
+CREATE TABLE IF NOT EXISTS order_addresses (
+  orderId INT NOT NULL,
+  line1 VARCHAR(255) NOT NULL,
+  line2 VARCHAR(255) NULL,
+  city VARCHAR(120) NOT NULL,
+  postalCode VARCHAR(32) NULL,
+  PRIMARY KEY (orderId),
+  CONSTRAINT fk_order_addresses_order
+    FOREIGN KEY (orderId) REFERENCES orders(id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+);
 
 -- Clear existing data
 SET FOREIGN_KEY_CHECKS=0;
@@ -1583,19 +1595,19 @@ INSERT IGNORE INTO addresses (id, userId, line1, line2, city, cityId, postalCode
 (5,7,'654 Maple Rd','Suite 10','Philadelphia',5,'19019',1);
 
 -- Insert Sample Orders (covering different time periods)
-INSERT IGNORE INTO orders (id, userId, orderDate, totalPrice, deliveryMode, deliveryAddressId, deliveryCharge, status, paymentMethod) VALUES
-(1,3,'2024-11-15 10:30:00',1314.99,'Standard Delivery',1,15.00,'Delivered','Card'),
-(2,4,'2024-12-05 14:45:00',399.99,'Store Pickup',NULL,0.00,'Delivered','Card'),
-(3,5,'2025-01-10 09:15:00',311.99,'Standard Delivery',3,12.00,'Shipped','CashOnDelivery'),
-(4,3,'2025-02-14 16:20:00',189.99,'Standard Delivery',1,10.00,'Confirmed','Card'),
-(5,6,'2025-03-20 11:30:00',449.99,'Store Pickup',NULL,0.00,'Delivered','Card'),
-(6,4,'2025-04-18 13:45:00',1514.99,'Standard Delivery',2,15.00,'Delivered','Card'),
-(7,7,'2025-05-22 10:00:00',699.99,'Standard Delivery',5,12.00,'Shipped','Card'),
-(8,5,'2025-06-10 15:30:00',249.99,'Store Pickup',NULL,0.00,'Confirmed','CashOnDelivery'),
-(9,3,'2025-07-08 12:15:00',3514.99,'Standard Delivery',1,15.00,'Delivered','Card'),
-(10,6,'2025-08-25 14:20:00',829.99,'Standard Delivery',4,20.00,'Delivered','Card'),
-(11,4,'2025-09-12 11:45:00',179.99,'Store Pickup',NULL,0.00,'Confirmed','Card'),
-(12,7,'2025-10-01 16:30:00',2514.99,'Standard Delivery',5,15.00,'Pending','Card');
+INSERT IGNORE INTO orders (id, userId, orderDate, totalPrice, deliveryMode, deliveryCharge, status, paymentMethod) VALUES
+(1,3,'2024-11-15 10:30:00',1314.99,'Standard Delivery',15.00,'Delivered','Card'),
+(2,4,'2024-12-05 14:45:00',399.99,'Store Pickup',0.00,'Delivered','Card'),
+(3,5,'2025-01-10 09:15:00',311.99,'Standard Delivery',12.00,'Shipped','CashOnDelivery'),
+(4,3,'2025-02-14 16:20:00',189.99,'Standard Delivery',10.00,'Confirmed','Card'),
+(5,6,'2025-03-20 11:30:00',449.99,'Store Pickup',0.00,'Delivered','Card'),
+(6,4,'2025-04-18 13:45:00',1514.99,'Standard Delivery',15.00,'Delivered','Card'),
+(7,7,'2025-05-22 10:00:00',699.99,'Standard Delivery',12.00,'Shipped','Card'),
+(8,5,'2025-06-10 15:30:00',249.99,'Store Pickup',0.00,'Confirmed','CashOnDelivery'),
+(9,3,'2025-07-08 12:15:00',3514.99,'Standard Delivery',15.00,'Delivered','Card'),
+(10,6,'2025-08-25 14:20:00',829.99,'Standard Delivery',20.00,'Delivered','Card'),
+(11,4,'2025-09-12 11:45:00',179.99,'Store Pickup',0.00,'Confirmed','Card'),
+(12,7,'2025-10-01 16:30:00',2514.99,'Standard Delivery',15.00,'Pending','Card');
 
 -- Insert Order Items
 INSERT IGNORE INTO order_items (orderId, variantId, quantity, unitPrice, totalPrice) VALUES

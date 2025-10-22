@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { BillSummary } from "@/components/Order/BillSummary";
 import { useEffect, useMemo, useState } from "react";
 import { listAddresses } from "@/services/address.services";
+import { verifyPaymentSuccess } from "@/services/payment.services";
+import { getOrderById, type Order as BackendOrder } from "@/services/order.services";
+import { estimatedDeliveryDate } from "@/services/delivery.services";
 
 export default function OrderSuccess() {
   const navigate = useNavigate();
@@ -14,8 +17,13 @@ export default function OrderSuccess() {
   const sessionKeyParam = searchParams.get("sessionKey");
   const sessionKey = sessionKeyParam || "order:_:_";
   const flow = (searchParams.get("flow") || "online") as "online" | "cod";
+  const sessionId = searchParams.get("session_id");
   const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
   const [addresses, setAddresses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(flow === "online");
+  const [paid, setPaid] = useState(flow === "cod" ? true : false);
+  const [error, setError] = useState<string | null>(null);
+  const [backendOrder, setBackendOrder] = useState<BackendOrder | null>(null);
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -29,8 +37,53 @@ export default function OrderSuccess() {
     return () => { mounted = false; };
   }, []);
 
-  // Guard invalid direct access
-  const isInvalid = items.length === 0;
+  // For online flow, verify payment with backend using session_id before showing success
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (flow !== "online") return; // COD handled separately
+      if (!sessionId) {
+        setError("Missing payment session. If you paid, please check your email for confirmation.");
+        setLoading(false);
+        return;
+      }
+      try {
+        const resp = await verifyPaymentSuccess(sessionId);
+        // Backend returns success: true even if unpaid, with data.paymentStatus
+        const status = resp.data?.paymentStatus || "unpaid";
+        if (!mounted) return;
+        if (status === "paid") {
+          setPaid(true);
+          setError(null);
+          const returnedOrder: any = resp.data?.order;
+          const id = returnedOrder?.id;
+          // Show what we have immediately (may not include items), then fetch full details
+          if (returnedOrder) setBackendOrder(returnedOrder as BackendOrder);
+          if (id) {
+            try {
+              const fullOrder = await getOrderById(Number(id));
+              if (mounted) setBackendOrder(fullOrder);
+            } catch (e) {
+              console.warn("[OrderSuccess] failed to fetch full order details", e);
+            }
+          }
+        } else {
+          setPaid(false);
+          setError("Payment not completed. If funds were deducted, contact support with your order details.");
+        }
+      } catch (e: any) {
+        if (!mounted) return;
+        console.error("[OrderSuccess] verify payment failed", e);
+        setError(e?.message || "Failed to verify payment. Please refresh this page.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [flow, sessionId]);
+
+  // Guard invalid direct access — allow if we have backend order or while loading verification
+  const isInvalid = items.length === 0 && !backendOrder && !loading;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
@@ -41,32 +94,123 @@ export default function OrderSuccess() {
     );
   }
 
-  const subtotal = items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
-  const shipping = 0;
+  // Prefer backend order details if available (post-payment), else fall back to local session
+  const billItems = (backendOrder?.items && backendOrder.items.length > 0)
+    ? backendOrder.items.map((i: any) => ({
+        id: i.variantId ?? i.id,
+        name: i.productName || i.variantName || `Item #${i.variantId ?? i.id}`,
+        unitPrice: Number(i.unitPrice ?? i.price ?? 0),
+        quantity: Number(i.quantity ?? 1),
+      }))
+    : items.map((i: CtxOrderItem) => ({ id: i.id, name: i.name, unitPrice: i.unitPrice, quantity: i.quantity }));
+
+  const subtotal = (backendOrder?.items && backendOrder.items.length > 0)
+    ? backendOrder.items.reduce((sum: number, i: any) => sum + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 1), 0)
+    : items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
+
+  const shipping = backendOrder ? Number(backendOrder.deliveryCharge ?? 0) : 0;
   const discount = 0;
-  const total = subtotal + shipping - discount;
-  const paymentStatus = flow === "online" ? "Paid (Online)" : "Payment Due (Cash on Delivery)";
+  const total = backendOrder ? Number(backendOrder.totalPrice ?? (subtotal + shipping)) : (subtotal + shipping - discount);
+  const paymentStatus = flow === "online" ? (paid ? "Paid (Online)" : "Unpaid") : "Payment Due (Cash on Delivery)";
+  const [etaText, setEtaText] = useState<string | undefined>(undefined);
+
+  // Fetch estimated delivery date for invoice display
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        // Determine delivery mode preference
+        const deliveryMode = backendOrder?.deliveryMode || (shippingMethod === 'standard' ? 'Standard Delivery' : 'Store Pickup');
+        if (deliveryMode !== 'Standard Delivery') {
+          if (!ignore) setEtaText(undefined);
+          return;
+        }
+        if (backendOrder?.id) {
+          const resp = await estimatedDeliveryDate(Number(backendOrder.id), null, 'Standard Delivery', false);
+          const data = (resp as any)?.data;
+          let text: string | undefined;
+          const toNice = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+          if (typeof data === 'string') {
+            const d = new Date(data); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+          } else if (data && typeof data === 'object') {
+            if (data.date || data.estimatedDate) {
+              const raw = data.date || data.estimatedDate; const d = new Date(raw); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+            } else if (typeof data.etaDays === 'number') {
+              const d = new Date(); d.setDate(d.getDate() + data.etaDays); text = `Arrives by ${toNice(d)}`;
+            }
+          }
+          if (!ignore) setEtaText(text);
+          return;
+        }
+        // fallback: try with address id from session when no backend order id (e.g., COD immediate success)
+        const numericId = shippingAddressId && /^\d+$/.test(String(shippingAddressId)) ? Number(shippingAddressId) : null;
+        if (!numericId) { if (!ignore) setEtaText(undefined); return; }
+        const resp = await estimatedDeliveryDate(null, numericId, 'Standard Delivery', false);
+        const data = (resp as any)?.data;
+        let text: string | undefined;
+        const toNice = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+        if (typeof data === 'string') {
+          const d = new Date(data); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+        } else if (data && typeof data === 'object') {
+          if (data.date || data.estimatedDate) {
+            const raw = data.date || data.estimatedDate; const d = new Date(raw); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+          } else if (typeof data.etaDays === 'number') {
+            const d = new Date(); d.setDate(d.getDate() + data.etaDays); text = `Arrives by ${toNice(d)}`;
+          }
+        }
+        if (!ignore) setEtaText(text);
+      } catch (e) {
+        if (!ignore) setEtaText(undefined);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [backendOrder, shippingMethod, shippingAddressId]);
   const deliveryAddressText = useMemo(() => {
-    if (shippingMethod !== 'standard' || !shippingAddressId) return undefined;
-    const addr = addresses.find((a) => String(a.id) === String(shippingAddressId));
-    if (!addr) return undefined;
-    const parts = [addr.line1, addr.line2, addr.city, addr.postalCode].filter(Boolean);
-    return parts.join(", ");
-  }, [addresses, shippingMethod, shippingAddressId]);
+    // Prefer backend-reported delivery address if present
+    const deliveryMode = backendOrder?.deliveryMode || (shippingMethod === 'standard' ? 'Standard Delivery' : 'Store Pickup');
+    if (deliveryMode === 'Standard Delivery') {
+      // 1) Backend may provide a composed address string
+      const backendAddress = (backendOrder as any)?.deliveryAddress;
+      if (backendAddress && typeof backendAddress === 'string') return backendAddress;
+      // 2) Fallback to selected address from session (if still available)
+      if (!shippingAddressId) return undefined;
+      const addr = addresses.find((a) => String(a.id) === String(shippingAddressId));
+      if (!addr) return undefined;
+      const parts = [addr.line1, addr.line2, addr.city, addr.postalCode].filter(Boolean);
+      return parts.join(', ');
+    }
+    return undefined;
+  }, [addresses, backendOrder, shippingMethod, shippingAddressId]);
 
   return (
     <div className="space-y-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Order Successful</h1>
-        <p className="text-muted-foreground">Thank you for your purchase! Your order has been recorded.</p>
-      </div>
+      {loading ? (
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Verifying payment…</h1>
+          <p className="text-muted-foreground">Please wait while we confirm your payment status.</p>
+        </div>
+      ) : error ? (
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">Payment Verification</h1>
+          <p className="text-red-600">{error}</p>
+          <div>
+            <Button variant="outline" onClick={() => navigate("/order/payment?sessionKey=" + sessionKey)}>Return to Payment</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Order Successful</h1>
+          <p className="text-muted-foreground">Thank you for your purchase! Your order has been recorded.</p>
+        </div>
+      )}
 
       <BillSummary
         title="Invoice"
-        items={items.map((i: CtxOrderItem) => ({ id: i.id, name: i.name, unitPrice: i.unitPrice, quantity: i.quantity }))}
-        shippingMethod={shippingMethod}
+        items={billItems}
+        shippingMethod={backendOrder ? (backendOrder.deliveryMode === 'Standard Delivery' ? 'standard' : 'pickup') : shippingMethod}
         paymentMethod={paymentMethod}
         deliveryAddressText={deliveryAddressText}
+        estimatedDeliveryText={etaText}
         paymentStatus={paymentStatus}
         subtotal={subtotal}
         shipping={shipping}

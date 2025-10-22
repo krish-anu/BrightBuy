@@ -22,6 +22,7 @@ export function BillSummary({
   shippingMethod,
   paymentMethod,
   deliveryAddressText,
+  estimatedDeliveryText,
   paymentStatus,
   subtotal,
   shipping,
@@ -35,6 +36,7 @@ export function BillSummary({
   shippingMethod: string;
   paymentMethod: string;
   deliveryAddressText?: string;
+  estimatedDeliveryText?: string;
   paymentStatus?: string;
   subtotal: number;
   shipping: number;
@@ -105,18 +107,28 @@ export function BillSummary({
           <h3 className="text-sm font-semibold">Payment Method</h3>
           <p className="text-sm text-muted-foreground uppercase">{paymentMethod}</p>
         </div>
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold">Delivery Address</h3>
-          <p className="text-sm text-muted-foreground">
-            {shippingMethod?.toLowerCase() !== "standard" ? (
-              <>Store Pickup</>
-            ) : deliveryAddressText ? (
-              <>{deliveryAddressText}</>
-            ) : (
-              <>Not selected</>
-            )}
-          </p>
-        </div>
+        {/* Hide address for COD as requested */}
+        {paymentMethod?.toLowerCase() !== 'cod' && (
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Delivery Address</h3>
+            <p className="text-sm text-muted-foreground">
+              {shippingMethod?.toLowerCase() !== "standard" ? (
+                <>Store Pickup</>
+              ) : deliveryAddressText ? (
+                <>{deliveryAddressText}</>
+              ) : (
+                <>Not selected</>
+              )}
+            </p>
+          </div>
+        )}
+
+        {shippingMethod?.toLowerCase() === 'standard' && estimatedDeliveryText ? (
+          <div className="space-y-1 md:col-span-3">
+            <h3 className="text-sm font-semibold">Estimated Delivery</h3>
+            <p className="text-sm text-muted-foreground">{estimatedDeliveryText}</p>
+          </div>
+        ) : null}
         {paymentStatus ? (
           <div className="space-y-1 md:col-span-3">
             <h3 className="text-sm font-semibold">Payment Status</h3>

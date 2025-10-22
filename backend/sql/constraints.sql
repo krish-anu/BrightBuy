@@ -58,10 +58,19 @@ ALTER TABLE product_variant_options
 ALTER TABLE orders
   ADD CONSTRAINT fk_orders_user
     FOREIGN KEY (userId) REFERENCES users(id)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT fk_orders_address
-    FOREIGN KEY (deliveryAddressId) REFERENCES addresses(id)
-    ON UPDATE CASCADE ON DELETE SET NULL;
+    ON UPDATE CASCADE ON DELETE RESTRICT; 
+
+-- View to simplify reading orders with their address snapshot (3NF)
+CREATE OR REPLACE VIEW vw_orders_with_address AS
+SELECT 
+  o.*, 
+  oa.line1 AS deliveryLine1,
+  oa.line2 AS deliveryLine2,
+  oa.city AS deliveryCity,
+  oa.postalCode AS deliveryPostalCode,
+  TRIM(BOTH ' ' FROM CONCAT_WS(', ', oa.line1, oa.line2, oa.city, oa.postalCode)) AS deliveryAddressText
+FROM orders o
+LEFT JOIN order_addresses oa ON oa.orderId = o.id;
 
 ALTER TABLE order_items
   ADD CONSTRAINT fk_order_items_order

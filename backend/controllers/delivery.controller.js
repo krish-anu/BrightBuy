@@ -19,21 +19,20 @@ const getDeliveries = async (req, res, next) => {
 const getAssignedDeliveriesForStaff = async (req, res, next) => {
   try {
     const { id: userId, role } = req.user;
-    // Normalize address using addresses table (orders now store deliveryAddressId)
-    // Build a human readable address string; fallback to 'Store Pickup' if no address
+    // Join order_addresses snapshot (3NF). For Store Pickup (no snapshot row), show 'Store Pickup'.
     const baseSelect = `
       SELECT 
         d.*, 
         o.id AS orderId, 
         o.totalPrice AS orderTotal, 
-  COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
+        COALESCE(NULLIF(CONCAT_WS(', ', oa.line1, oa.line2, oa.postalCode), ''), 'Store Pickup') AS deliveryAddress,
         DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, 
         o.status AS orderStatus, 
         cust.phone AS customerPhone,
         staff.name AS staffName
       FROM deliveries d
       JOIN orders o ON d.orderId = o.id
-      LEFT JOIN addresses a ON o.deliveryAddressId = a.id
+      LEFT JOIN order_addresses oa ON oa.orderId = o.id
       LEFT JOIN users cust ON o.userId = cust.id
       LEFT JOIN users staff ON d.staffId = staff.id
     `;
@@ -178,18 +177,33 @@ const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
 
 const getEstimatedDeliveryDate = async (req, res, next) => {
   try {
-    const { deliveryAddressId, deliveryMode, hasOutOfStock } = req.body;
+    // Accept both GET (query) and POST (body)
+    const src = req.method === 'GET' ? (req.query || {}) : (req.body || {});
+    let { deliveryAddressId, orderId, deliveryMode, hasOutOfStock } = src;
 
-    if (deliveryAddressId == null || !deliveryMode || hasOutOfStock == null) {
-      throw new ApiError('deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
+    // Normalize types
+    const orderIdNum = orderId != null && orderId !== '' ? Number(orderId) : null;
+    const deliveryAddressIdNum = deliveryAddressId != null && deliveryAddressId !== '' ? Number(deliveryAddressId) : null;
+    const hasOutOfStockBool = (function(v){
+      if (typeof v === 'boolean') return v;
+      if (v == null || v === '') return null;
+      const s = String(v).toLowerCase();
+      if (s === 'true' || s === '1') return true;
+      if (s === 'false' || s === '0') return false;
+      return null;
+    })(hasOutOfStock);
+
+    if ((orderIdNum == null && deliveryAddressIdNum == null) || !deliveryMode || hasOutOfStockBool == null) {
+      throw new ApiError('orderId, deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
     }
 
     const connection = await pool.getConnection();
 
     const deliveryDate = await EstimateDeliveryDate(
-      deliveryAddressId,
+      orderIdNum,
+      deliveryAddressIdNum,
       deliveryMode,
-      hasOutOfStock,
+      hasOutOfStockBool,
       connection
     );
 

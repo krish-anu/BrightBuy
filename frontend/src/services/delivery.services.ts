@@ -45,3 +45,21 @@ export const getDeliveryAssignmentSummary = async () => {
     return { success: false, error: errMsg };
   }
 };
+
+export const estimatedDeliveryDate = async (
+  orderId: number | null = null,
+  deliveryAddressId: number | null = null,
+  deliveryMode?: string,
+  hasOutOfStock?: boolean
+) => {
+  try {
+    const response = await axiosInstance.get('/api/delivery/deliveyDate', {
+      params: { orderId, deliveryAddressId, deliveryMode, hasOutOfStock },
+    });
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error('Error fetching estimated delivery date:', error);
+    const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch estimated date';
+    return { success: false, error: errMsg };
+  }
+};

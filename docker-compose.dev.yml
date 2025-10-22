@@ -50,6 +50,8 @@ services:
       context: ./frontend
       target: builder
     container_name: frontend
+    environment:
+      VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
     volumes:
       - ./frontend:/app
       - ./frontend/node_modules:/app/node_modules
