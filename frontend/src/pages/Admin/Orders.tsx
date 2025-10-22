@@ -535,6 +535,7 @@ const Orders: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Mode</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -565,6 +566,10 @@ const Orders: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {/* deliveryMode may be a string or object; normalize display */}
+                      {typeof order.deliveryMode === 'string' ? order.deliveryMode : ((order.deliveryMode as any)?.mode || stringifyField(order.deliveryMode) || 'Unknown')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(order.orderDate || order.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -590,15 +595,18 @@ const Orders: React.FC = () => {
                           <IconComponent iconName="Edit" size={16} />
                         </button>
                         { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
-                          // Only allow assignment when order status is Shipped
+                          // Only allow assignment when order status is Shipped and delivery mode is not Store Pickup
                           (() => {
                             const isShipped = (order.status || '').toString().toLowerCase() === 'shipped';
+                            const modeStr = typeof order.deliveryMode === 'string' ? order.deliveryMode : ((order.deliveryMode as any)?.mode || '');
+                            const isStorePickup = (modeStr || '').toString().toLowerCase() === 'store pickup';
+                            const disableAssign = !isShipped || isStorePickup;
                             return (
                               <button
-                                className={`${isShipped ? 'text-purple-600 hover:text-purple-900' : 'text-gray-400 cursor-not-allowed'}`}
-                                title={isShipped ? 'Assign Delivery' : 'Assign Delivery (only available when order is Shipped)'}
+                                className={`${!disableAssign ? 'text-purple-600 hover:text-purple-900' : 'text-gray-400 cursor-not-allowed'}`}
+                                title={!disableAssign ? 'Assign Delivery' : isStorePickup ? 'Assign disabled for Store Pickup' : 'Assign Delivery (only available when order is Shipped)'}
                                 onClick={async () => {
-                                  if (!isShipped) return; // prevent action when not shipped
+                                  if (disableAssign) return; // prevent action when not shipped or store pickup
                                   // Guard client-side: ensure current token belongs to Admin or SuperAdmin
                                   const current = getCurrentUserFromToken();
                                   if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
