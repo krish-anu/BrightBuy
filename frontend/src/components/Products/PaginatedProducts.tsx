@@ -358,7 +358,16 @@ export default function PaginatedProducts() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between pt-2">
-            <div className="text-sm text-muted-foreground">Page {page} of {totalPages} • {totalCount} results</div>
+            {(() => {
+              const start = totalCount === 0 ? 0 : (page - 1) * limit + 1;
+              const end = totalCount === 0 ? 0 : (page - 1) * limit + rows.length;
+              return (
+                <div className="text-sm text-muted-foreground">
+                  Showing {start}		{start !== end ? `– ${end}` : ''} of {totalCount} results
+                  <span className="ml-2 opacity-70">(Page {page} of {totalPages})</span>
+                </div>
+              );
+            })()}
             <div className="flex items-center gap-2">
               <Button variant="outline" disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
               <Button variant="default" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>Next</Button>
