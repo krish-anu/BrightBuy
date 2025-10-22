@@ -52,11 +52,12 @@ const getOrderDetails = async (orderId, connection) => {
 const isValidUpdate = async (newStatus, currStatus) => {
   const validStatus = {
     Pending: 0,
-    Confirmed: 1,
-    Shipped: 2,
-    Delivered: 3,
-    Returned: 4,
-    Failed: 5,
+    Cancelled:1,
+    Confirmed: 2,
+    Shipped: 3,
+    Delivered: 4,
+    Returned: 5,
+    Failed: 6,
   };
 
   if (!(newStatus in validStatus)) {
