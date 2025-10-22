@@ -7,8 +7,9 @@ import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getUserProfile } from "@/services/user.services";
+import { getVariant } from "@/services/variant.services";
  
 
 type ShippingChoice = "standard" | "pickup";
@@ -30,7 +31,40 @@ export default function OrderPayment() {
   const variantId: string | null = searchParams.get("variantId");
   const sessionKey = sessionKeyParam || `order:${productId || "_"}:${variantId || "_"}`;
   const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
+  // Derive delivery mode from user selection
+  const deliveryMode = useMemo(() => (shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup"), [shippingMethod]);
 
+  // Determine if any item is out of stock by checking variant stock on the server
+  const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        if (!items || items.length === 0) {
+          if (!ignore) setHasOutOfStock(false);
+          return;
+        }
+        // Fetch variant details for each item to read stockQnt
+        const results = await Promise.all(
+          items.map(async (it) => {
+            const vid = (typeof it.id === "string" && /^\d+$/.test(it.id)) ? Number(it.id) : it.id;
+            const resp = await getVariant(vid as any);
+            // resp may be null if variant deleted
+            const data = resp && (resp as any).data ? (resp as any).data : (resp as any);
+            const stock = data?.stockQnt ?? data?.stock ?? 0;
+            return Number(stock) <= 0;
+          })
+        );
+        if (!ignore) setHasOutOfStock(results.some(Boolean));
+      } catch (e) {
+        // If stock check fails, be conservative and do not block; treat as not out of stock
+        if (!ignore) setHasOutOfStock(false);
+      } finally {
+        // no-op
+      }
+    })();
+    return () => { ignore = true; };
+  }, [items]);
   console.log(items);
   // compute summary values
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
@@ -58,6 +92,7 @@ export default function OrderPayment() {
     };
   }, [navigate, location]);
 
+
   // Guard against invalid direct access or missing session data
   // Consider the session invalid if there are no items.
   // Use a null-safe check in case `items` is undefined/null from the context.
@@ -73,6 +108,9 @@ export default function OrderPayment() {
   }
 
   // No forced payment change; COD is allowed for Store Pickup now
+  // Debug: log derived values for ETA inputs
+  // console.debug("Derived deliveryMode:", deliveryMode, "hasOutOfStock:", hasOutOfStock);
+  void deliveryMode;
 
   return (
     <div className="space-y-8">
@@ -82,7 +120,11 @@ export default function OrderPayment() {
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
           {shippingMethod === "standard" ? (
-            <ShippingAddressSection onSelectionChange={setShippingAddressId} />
+            <ShippingAddressSection
+              onSelectionChange={setShippingAddressId}
+              shippingMethod={shippingMethod}
+              hasOutOfStock={hasOutOfStock}
+            />
           ) : null}
           <Separator />
           <PaymentMethod

@@ -176,15 +176,16 @@ const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
 
 const getEstimatedDeliveryDate = async (req, res, next) => {
   try {
-    const { deliveryAddressId, deliveryMode, hasOutOfStock } = req.body;
+    const { deliveryAddressId, orderId, deliveryMode, hasOutOfStock } = req.body;
 
-    if (deliveryAddressId == null || !deliveryMode || hasOutOfStock == null) {
-      throw new ApiError('deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
+    if ((orderId == null && deliveryAddressId == null )|| !deliveryMode || hasOutOfStock == null) {
+      throw new ApiError('orderId, deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
     }
 
     const connection = await pool.getConnection();
 
     const deliveryDate = await EstimateDeliveryDate(
+      orderId,
       deliveryAddressId,
       deliveryMode,
       hasOutOfStock,

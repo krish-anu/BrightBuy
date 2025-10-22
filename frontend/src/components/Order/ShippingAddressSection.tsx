@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -18,8 +18,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ShippingAddressSection({
 	onSelectionChange,
+	shippingMethod,
+	hasOutOfStock,
 }: {
 	onSelectionChange?: (addressId: string | undefined, address?: Address) => void;
+	shippingMethod?: "standard" | "pickup";
+	hasOutOfStock?: boolean;
 }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -347,6 +351,43 @@ export default function ShippingAddressSection({
 	const defaultId =
 		addresses.find((addr) => addr.isDefault)?.id ?? addresses[0]?.id ?? "";
 
+	// Derive a single ETA date according to spec (only for Standard Delivery)
+	const selectedAddress = useMemo(() => (
+		addresses.find((addr) => addr.id === selectedId) ||
+		addresses.find((addr) => addr.isDefault) ||
+		addresses[0] || null
+	), [addresses, selectedId]);
+
+	const isMainCity = useMemo(() => {
+		if (!selectedAddress) return false;
+		// Prefer id match, fallback to name
+		if (selectedAddress.cityId != null) {
+			const match = cities.find((c) => String(c.id) === String(selectedAddress.cityId));
+			return !!(match && (match as any).isMainCategory);
+		}
+		if (selectedAddress.city) {
+			const match = cities.find((c) => String(c.name).toLowerCase() === String(selectedAddress.city).toLowerCase());
+			return !!(match && (match as any).isMainCategory);
+		}
+		return false;
+	}, [selectedAddress, cities]);
+
+	const etaDays = useMemo(() => {
+		if (shippingMethod !== "standard") return null;
+		if (!selectedAddress) return null;
+		let days = isMainCity ? 5 : 7;
+		if (hasOutOfStock) days += 3;
+		return days;
+	}, [shippingMethod, selectedAddress, isMainCity, hasOutOfStock]);
+
+	const etaDisplay = useMemo(() => {
+		if (etaDays == null) return null;
+		const d = new Date();
+		d.setDate(d.getDate() + Number(etaDays));
+		return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+	}, [etaDays]);
+
+
 	return (
 		<div>
 			<span>
@@ -437,21 +478,6 @@ export default function ShippingAddressSection({
 												>
 													Check your details
 												</Button>
-											{/* <Button
-												variant="order"
-												className="w-full"
-												disabled={!selectedId || selectedId === (addresses.find((a) => a.isDefault)?.id ?? "")}
-												onClick={async () => {
-													const currentDefault = addresses.find((a) => a.isDefault)?.id ?? "";
-													if (selectedId && selectedId !== currentDefault) {
-														console.debug("Confirming selection; persisting default", { selectedId, currentDefault });
-														await setDefaultAddress(selectedId);
-													}
-													setOpen(false);
-												}}
-											>
-												Use Selected Address
-											</Button> */}
 										</div>
 									</>
 								) : (
@@ -481,6 +507,26 @@ export default function ShippingAddressSection({
 					</Dialog>
 				</div>
 			</div>
+			{shippingMethod === "standard" && etaDisplay && (
+				<div className="mt-6">
+					<label className="text-lg md:text-xl font-medium text-muted-foreground block mb-2">
+						Estimated Delivery
+					</label>
+					<div
+						className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-muted/30 border border-muted text-sm md:text-base"
+						title={etaDisplay}
+						aria-label={`Estimated delivery ${etaDisplay}`}
+					>
+						<span className="text-accent-foreground" aria-hidden>
+							📅
+						</span>
+						<span className="font-semibold text-accent-foreground">Arrives by {etaDisplay}</span>
+						{hasOutOfStock ? (
+							<span className="ml-2 text-xs text-muted-foreground">(+ extra time due to backorder)</span>
+						) : null}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
