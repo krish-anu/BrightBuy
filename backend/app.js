@@ -10,6 +10,7 @@ const variantRouter = require('./routes/variant');
 const orderRouter = require('./routes/order');
 const cityRouter = require('./routes/city');
 const authRouter = require('./routes/auth');
+const adminRouter = require('./routes/admin');
 const webhookRouter = require('./routes/webhook');
 const userRouter = require("./routes/user");
 const addressRouter = require('./routes/address');
@@ -31,6 +32,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
 app.use('/api/variant', variantRouter);

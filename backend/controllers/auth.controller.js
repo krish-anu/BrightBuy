@@ -127,7 +127,7 @@ const loginUser = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // session valid for 10 minutes
+      { expiresIn: '1h' } 
     );
 
   res.status(200).json({ token, role: user.role, email: user.email, name: user.name, id: user.id, roleAccepted: !!user.role_accepted });

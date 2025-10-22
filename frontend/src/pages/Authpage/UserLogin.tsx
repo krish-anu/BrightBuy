@@ -114,7 +114,7 @@ const UserLogin: React.FC = () => {
         </p>
 
         {/* Admin guidance banner */}
-        {location.pathname.startsWith('/admin') ? (
+        {/* {location.pathname.startsWith('/admin') ? (
           <div className="mt-3 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
             Admin / Staff login — use this page to sign in to the admin dashboard.
           </div>
@@ -122,7 +122,7 @@ const UserLogin: React.FC = () => {
           <div className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
             Are you an admin or staff member? Please <Link to="/admin/login" className="font-medium underline">use the admin login page</Link> instead.
           </div>
-        )}
+        )} */}
 
         {/* Form */}
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
