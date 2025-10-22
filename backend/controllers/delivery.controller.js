@@ -176,19 +176,33 @@ const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
 
 const getEstimatedDeliveryDate = async (req, res, next) => {
   try {
-    const { deliveryAddressId, orderId, deliveryMode, hasOutOfStock } = req.body;
+    // Accept both GET (query) and POST (body)
+    const src = req.method === 'GET' ? (req.query || {}) : (req.body || {});
+    let { deliveryAddressId, orderId, deliveryMode, hasOutOfStock } = src;
 
-    if ((orderId == null && deliveryAddressId == null )|| !deliveryMode || hasOutOfStock == null) {
+    // Normalize types
+    const orderIdNum = orderId != null && orderId !== '' ? Number(orderId) : null;
+    const deliveryAddressIdNum = deliveryAddressId != null && deliveryAddressId !== '' ? Number(deliveryAddressId) : null;
+    const hasOutOfStockBool = (function(v){
+      if (typeof v === 'boolean') return v;
+      if (v == null || v === '') return null;
+      const s = String(v).toLowerCase();
+      if (s === 'true' || s === '1') return true;
+      if (s === 'false' || s === '0') return false;
+      return null;
+    })(hasOutOfStock);
+
+    if ((orderIdNum == null && deliveryAddressIdNum == null) || !deliveryMode || hasOutOfStockBool == null) {
       throw new ApiError('orderId, deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
     }
 
     const connection = await pool.getConnection();
 
     const deliveryDate = await EstimateDeliveryDate(
-      orderId,
-      deliveryAddressId,
+      orderIdNum,
+      deliveryAddressIdNum,
       deliveryMode,
-      hasOutOfStock,
+      hasOutOfStockBool,
       connection
     );
 

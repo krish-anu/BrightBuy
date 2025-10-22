@@ -5,6 +5,8 @@ import { createOrder } from "@/services/order.services";
 import { BillSummary } from "@/components/Order/BillSummary";
 import { listAddresses } from "@/services/address.services";
 import { useEffect, useMemo, useState } from "react";
+import { estimatedDeliveryDate } from "@/services/delivery.services";
+import { getVariant } from "@/services/variant.services";
 // import { loadStripe } from "@stripe/stripe-js";
 
 export default function OrderSummary() {
@@ -56,6 +58,73 @@ export default function OrderSummary() {
     const parts = [addr.line1, addr.line2, addr.city, addr.postalCode].filter(Boolean);
     return parts.join(", ");
   }, [addresses, shippingAddressId]);
+
+  // Estimated delivery via backend API
+  const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        if (!items || items.length === 0) { if (!ignore) setHasOutOfStock(false); return; }
+        const results = await Promise.all(
+          items.map(async (it) => {
+            const vid = (typeof it.id === "string" && /^\d+$/.test(it.id)) ? Number(it.id) : (it.id as any);
+            const resp = await getVariant(vid);
+            const data = (resp && (resp as any).data) ? (resp as any).data : (resp as any);
+            const stock = data?.stockQnt ?? data?.stock ?? 0;
+            return Number(stock) <= 0;
+          })
+        );
+  const anyOOS = results.some(Boolean);
+  if (!ignore) setHasOutOfStock(anyOOS);
+      } catch {
+        if (!ignore) setHasOutOfStock(false);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [items]);
+  const [etaText, setEtaText] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        if (shippingMethod !== "standard") {
+          if (!ignore) setEtaText(undefined);
+          return;
+        }
+        const numericId = shippingAddressId && /^\d+$/.test(String(shippingAddressId))
+          ? Number(shippingAddressId)
+          : null;
+        if (!numericId) {
+          if (!ignore) setEtaText(undefined);
+          return;
+        }
+        const resp = await estimatedDeliveryDate(null, numericId, "Standard Delivery", hasOutOfStock);
+        const data = (resp as any)?.data;
+        // Try multiple shapes: string date, { date }, { estimatedDate }, { etaDays }
+        let text: string | undefined;
+        const toNice = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+        if (typeof data === 'string') {
+          const d = new Date(data);
+          if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+        } else if (data && typeof data === 'object') {
+          if (data.date || data.estimatedDate) {
+            const raw = data.date || data.estimatedDate;
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+          } else if (typeof data.etaDays === 'number') {
+            const d = new Date();
+            d.setDate(d.getDate() + data.etaDays);
+            text = `Arrives by ${toNice(d)}`;
+          }
+        }
+        if (!ignore) setEtaText(text);
+      } catch (e) {
+        if (!ignore) setEtaText(undefined);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [shippingMethod, shippingAddressId, hasOutOfStock]);
 
   const subtotal = items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
   const shipping = 0;
@@ -209,7 +278,8 @@ export default function OrderSummary() {
         }))}
         shippingMethod={shippingMethod}
         paymentMethod={paymentMethod}
-        deliveryAddressText={shippingMethod === "standard" ? deliveryAddressText : undefined}
+        deliveryAddressText={shippingMethod === "standard" && paymentMethod !== 'cod' ? deliveryAddressText : undefined}
+        estimatedDeliveryText={shippingMethod === "standard" ? etaText : undefined}
         subtotal={subtotal}
         shipping={shipping}
         discount={discount}

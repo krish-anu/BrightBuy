@@ -124,8 +124,6 @@ export default function OrderPayment() {
   }
 
   // No forced payment change; COD is allowed for Store Pickup now
-  // Debug: log derived values for ETA inputs
-  // console.debug("Derived deliveryMode:", deliveryMode, "hasOutOfStock:", hasOutOfStock);
   void deliveryMode;
 
   return (
@@ -135,14 +133,19 @@ export default function OrderPayment() {
         <div className="md:col-span-3 space-y-8">
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
-          {shippingMethod === "standard" ? (
+          {shippingMethod === "standard" && paymentMethod !== "cod" ? (
             <ShippingAddressSection
               onSelectionChange={setShippingAddressId}
               initialSelectedId={shippingAddressId}
               shippingMethod={shippingMethod}
               hasOutOfStock={hasOutOfStock}
+              showEta={false}
             />
-          ) : null}
+          ) : (
+            <div className="p-4 rounded-lg bg-muted/30 border text-sm md:text-base text-muted-foreground">
+              You can pick up your order from the store nearest to you.
+            </div>
+          )}
           <Separator />
           <PaymentMethod
             value={paymentMethod}

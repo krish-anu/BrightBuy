@@ -21,11 +21,13 @@ export default function ShippingAddressSection({
 	shippingMethod,
 	hasOutOfStock,
 	initialSelectedId,
+	showEta = true,
 }: {
 	onSelectionChange?: (addressId: string | undefined, address?: Address) => void;
 	shippingMethod?: "standard" | "pickup";
 	hasOutOfStock?: boolean;
 	initialSelectedId?: string;
+	showEta?: boolean;
 }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -368,26 +370,33 @@ export default function ShippingAddressSection({
 	), [addresses, selectedId]);
 
 	const isMainCity = useMemo(() => {
+		if (!showEta) return false;
 		if (!selectedAddress) return false;
 		// Prefer id match, fallback to name
 		if (selectedAddress.cityId != null) {
+			console.log(cities)
 			const match = cities.find((c) => String(c.id) === String(selectedAddress.cityId));
-			return !!(match && (match as any).isMainCategory);
+			console.log(match)
+			const flag = match ? (match as any).isMainCategory : undefined;
+			return !!(typeof flag === 'number' ? flag === 1 : flag);
 		}
 		if (selectedAddress.city) {
 			const match = cities.find((c) => String(c.name).toLowerCase() === String(selectedAddress.city).toLowerCase());
-			return !!(match && (match as any).isMainCategory);
+			const flag = match ? (match as any).isMainCategory : undefined;
+			return !!(typeof flag === 'number' ? flag === 1 : flag);
 		}
 		return false;
-	}, [selectedAddress, cities]);
+	}, [selectedAddress, cities, showEta]);
 
 	const etaDays = useMemo(() => {
+		if (!showEta) return null;
 		if (shippingMethod !== "standard") return null;
 		if (!selectedAddress) return null;
-		let days = isMainCity ? 5 : 7;
+		let base = isMainCity ? 5 : 7;
+		let days = base;
 		if (hasOutOfStock) days += 3;
 		return days;
-	}, [shippingMethod, selectedAddress, isMainCity, hasOutOfStock]);
+	}, [showEta, shippingMethod, selectedAddress, isMainCity, hasOutOfStock]);
 
 	const etaDisplay = useMemo(() => {
 		if (etaDays == null) return null;
@@ -465,7 +474,6 @@ export default function ShippingAddressSection({
 												value={selectedId || defaultId}
 												onChange={(val) => {
 													if (val !== selectedId) {
-														console.debug("Address selection changed", { from: selectedId, to: val });
 														setSelectedId(val);
 													}
 												}}
@@ -516,7 +524,7 @@ export default function ShippingAddressSection({
 					</Dialog>
 				</div>
 			</div>
-			{shippingMethod === "standard" && etaDisplay && (
+			{shippingMethod === "standard" && showEta && etaDisplay && (
 				<div className="mt-6">
 					<label className="text-lg md:text-xl font-medium text-muted-foreground block mb-2">
 						Estimated Delivery

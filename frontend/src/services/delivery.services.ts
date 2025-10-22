@@ -53,7 +53,7 @@ export const estimatedDeliveryDate = async (
   hasOutOfStock?: boolean
 ) => {
   try {
-    const response = await axiosInstance.get('/api/delivery/estimatedDate', {
+    const response = await axiosInstance.get('/api/delivery/deliveyDate', {
       params: { orderId, deliveryAddressId, deliveryMode, hasOutOfStock },
     });
     return { success: true, data: response.data.data };

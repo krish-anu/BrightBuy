@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listAddresses } from "@/services/address.services";
 import { verifyPaymentSuccess } from "@/services/payment.services";
 import { getOrderById, type Order as BackendOrder } from "@/services/order.services";
+import { estimatedDeliveryDate } from "@/services/delivery.services";
 
 export default function OrderSuccess() {
   const navigate = useNavigate();
@@ -111,6 +112,59 @@ export default function OrderSuccess() {
   const discount = 0;
   const total = backendOrder ? Number(backendOrder.totalPrice ?? (subtotal + shipping)) : (subtotal + shipping - discount);
   const paymentStatus = flow === "online" ? (paid ? "Paid (Online)" : "Unpaid") : "Payment Due (Cash on Delivery)";
+  const [etaText, setEtaText] = useState<string | undefined>(undefined);
+
+  // Fetch estimated delivery date for invoice display
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        // Determine delivery mode preference
+        const deliveryMode = backendOrder?.deliveryMode || (shippingMethod === 'standard' ? 'Standard Delivery' : 'Store Pickup');
+        if (deliveryMode !== 'Standard Delivery') {
+          if (!ignore) setEtaText(undefined);
+          return;
+        }
+        if (backendOrder?.id) {
+          const resp = await estimatedDeliveryDate(Number(backendOrder.id), null, 'Standard Delivery', false);
+          const data = (resp as any)?.data;
+          let text: string | undefined;
+          const toNice = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+          if (typeof data === 'string') {
+            const d = new Date(data); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+          } else if (data && typeof data === 'object') {
+            if (data.date || data.estimatedDate) {
+              const raw = data.date || data.estimatedDate; const d = new Date(raw); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+            } else if (typeof data.etaDays === 'number') {
+              const d = new Date(); d.setDate(d.getDate() + data.etaDays); text = `Arrives by ${toNice(d)}`;
+            }
+          }
+          if (!ignore) setEtaText(text);
+          return;
+        }
+        // fallback: try with address id from session when no backend order id (e.g., COD immediate success)
+        const numericId = shippingAddressId && /^\d+$/.test(String(shippingAddressId)) ? Number(shippingAddressId) : null;
+        if (!numericId) { if (!ignore) setEtaText(undefined); return; }
+        const resp = await estimatedDeliveryDate(null, numericId, 'Standard Delivery', false);
+        const data = (resp as any)?.data;
+        let text: string | undefined;
+        const toNice = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+        if (typeof data === 'string') {
+          const d = new Date(data); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+        } else if (data && typeof data === 'object') {
+          if (data.date || data.estimatedDate) {
+            const raw = data.date || data.estimatedDate; const d = new Date(raw); if (!isNaN(d.getTime())) text = `Arrives by ${toNice(d)}`;
+          } else if (typeof data.etaDays === 'number') {
+            const d = new Date(); d.setDate(d.getDate() + data.etaDays); text = `Arrives by ${toNice(d)}`;
+          }
+        }
+        if (!ignore) setEtaText(text);
+      } catch (e) {
+        if (!ignore) setEtaText(undefined);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [backendOrder, shippingMethod, shippingAddressId]);
   const deliveryAddressText = useMemo(() => {
     // Prefer backend-reported delivery address if present
     const deliveryMode = backendOrder?.deliveryMode || (shippingMethod === 'standard' ? 'Standard Delivery' : 'Store Pickup');
@@ -156,6 +210,7 @@ export default function OrderSuccess() {
         shippingMethod={backendOrder ? (backendOrder.deliveryMode === 'Standard Delivery' ? 'standard' : 'pickup') : shippingMethod}
         paymentMethod={paymentMethod}
         deliveryAddressText={deliveryAddressText}
+        estimatedDeliveryText={etaText}
         paymentStatus={paymentStatus}
         subtotal={subtotal}
         shipping={shipping}
