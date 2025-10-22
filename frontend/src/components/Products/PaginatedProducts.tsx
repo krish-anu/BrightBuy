@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ type BrandOption = { id: number | null; name: string };
 type AttrOption = { id: number; name: string };
 
 export default function PaginatedProducts() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -35,6 +37,15 @@ export default function PaginatedProducts() {
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [globalBrands, setGlobalBrands] = useState<BrandOption[]>([]);
   const [attributes, setAttributes] = useState<AttrOption[]>([]);
+
+  // Sync local search state from URL (e.g., when navigating from Navbar to /shop?search=...)
+  useEffect(() => {
+    const s = searchParams.get('search') || '';
+    // Only update if different to avoid unnecessary renders
+    setSearch((prev) => (prev !== s ? s : prev));
+    // Reset to first page when query changes via URL
+    setPage(1);
+  }, [searchParams]);
 
   // Load categories once
   useEffect(() => {
@@ -89,10 +100,10 @@ export default function PaginatedProducts() {
   // Fetch paginated products on filter/page changes
   useEffect(() => {
     (async () => {
-      setLoading(true);
+    setLoading(true);
       setError(null);
       try {
-  const res = await getProductsPaginatedFrontend(page, limit, categoryId ?? undefined, parentCategoryId ?? undefined);
+  const res = await getProductsPaginatedFrontend(page, limit, categoryId ?? undefined, parentCategoryId ?? undefined, (search || '').trim() || undefined);
         let raw = res?.data || [];
 
         // Derive available brands for the selected category (or parent). Use the unfiltered raw results.
@@ -199,11 +210,7 @@ export default function PaginatedProducts() {
 
   // Backend now paginates by product; use normalized rows directly
   let data: Product[] = normalized;
-        // Client-side search & price filters
-        if (search.trim()) {
-          const q = search.trim().toLowerCase();
-          data = data.filter((p) => p.name.toLowerCase().includes(q));
-        }
+        // Client-side price filters (search is now server-side but keep a lightweight fallback if needed)
         const min = Number(priceMin);
         const max = Number(priceMax);
         const hasMin = !isNaN(min) && priceMin !== "";
@@ -237,7 +244,20 @@ export default function PaginatedProducts() {
         <Card className="p-4 md:col-span-3 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="search">Search</Label>
-            <Input id="search" placeholder="Search products..." value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+            <Input
+              id="search"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPage(1);
+                setSearch(v);
+                // reflect in URL for shareable links and to keep Navbar in sync
+                const next = new URLSearchParams(searchParams);
+                if (v.trim()) next.set('search', v); else next.delete('search');
+                setSearchParams(next, { replace: true });
+              }}
+            />
           </div>
           <div className="space-y-2">
             <Label>Category</Label>
@@ -338,7 +358,16 @@ export default function PaginatedProducts() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between pt-2">
-            <div className="text-sm text-muted-foreground">Page {page} of {totalPages} • {totalCount} results</div>
+            {(() => {
+              const start = totalCount === 0 ? 0 : (page - 1) * limit + 1;
+              const end = totalCount === 0 ? 0 : (page - 1) * limit + rows.length;
+              return (
+                <div className="text-sm text-muted-foreground">
+                  Showing {start}		{start !== end ? `– ${end}` : ''} of {totalCount} results
+                  <span className="ml-2 opacity-70">(Page {page} of {totalPages})</span>
+                </div>
+              );
+            })()}
             <div className="flex items-center gap-2">
               <Button variant="outline" disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
               <Button variant="default" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>Next</Button>

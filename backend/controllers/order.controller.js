@@ -2,7 +2,7 @@ const { query ,pool} = require('../config/db');
 const orderQueries = require('../queries/orderQueries');
 const ApiError = require('../utils/ApiError');
 const { calculateOrderDetails } = require('../utils/calculateOrderDetails');
-const { STRIPE_SECRET_KEY } = require('../config/dbConfig');
+const { STRIPE_SECRET_KEY, FRONTEND_URL } = require('../config/dbConfig');
 const { saveOrderToDatabase, isValidUpdate } = require('../services/order.service');
 const { createPayment } = require('../services/payment.service');
 const { updateStock, restock } = require('../services/variant.service');
@@ -72,7 +72,7 @@ const addOrder = async (req, res, next) => {
   console.log(query);
 
   try {
-    const { items, paymentMethod, deliveryMode, deliveryAddressId } = req.body;
+  const { items, paymentMethod, deliveryMode, deliveryAddressId, sessionKey, productId, variantId, qty } = req.body;
 
     // Validation
     if (!items || !deliveryMode || !paymentMethod) {
@@ -84,12 +84,12 @@ const addOrder = async (req, res, next) => {
       throw new ApiError('Delivery address is required for Standard Delivery', 400);
     }
 
-    if (deliveryMode === 'Store Pickup' && paymentMethod === 'CashOnDelivery') {
-      throw new ApiError('Invalid payment method', 400);
-    }
+    // if (deliveryMode === 'Store Pickup' && paymentMethod === 'CashOnDelivery') {
+    //   throw new ApiError('Invalid payment method', 400);
+    // }
 
     const { totalPrice, deliveryCharge, deliveryDate, orderedItems } =
-      await calculateOrderDetails(items, deliveryMode, req.user, connection);
+      await calculateOrderDetails(items, deliveryMode, req.user, connection, deliveryAddressId);
 
     const order = await saveOrderToDatabase(
       orderedItems,
@@ -113,24 +113,64 @@ const addOrder = async (req, res, next) => {
     }
 
     if (paymentMethod === 'Card') {
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: orderedItems.map(item => ({
-          price_data: {
-            currency: 'usd',
-            product_data: { name: item.productName },
-            unit_amount: Math.round(item.price * 100)
-          },
-          quantity: item.quantity
-        })),
-        mode: 'payment',
-        success_url: `http://localhost:8081/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `http://localhost:8081/payment/cancel`,
-        metadata: { userId: req.user.id.toString(), orderId: order.id.toString() }
-      });
+      // Build return query to preserve original checkout context
+      // Prefer values from body; fallback to query string if provided
+      const ctx = {
+        sessionKey: sessionKey ?? req.query?.sessionKey,
+        productId: productId ?? req.query?.productId,
+        variantId: variantId ?? req.query?.variantId,
+        qty: qty ?? req.query?.qty,
+      };
+      const params = new URLSearchParams();
+      if (ctx.productId) params.set('productId', String(ctx.productId));
+      if (ctx.variantId) params.set('variantId', String(ctx.variantId));
+      if (ctx.qty) params.set('qty', String(ctx.qty));
+      // params.set('flow',"online");
+      // if (ctx.sessionKey) params.set('sessionKey', String(ctx.sessionKey));
+      const qs = params.toString();
+
+      const successUrl = `${FRONTEND_URL}/order/success?session_id={CHECKOUT_SESSION_ID}${qs ? `&${qs}` : ''}`;
+      const cancelUrl = `${FRONTEND_URL}/order/payment/${qs ? `?${qs}` : ''}`;
+
+      let session;
+      try {
+        session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: orderedItems.map(item => ({
+            price_data: {
+              currency: 'usd',
+              product_data: { name: item.productName },
+              unit_amount: Math.round(item.price * 100)
+            },
+            quantity: item.quantity
+          })),
+          mode: 'payment',
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          metadata: { 
+            userId: req.user.id.toString(), 
+            orderId: order.id.toString(), 
+            sessionKey: ctx.sessionKey ? String(ctx.sessionKey) : '',
+            productId: ctx.productId ? String(ctx.productId) : '',
+            variantId: ctx.variantId ? String(ctx.variantId) : '',
+            qty: ctx.qty ? String(ctx.qty) : ''
+          }
+        });
+      } catch (e) {
+        // Handle transient network/DNS errors to Stripe explicitly
+        const code = e?.code;
+        const type = e?.type;
+        if (type === 'StripeConnectionError' || code === 'ECONNRESET' || code === 'EAI_AGAIN') {
+          console.error('[addOrder] Stripe connection error during session.create', { type, code, message: e?.message });
+          await connection.rollback();
+          return next(new ApiError('Payment service is temporarily unavailable. Please try again in a moment.', 503));
+        }
+        throw e;
+      }
 
       await connection.commit();
-      return res.status(200).json({ success: true, data: { sessionId: session.id } });
+      // Return both id and url so clients can redirect via URL (Stripe deprecated redirectToCheckout)
+      return res.status(200).json({ success: true, data: { sessionId: session.id, url: session.url } });
     }
 
     throw new ApiError('Invalid payment method', 400);

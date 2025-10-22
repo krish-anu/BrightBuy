@@ -5,15 +5,9 @@ import { Button } from "@/components/ui/button";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArrowRight, Star, ShoppingBag } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import ProductCard from "@/components/Products/ProductCard";
-
-type FeaturedProduct = {
-  id: string;
-  name: string;
-  category: string;
-  ProductVariants: { price: number; imageUrl: string }[];
-};
+import { getPopularProducts } from '@/services/product.services';
 
 // Seed-aligned categories
 const CATEGORY_ITEMS = [
@@ -29,104 +23,77 @@ const CATEGORY_ITEMS = [
   { name: "Toys & Gadgets", emoji: "🧩" },
 ];
 
-// Seed-aligned featured products (names, categories, prices, image URLs)
-const MOCK_FEATURED: FeaturedProduct[] = [
-  {
-    id: "1",
-    name: "Galaxy S25 Ultra",
-    category: "Mobiles & Tablets",
-    ProductVariants: [{ price: 1299.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/1/1760940242661_siad2d.webp" }],
-  },
-  {
-    id: "2",
-    name: "iPhone 17 Pro",
-    category: "Mobiles & Tablets",
-    ProductVariants: [{ price: 1199.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/2/1760940489537_bjbgli.webp" }],
-  },
-  {
-    id: "5",
-    name: 'MacBook Air M3 15"',
-    category: "Laptops & Computers",
-    ProductVariants: [{ price: 1299.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/5/1760940821857_gg3h4m.jpg" }],
-  },
-  {
-    id: "9",
-    name: "Sony WH-1000XM6",
-    category: "Audio Devices",
-    ProductVariants: [{ price: 399.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/9/1760941493798_g662u6.webp" }],
-  },
-  {
-    id: "10",
-    name: "AirPods Pro 3",
-    category: "Audio Devices",
-    ProductVariants: [{ price: 299.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/10/1760941633317_qt1eku.jpg" }],
-  },
-  {
-    id: "13",
-    name: "Sony A7R V",
-    category: "Cameras & Photography",
-    ProductVariants: [{ price: 3499.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/13/1760941478026_kriqd7.webp" }],
-  },
-  {
-    id: "21",
-    name: "Apple Watch Series 10",
-    category: "Wearables & Smart Devices",
-    ProductVariants: [{ price: 399.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/21/1760881042787_erevfv.webp" }],
-  },
-  {
-    id: "25",
-    name: "Anker 737 Power Bank",
-    category: "Power & Charging",
-    ProductVariants: [{ price: 119.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/29/1760939513076_489ne7.webp" }],
-  },
-  {
-    id: "29",
-    name: "Philips Series 9000",
-    category: "Personal Care & Health",
-    ProductVariants: [{ price: 299.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/37/1760941186269_kx3sxo.jpg" }],
-  },
-  {
-    id: "34",
-    name: "Ring Spotlight Cam",
-    category: "Security & Safety",
-    ProductVariants: [{ price: 199.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/50/1760941284778_7uenw8.jpg" }],
-  },
-  {
-    id: "37",
-    name: "Sphero Mini",
-    category: "Toys & Gadgets",
-    ProductVariants: [{ price: 49.99, imageUrl: "https://brightbuy.s3.ap-south-1.amazonaws.com/variant/59/1760941515433_4ywtgz.webp" }],
-  },
-];
+
 
 // Add a flat product type that ProductCard can consume
-type CardProduct = Omit<FeaturedProduct, "ProductVariants"> & {
-  price: number;
-  imageUrl: string;
-};
+// (removed unused CardProduct type)
 
 export default function HomePage() {
   // Future-friendly filter (e.g., filter by category like "Mobiles & Tablets")
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const categories = useMemo(() => ["all", ...CATEGORY_ITEMS.map((c) => c.name)], []);
 
+  const [featuredSource, setFeaturedSource] = useState<any[]>([]);
+
+  useEffect(() => {
+
+    const load = async () => {
+      try {
+        const rows = await getPopularProducts();
+        console.log("Fea", rows);
+        setFeaturedSource(rows);
+      } catch (error) {
+        console.error("Error loading popular products:", error);
+      }
+    };
+    load();
+    
+  }, []);
+        console.log("featuredSource", featuredSource);
+
+  // normalize popular rows (no debug log)
+  const normalized = useMemo(() => {
+    return featuredSource.map((p) => ({
+      // prefer variantId (unique per variant), fall back to productId or id
+      id: p.variantId ?? p.productId ?? p.id,
+      // prefer productName from backend, fall back to name
+      name: p.productName ?? p.name,
+      // Categories may come as JSON string or array under 'Categories' or 'categories'
+      category: (() => {
+        const raw = p.Categories ?? p.categories ?? p.Categories;
+        if (!raw) return "";
+        try {
+          const arr = Array.isArray(raw) ? raw : JSON.parse(raw);
+          return arr?.[0]?.name ?? "";
+        } catch (_) {
+          return Array.isArray(raw) ? raw?.[0]?.name ?? "" : "";
+        }
+      })(),
+      // many popular endpoints return price as a top-level field
+      price: Number(p.price ?? p.ProductVariants?.[0]?.price ?? 0),
+      // many popular endpoints use imageURL (note casing) or ProductVariants
+      imageUrl: p.imageURL ?? p.imageUrl ?? p.ProductVariants?.[0]?.imageUrl ?? "",
+    }));
+  }, [featuredSource]);
+
   const filtered = useMemo(() => {
-    if (selectedFilter === "all") return MOCK_FEATURED.slice(0, 4);
-    return MOCK_FEATURED.filter((p) => p.category === selectedFilter).slice(0, 4);
-  }, [selectedFilter]);
+    // show more featured items (up to 8) from the popular feed
+    if (selectedFilter === "all") return normalized.slice(0, 8);
+    return normalized.filter((p) => p.category === selectedFilter).slice(0, 8);
+  }, [selectedFilter, normalized]);
 
   // Adapt products to a flat shape expected by ProductCard
-  const featuredForCard = useMemo<CardProduct[]>(
-    () =>
-      filtered.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        price: p.ProductVariants?.[0]?.price ?? 0,
-        imageUrl: p.ProductVariants?.[0]?.imageUrl ?? "",
-      })),
-    [filtered]
-  );
+  // const featuredForCard = useMemo<CardProduct[]>(
+  //   () =>
+  //     filtered.map((p) => ({
+  //       id: p.id,
+  //       name: p.name,
+  //       category: p.category,
+  //       price: p.ProductVariants?.[0]?.price ?? 0,
+  //       imageUrl: p.ProductVariants?.[0]?.imageUrl ?? "",
+  //     })),
+  //   [filtered]
+  // );
 
   return (
     <div className="min-w-full">

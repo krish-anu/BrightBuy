@@ -25,16 +25,19 @@ export function AddressEditForm({
   const [line1, setLine1] = useState("")
   const [line2, setLine2] = useState("")
 
+  // Initialize local fields when starting to edit a specific address.
+  // Avoid resetting on every keystroke by depending on the address identity only.
   useEffect(() => {
-    if (!a?.address) {
+    const addr = a?.address ?? ""
+    if (!addr) {
       setLine1("")
       setLine2("")
       return
     }
-    const parts = String(a.address).split(",").map((p) => p.trim()).filter(Boolean)
+    const parts = String(addr).split(",").map((p) => p.trim()).filter(Boolean)
     setLine1(parts[0] || "")
     setLine2(parts.slice(1).join(", ") || "")
-  }, [a?.address])
+  }, [a?.id])
 
   const commitAddressChange = (newPartial: Partial<Address> = {}) => {
     const combinedAddress = [newPartial.address ?? `${line1}${line2 ? `, ${line2}` : ""}`].filter(Boolean)[0]
@@ -71,12 +74,30 @@ export function AddressEditForm({
               <label htmlFor="address-line1" className="text-sm font-medium">
                 Address Line 1
               </label>
-              <Input id="address-line1" value={line1} onChange={(e) => { setLine1(e.target.value); commitAddressChange() }} />
+              <Input
+                id="address-line1"
+                value={line1}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setLine1(v)
+                  // pass the new combined address so we don't rely on state which updates asynchronously
+                  commitAddressChange({ address: `${v}${line2 ? `, ${line2}` : ""}` })
+                }}
+              />
 
               <label htmlFor="address-line2" className="text-sm font-medium mt-2 block">
                 Address Line 2
               </label>
-              <Input id="address-line2" value={line2} onChange={(e) => { setLine2(e.target.value); commitAddressChange() }} />
+              <Input
+                id="address-line2"
+                value={line2}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setLine2(v)
+                  // include the updated line2 when committing
+                  commitAddressChange({ address: `${line1}${v ? `, ${v}` : ""}` })
+                }}
+              />
             </FieldContent>
           </Field>
           <Field>

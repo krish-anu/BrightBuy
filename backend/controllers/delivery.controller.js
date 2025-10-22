@@ -19,21 +19,20 @@ const getDeliveries = async (req, res, next) => {
 const getAssignedDeliveriesForStaff = async (req, res, next) => {
   try {
     const { id: userId, role } = req.user;
-    // Normalize address using addresses table (orders now store deliveryAddressId)
-    // Build a human readable address string; fallback to 'Store Pickup' if no address
+    // Join order_addresses snapshot (3NF). For Store Pickup (no snapshot row), show 'Store Pickup'.
     const baseSelect = `
       SELECT 
         d.*, 
         o.id AS orderId, 
         o.totalPrice AS orderTotal, 
-  COALESCE(NULLIF(CONCAT_WS(', ', a.line1, a.line2, a.postalCode), ''), 'Store Pickup') AS deliveryAddress,
+        COALESCE(NULLIF(CONCAT_WS(', ', oa.line1, oa.line2, oa.postalCode), ''), 'Store Pickup') AS deliveryAddress,
         DATE_ADD(COALESCE(o.orderDate, o.createdAt), INTERVAL 3 DAY) AS estimatedDelivery, 
         o.status AS orderStatus, 
         cust.phone AS customerPhone,
         staff.name AS staffName
       FROM deliveries d
       JOIN orders o ON d.orderId = o.id
-      LEFT JOIN addresses a ON o.deliveryAddressId = a.id
+      LEFT JOIN order_addresses oa ON oa.orderId = o.id
       LEFT JOIN users cust ON o.userId = cust.id
       LEFT JOIN users staff ON d.staffId = staff.id
     `;
@@ -45,8 +44,13 @@ const getAssignedDeliveriesForStaff = async (req, res, next) => {
       where.push('d.staffId = ?');
       params.push(userId);
     }
-    // Only show assigned deliveries for this endpoint
-    where.push("d.status = 'Assigned'");
+    // By default only show deliveries that are actionable for staff: Assigned or Shipped (in_transit).
+    // Delivered or Cancelled should not be returned so they disappear from staff view after delivery.
+    // However if caller passes ?includeDelivered=true we will include Delivered rows as well.
+    const includeDelivered = String(req.query?.includeDelivered || '').toLowerCase() === 'true';
+    if (!includeDelivered) {
+      where.push("d.status IN ('Assigned','Shipped')");
+    }
     if (where.length) {
       sql += `WHERE ${where.join(' AND ')}\n`;
     }
@@ -177,18 +181,33 @@ const getDeliveryStaffAssignmentSummary = async (req, res, next) => {
 
 const getEstimatedDeliveryDate = async (req, res, next) => {
   try {
-    const { deliveryAddressId, deliveryMode, hasOutOfStock } = req.body;
+    // Accept both GET (query) and POST (body)
+    const src = req.method === 'GET' ? (req.query || {}) : (req.body || {});
+    let { deliveryAddressId, orderId, deliveryMode, hasOutOfStock } = src;
 
-    if (deliveryAddressId == null || !deliveryMode || hasOutOfStock == null) {
-      throw new ApiError('deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
+    // Normalize types
+    const orderIdNum = orderId != null && orderId !== '' ? Number(orderId) : null;
+    const deliveryAddressIdNum = deliveryAddressId != null && deliveryAddressId !== '' ? Number(deliveryAddressId) : null;
+    const hasOutOfStockBool = (function(v){
+      if (typeof v === 'boolean') return v;
+      if (v == null || v === '') return null;
+      const s = String(v).toLowerCase();
+      if (s === 'true' || s === '1') return true;
+      if (s === 'false' || s === '0') return false;
+      return null;
+    })(hasOutOfStock);
+
+    if ((orderIdNum == null && deliveryAddressIdNum == null) || !deliveryMode || hasOutOfStockBool == null) {
+      throw new ApiError('orderId, deliveryAddressId, deliveryMode, hasOutOfStock are required', 400);
     }
 
     const connection = await pool.getConnection();
 
     const deliveryDate = await EstimateDeliveryDate(
-      deliveryAddressId,
+      orderIdNum,
+      deliveryAddressIdNum,
       deliveryMode,
-      hasOutOfStock,
+      hasOutOfStockBool,
       connection
     );
 
@@ -204,6 +223,18 @@ const getEstimatedDeliveryDate = async (req, res, next) => {
   }
 };
 
+// Get single delivery by id (admin/superadmin)
+const getDeliveryByIdController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rows = await query(deliveryQueries.getDeliveryById, [id]);
+    if (!rows.length) return res.status(404).json({ message: 'Delivery not found' });
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 
@@ -214,4 +245,5 @@ module.exports = {
   updateDeliveryStatusController,
   getDeliveryStaffAssignmentSummary,
   getEstimatedDeliveryDate
+  ,getDeliveryByIdController
 };

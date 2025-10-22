@@ -4,12 +4,13 @@ import axiosInstance from "../axiosConfig";
 export const LOCAL_STORAGE__TOKEN = "brightbuy_token";
 
 // Login function
-export const loginUser = async (email: string, password: string) => {
+export const loginUser = async (email: string, password: string, adminLogin = false) => {
   try {
     // console.log("Logging in user:", email);
     const response = await axiosInstance.post("/api/auth/login", {
       email,
       password,
+      adminLogin,
     });
     // console.log("Res",response);
 

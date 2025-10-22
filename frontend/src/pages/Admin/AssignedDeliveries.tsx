@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getAssignedDeliveries } from '../../services/delivery.services';
+import { getAssignedDeliveries, updateDeliveryStatusForStaff } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
 import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
@@ -22,6 +22,8 @@ const AssignedDeliveries: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [deliveriesList, setDeliveriesList] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const IconComponent: React.FC<{
     iconName: keyof typeof LucideIcons;
@@ -143,6 +145,125 @@ const AssignedDeliveries: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
+  const refreshList = async () => {
+    setLoading(true);
+    try {
+      const resp = await getAssignedDeliveries();
+      if (resp.success) {
+        const rows = resp.data.map((r: any) => ({
+          id: String(r.id),
+          orderId: String(r.orderId),
+          status: ((r.status || '').toString().toLowerCase() === 'delivered' ? 'delivered' : (r.status || '').toString().toLowerCase() === 'shipped' ? 'in_transit' : (r.status || '').toString().toLowerCase() === 'failed' || (r.status || '').toString().toLowerCase() === 'cancelled' ? 'failed' : 'assigned') as Delivery['status'],
+          customerAddress: stringifyAddress(r.deliveryAddress ?? r.shippingAddress ?? r.address ?? 'No address'),
+          customerPhone: r.customerPhone || r.phone || 'No phone',
+          estimatedDelivery: r.estimatedDelivery || r.estimatedDeliveryDate || undefined,
+          deliveredAt: r.deliveryDate || undefined,
+          orderTotal: safeNumber(r.orderTotal ?? r.totalPrice ?? 0),
+          staffName: r.staffName || undefined,
+        }));
+        setDeliveriesList(rows);
+      } else {
+        setDeliveriesList([]);
+      }
+    } catch (e) {
+      setDeliveriesList([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (deliveryId: string, newStatus: 'in_transit' | 'delivered' | 'failed') => {
+    setUpdatingId(deliveryId);
+    try {
+      const resp = await updateDeliveryStatusForStaff(Number(deliveryId), newStatus);
+      if (!resp.success) {
+        console.error('Failed to update delivery status', resp.error);
+      }
+      // Refresh list so delivered items disappear
+      await refreshList();
+    } catch (err) {
+      console.error('Error updating delivery status', err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Try to open tel: or sms: URIs and provide a clipboard fallback & UI notice so desktop users get feedback
+  const tryOpenUriWithFallback = async (uri: string, fallbackText?: string) => {
+    try {
+      // Attempt navigation which on mobile should open phone/sms handler
+      window.location.href = uri;
+      // Also copy fallback text (phone number) to clipboard for desktop users
+      if (fallbackText && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(fallbackText);
+      }
+      setActionNotice('Opened phone app (or copied number to clipboard)');
+    } catch (err) {
+      // Clipboard or navigation failed — still attempt to copy if possible
+      try {
+        if (fallbackText && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(fallbackText);
+          setActionNotice('Number copied to clipboard');
+        } else {
+          setActionNotice('Action attempted — please try on a mobile device');
+        }
+      } catch (err2) {
+        setActionNotice('Unable to open dialer or copy number');
+      }
+    }
+
+    // Clear notice after 3 seconds
+    setTimeout(() => setActionNotice(null), 3000);
+  };
+
+  const handleCall = async (phone: string) => {
+    const normal = (phone || '').replace(/[^+0-9]/g, '');
+    if (!normal) {
+      setActionNotice('No valid phone number');
+      setTimeout(() => setActionNotice(null), 2000);
+      return;
+    }
+    // Copy to clipboard first for desktop users, then attempt to open tel: URI
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(normal);
+        setActionNotice('Number copied to clipboard');
+      }
+    } catch (err) {
+      // ignore
+    }
+    // small delay to ensure clipboard action is complete for UX
+    setTimeout(() => {
+      tryOpenUriWithFallback(`tel:${normal}`, normal);
+    }, 150);
+  };
+
+  const handleMessage = async (phone: string, deliveryId?: string) => {
+    const normal = (phone || '').replace(/[^+0-9]/g, '');
+    if (!normal) {
+      setActionNotice('No valid phone number');
+      setTimeout(() => setActionNotice(null), 2000);
+      return;
+    }
+    const body = `Hello, this is BrightBuy regarding your delivery ${deliveryId ? `#${deliveryId}` : ''}`.trim();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(normal);
+        setActionNotice('Number copied to clipboard');
+      }
+    } catch (err) {
+      // ignore
+    }
+    setTimeout(() => {
+      tryOpenUriWithFallback(`sms:${normal}?body=${encodeURIComponent(body)}`, normal);
+    }, 150);
+  };
+
+  // Reference the handlers so TypeScript/linters don't mark them as unused
+  // (They are intended for future quick-action buttons)
+  void handleCall;
+  void handleMessage;
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
@@ -151,6 +272,9 @@ const AssignedDeliveries: React.FC = () => {
         </h1>
         <p className="text-gray-600 mt-2">Manage your delivery assignments</p>
       </div>
+      {actionNotice && (
+        <div className="mb-4 rounded-md bg-indigo-50 text-indigo-800 p-3">{actionNotice}</div>
+      )}
 
       {/* Search and Filter */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -178,10 +302,10 @@ const AssignedDeliveries: React.FC = () => {
             <option value="delivered">Delivered</option>
             <option value="failed">Failed</option>
           </select>
-          <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          {/* <button className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
             <IconComponent iconName="MapPin" size={16} />
             <span className="ml-2">Route Optimizer</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -237,6 +361,7 @@ const AssignedDeliveries: React.FC = () => {
                     <p className="text-sm text-gray-600">
                       {delivery.customerPhone}
                     </p>
+                    
                   </div>
                 </div>
 
@@ -272,21 +397,38 @@ const AssignedDeliveries: React.FC = () => {
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex space-x-2">
                   {delivery.status === "assigned" && (
-                    <button className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">
-                      Start Delivery
+                    <button
+                      onClick={() => handleUpdateStatus(delivery.id, 'in_transit')}
+                      disabled={updatingId === delivery.id}
+                      className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {updatingId === delivery.id ? 'Starting...' : 'Start Delivery'}
                     </button>
                   )}
                   {delivery.status === "in_transit" && (
-                    <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700">
-                      Mark Delivered
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleUpdateStatus(delivery.id, 'delivered')}
+                        disabled={updatingId === delivery.id}
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-60"
+                      >
+                        {updatingId === delivery.id ? 'Updating...' : 'Mark Delivered'}
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(delivery.id, 'failed')}
+                        disabled={updatingId === delivery.id}
+                        className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {updatingId === delivery.id ? 'Updating...' : 'Mark Failed'}
+                      </button>
+                    </>
                   )}
-                  <button className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                  {/* <button className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">
                     <IconComponent iconName="Navigation" size={14} />
                   </button>
                   <button className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">
                     <IconComponent iconName="MessageCircle" size={14} />
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>

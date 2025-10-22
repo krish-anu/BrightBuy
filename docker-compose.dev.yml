@@ -8,8 +8,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./seed.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
-      - ./backend/sql/procedures_and_triggers.sql:/docker-entrypoint-initdb.d/02_procedures_and_triggers.sql:ro
-      - ./backend/sql/constraints_and_indexes.sql:/docker-entrypoint-initdb.d/03_constraints_and_indexes.sql:ro
+      - ./backend/sql/functions.sql:/docker-entrypoint-initdb.d/02_functions.sql:ro
+      - ./backend/sql/procedures.sql:/docker-entrypoint-initdb.d/03_procedures.sql:ro
+      - ./backend/sql/triggers.sql:/docker-entrypoint-initdb.d/04_triggers.sql:ro
+      - ./backend/sql/indexes.sql:/docker-entrypoint-initdb.d/05_indexes.sql:ro
+      - ./backend/sql/constraints.sql:/docker-entrypoint-initdb.d/06_constraints.sql:ro
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     healthcheck:
@@ -47,6 +50,8 @@ services:
       context: ./frontend
       target: builder
     container_name: frontend
+    environment:
+      VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
     volumes:
       - ./frontend:/app
       - ./frontend/node_modules:/app/node_modules

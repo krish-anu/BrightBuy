@@ -65,11 +65,11 @@ export const getProductsPaginated = async (page: number = 1, limit: number = 10,
 }
 
 // Frontend storefront: one row per product with a representative variant
-export const getProductsPaginatedFrontend = async (page: number = 1, limit: number = 10, categoryId?: number, parentCategoryId?: number): Promise<PaginationResponse<any>> => {
+export const getProductsPaginatedFrontend = async (page: number = 1, limit: number = 10, categoryId?: number, parentCategoryId?: number, search?: string): Promise<PaginationResponse<any>> => {
   try {
     console.log(`Calling frontend paginated products API - page: ${page}, limit: ${limit}`);
     const response = await axiosInstance.get(`/api/product/paginated/frontend`, {
-      params: { page, limit, ...(categoryId ? { categoryId } : {}), ...(parentCategoryId ? { parentCategoryId } : {}) },
+      params: { page, limit, ...(categoryId ? { categoryId } : {}), ...(parentCategoryId ? { parentCategoryId } : {}), ...(search ? { search } : {}) },
     });
     console.log('Frontend paginated product service response:', response);
     if (response.status !== 200) {
@@ -234,5 +234,15 @@ export const createAttribute = async (name: string): Promise<Attribute | null> =
     }
     console.error('Error creating attribute:', err);
     return null;
+  }
+};
+
+export const getPopularProducts = async (): Promise<any[]> => {
+  try {
+    const resp = await axiosInstance.get('/api/product/popular');
+    return resp.data?.data || [];
+  } catch (err) {
+    console.error('Error fetching popular products:', err);
+    return [];
   }
 };

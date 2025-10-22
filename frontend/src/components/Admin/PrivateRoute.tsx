@@ -1,7 +1,6 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
-import { useRole } from "../../../contexts/RoleContext";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -10,7 +9,6 @@ interface PrivateRouteProps {
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
   const { isAuthenticated, user, authReady } = useAuth();
-  const { currentRole } = useRole();
   const location = useLocation();
 
   // While auth hydrating, don't redirect yet
@@ -22,24 +20,24 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, roles }) => {
   if (!isAuthenticated()) {
     // store last attempted path for post-login redirect
     try { sessionStorage.setItem('brightbuy_last_path', location.pathname + location.search); } catch {}
+    // If this route is under /admin, send the user to the admin login page
+    if (location.pathname.startsWith('/admin')) {
+      return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Role mismatch → redirect to correct dashboard for current role
+  // Role mismatch → if we have a user object (authenticated), redirect based on role
+  // If user is missing for some reason, send to login (safety)
   if (roles && user && !roles.includes(user.role)) {
-    switch (currentRole) {
-      case "SuperAdmin":
-        // SuperAdmin should land on the unified admin dashboard
-        return <Navigate to="/admin" replace />;
-      case "Admin":
-        return <Navigate to="/admin" replace />;
-      case "WarehouseStaff":
-        return <Navigate to="/admin/inventory" replace />;
-      case "DeliveryStaff":
-        return <Navigate to="/admin/deliveries" replace />;
-      default:
-        return <Navigate to="/shop" replace />; // normal user
-    }
+    // Authenticated but not allowed for these admin roles → send to shop
+    return <Navigate to="/shop" replace />;
+  }
+
+  if (roles && !user) {
+    // Edge case: roles requested but user is missing. Treat as unauthenticated.
+    try { sessionStorage.setItem('brightbuy_last_path', location.pathname + location.search); } catch {}
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // User has access

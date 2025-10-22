@@ -29,7 +29,7 @@ const userQueries = {
   getPendingStaff: `
     SELECT u.id, u.name, u.email, u.role, u.role_accepted, u.createdAt
     FROM users u
-    WHERE u.role_accepted = 0 AND u.role <> 'SuperAdmin'
+    WHERE u.role_accepted = 0
     ORDER BY u.createdAt DESC
   `,
   insert: `

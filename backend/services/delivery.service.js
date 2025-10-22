@@ -1,6 +1,6 @@
 const { estimateDeliveryDate } = require("../utils/estimateDeliveryDate");
 
-const EstimateDeliveryDate = async (deliveryAddressId, deliveryMode, hasOutOfStock, connection) => {
+const EstimateDeliveryDate = async (orderId = null, deliveryAddressId = null, deliveryMode, hasOutOfStock, connection) => {
     try {
         if (!connection) {
             throw new Error("Database connection is required");
@@ -18,6 +18,9 @@ const EstimateDeliveryDate = async (deliveryAddressId, deliveryMode, hasOutOfSto
         if (rows.length > 0 && rows[0].isMainCategory) {
             deliveryDays = 5;
         }
+        }
+
+        
 
         // Add extra delay for out of stock
         if (hasOutOfStock) {

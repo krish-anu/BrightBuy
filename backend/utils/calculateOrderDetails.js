@@ -184,7 +184,7 @@ const calculateOrderDetails = async (items, deliveryMode, user, connection,deliv
     // if (hasOutOfStock) deliveryDays += 3;
 
     // const deliveryDate = estimateDeliveryDate(deliveryDays);
-    const deliveryDate = await EstimateDeliveryDate(deliveryAddressId, deliveryMode, hasOutOfStock, connection)
+    const deliveryDate = await EstimateDeliveryDate(deliveryAddressId,orderId=null, deliveryMode, hasOutOfStock, connection)
 
     // Final total rounded and validated
     const totalAmount = parseFloat((totalPrice + deliveryCharge).toFixed(2));

@@ -50,11 +50,13 @@ const UserLogin: React.FC = () => {
     }
 
     try {
-      const result = await login(email, password);
+  // If user arrived from an admin path, or is on the admin login page, request admin login
+  const adminLogin: boolean = location.pathname.startsWith("/admin") || fromPath.startsWith("/admin");
+      const result = await login(email, password, adminLogin);
 
       if (result?.success === true) {
         const returnedRole = result.user?.role || null;
-        const wantsAdmin = fromPath && fromPath.startsWith("/admin");
+  const wantsAdmin = location.pathname.startsWith("/admin") || (fromPath && fromPath.startsWith("/admin"));
 
         // safe return path for "payment" 
         if (fromPath.startsWith("/order/payment")) {
@@ -110,6 +112,17 @@ const UserLogin: React.FC = () => {
           Login to continue shopping with{" "}
           <span className="font-semibold">BrightBuy</span>
         </p>
+
+        {/* Admin guidance banner */}
+        {/* {location.pathname.startsWith('/admin') ? (
+          <div className="mt-3 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+            Admin / Staff login — use this page to sign in to the admin dashboard.
+          </div>
+        ) : (
+          <div className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+            Are you an admin or staff member? Please <Link to="/admin/login" className="font-medium underline">use the admin login page</Link> instead.
+          </div>
+        )} */}
 
         {/* Form */}
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
@@ -204,8 +217,8 @@ const UserLogin: React.FC = () => {
         <p className="mt-5 text-center text-sm text-gray-600">
           Don’t have an account?{" "}
           {(() => {
-            // If user was redirected here from an admin route, pass admin=true to signup so role dropdown is shown
-            const signupUrl = fromPath && fromPath.startsWith('/admin') ? '/signup?admin=true' : '/signup';
+            // If user is on an admin path, pass admin=true to signup so role dropdown is shown
+            const signupUrl = location.pathname.startsWith('/admin') ? '/signup?admin=true' : '/signup';
             return (
               <Link to={signupUrl} className="text-primary hover:underline font-medium">
                 Create one

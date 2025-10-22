@@ -17,7 +17,7 @@ services:
   frontend:
     image: anusan2003/brightbuy-frontend:latest
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     networks:
@@ -30,7 +30,14 @@ services:
       MYSQL_DATABASE: BrightBuy
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
+      - ./backend/sql/functions.sql:/docker-entrypoint-initdb.d/02_functions.sql:ro
+      - ./backend/sql/procedures.sql:/docker-entrypoint-initdb.d/03_procedures.sql:ro
+      - ./backend/sql/triggers.sql:/docker-entrypoint-initdb.d/04_triggers.sql:ro
+      - ./backend/sql/indexes.sql:/docker-entrypoint-initdb.d/05_indexes.sql:ro
+      - ./backend/sql/constraints.sql:/docker-entrypoint-initdb.d/06_constraints.sql:ro
+
+
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pbrightbuy"]
       interval: 5s

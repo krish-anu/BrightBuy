@@ -1,20 +1,7 @@
--- BrightBuy DB procedures, functions, and triggers
--- Purpose: Centralize multi-step operations in transactions, enforce invariants at DB layer.
--- Compatible with MySQL 8.0+
+-- BrightBuy DB procedures
+-- Extracted from procedures_and_triggers.sql
 
 DELIMITER $$
-
--- Function: calculate order total from items table (fallback server-side check)
-DROP FUNCTION IF EXISTS fn_calculate_order_total $$
-CREATE FUNCTION fn_calculate_order_total(p_orderId INT)
-RETURNS DECIMAL(12,2)
-DETERMINISTIC
-BEGIN
-  DECLARE v_total DECIMAL(12,2);
-  SELECT IFNULL(SUM(totalPrice), 0.00) INTO v_total
-  FROM order_items WHERE orderId = p_orderId;
-  RETURN v_total;
-END $$
 
 -- Procedure: create a full order atomically (address -> order -> items -> delivery -> payment)
 -- Inputs mirror your controller flow; pass NULLs for optional values
@@ -32,7 +19,10 @@ CREATE PROCEDURE sp_create_order(
 )
 BEGIN
   DECLARE v_orderId INT;
-  DECLARE v_deliveryAddressId INT;
+  DECLARE v_line1 VARCHAR(255);
+  DECLARE v_line2 VARCHAR(255);
+  DECLARE v_city VARCHAR(120);
+  DECLARE v_postal VARCHAR(32);
 
   DECLARE exit handler for sqlexception
   BEGIN
@@ -49,11 +39,19 @@ BEGIN
   --   SET v_deliveryAddressId = LAST_INSERT_ID();
   -- END IF;
 
-  -- Insert order with Pending for card, Confirmed for COD (matches service logic)
-  INSERT INTO orders (userId, deliveryMode, deliveryAddressId, totalPrice, deliveryCharge, paymentMethod, status)
-  VALUES (p_userId, p_deliveryMode, p_deliveryAddressId, 0.00, p_deliveryCharge, p_paymentMethod,
-    CASE WHEN p_paymentMethod = 'CashOnDelivery' THEN 'Confirmed' ELSE 'Pending' END);
+  -- Insert order with initial warehouse status = 'Pending' (payment handled separately)
+  INSERT INTO orders (userId, deliveryMode, totalPrice, deliveryCharge, paymentMethod, status)
+  VALUES (p_userId, p_deliveryMode, 0.00, p_deliveryCharge, p_paymentMethod, 'Pending');
   SET v_orderId = LAST_INSERT_ID();
+
+  -- For Standard Delivery, snapshot the address into 1:1 child table (3NF, historical accuracy)
+  IF p_deliveryMode = 'Standard Delivery' AND p_deliveryAddressId IS NOT NULL THEN
+    SELECT a.line1, a.line2, a.city, a.postalCode
+      INTO v_line1, v_line2, v_city, v_postal
+      FROM addresses a WHERE a.id = p_deliveryAddressId LIMIT 1;
+    INSERT INTO order_addresses (orderId, line1, line2, city, postalCode)
+    VALUES (v_orderId, v_line1, v_line2, v_city, v_postal);
+  END IF;
 
   -- Items must be inserted by caller afterwards with sp_add_order_item; totals will be recomputed
 
@@ -64,7 +62,7 @@ BEGIN
 
   COMMIT;
 
-  SELECT v_orderId AS orderId, v_deliveryAddressId AS deliveryAddressId;
+  SELECT v_orderId AS orderId;
 END $$
 
 -- Procedure: add a single order item with stock check and optional stock decrement
@@ -145,60 +143,6 @@ BEGIN
   COMMIT;
 END $$
 
--- Trigger: prevent negative stock
-DROP TRIGGER IF EXISTS trg_product_variants_no_negative_stock $$
-CREATE TRIGGER trg_product_variants_no_negative_stock
-BEFORE UPDATE ON product_variants
-FOR EACH ROW
-BEGIN
-  IF NEW.stockQnt < 0 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Stock cannot be negative';
-  END IF;
-END $$
-
--- Trigger: ensure order_items totalPrice consistency
-DROP TRIGGER IF EXISTS trg_order_items_set_totals $$
-CREATE TRIGGER trg_order_items_set_totals
-BEFORE INSERT ON order_items
-FOR EACH ROW
-BEGIN
-  DECLARE v_price DECIMAL(10,2);
-  IF NEW.unitPrice IS NULL OR NEW.unitPrice = 0 THEN
-    SELECT price INTO v_price FROM product_variants WHERE id = NEW.variantId;
-    SET NEW.unitPrice = IFNULL(v_price, 0.00);
-  END IF;
-  SET NEW.totalPrice = ROUND(NEW.unitPrice * NEW.quantity, 2);
-END $$
-
--- Trigger: keep orders.totalPrice in sync when items change
-DROP TRIGGER IF EXISTS trg_order_items_after_change $$
-CREATE TRIGGER trg_order_items_after_change
-AFTER INSERT ON order_items
-FOR EACH ROW
-BEGIN
-  UPDATE orders SET totalPrice = fn_calculate_order_total(NEW.orderId)
-  WHERE id = NEW.orderId;
-END $$
-
--- Additional hook for updates/deletes if you allow editing items
-DROP TRIGGER IF EXISTS trg_order_items_after_update $$
-CREATE TRIGGER trg_order_items_after_update
-AFTER UPDATE ON order_items
-FOR EACH ROW
-BEGIN
-  UPDATE orders SET totalPrice = fn_calculate_order_total(NEW.orderId)
-  WHERE id = NEW.orderId;
-END $$
-
-DROP TRIGGER IF EXISTS trg_order_items_after_delete $$
-CREATE TRIGGER trg_order_items_after_delete
-AFTER DELETE ON order_items
-FOR EACH ROW
-BEGIN
-  UPDATE orders SET totalPrice = fn_calculate_order_total(OLD.orderId)
-  WHERE id = OLD.orderId;
-END $$
-
 DELIMITER ;
 
--- End of procedures_and_triggers.sql
+-- End of procedures.sql
