@@ -215,13 +215,39 @@ const insertVariantOption = `INSERT INTO product_variant_options (variantId, att
 // Update variant image URL
 const updateVariantImage = `UPDATE product_variants SET imageURL = ? WHERE id = ?`;
 
-// Get popular products
+// Get popular products (include representative variant info and imageURL)
 const getPopularProducts = `
-SELECT p.id, p.name, p.brand, p.description, SUM(oi.quantity) AS soldQuantity
+SELECT 
+    p.id AS productId,
+    p.name AS productName,
+    p.brand,
+    p.description,
+    pv.id AS variantId,
+    pv.variantName,
+    pv.price,
+    pv.imageURL,
+    COALESCE(
+        (
+        SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'id', csub.id,
+                'name', csub.name
+            )
+        )
+        FROM (
+            SELECT DISTINCT c2.id, c2.name
+            FROM product_categories pc2
+            JOIN categories c2 ON pc2.categoryId = c2.id
+            WHERE pc2.productId = p.id
+        ) AS csub
+        ),
+        JSON_ARRAY()
+    ) AS Categories,
+    SUM(oi.quantity) AS soldQuantity
 FROM products p
 JOIN product_variants pv ON pv.productId = p.id
 JOIN order_items oi ON oi.variantId = pv.id
-GROUP BY p.id
+GROUP BY p.id, p.name, p.brand, p.description, pv.id, pv.variantName, pv.price, pv.imageURL
 ORDER BY soldQuantity DESC
 `;
 

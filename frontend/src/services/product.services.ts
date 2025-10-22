@@ -236,3 +236,13 @@ export const createAttribute = async (name: string): Promise<Attribute | null> =
     return null;
   }
 };
+
+export const getPopularProducts = async (): Promise<any[]> => {
+  try {
+    const resp = await axiosInstance.get('/api/product/popular');
+    return resp.data?.data || [];
+  } catch (err) {
+    console.error('Error fetching popular products:', err);
+    return [];
+  }
+};

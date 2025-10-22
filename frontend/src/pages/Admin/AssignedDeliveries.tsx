@@ -259,6 +259,11 @@ const AssignedDeliveries: React.FC = () => {
     }, 150);
   };
 
+  // Reference the handlers so TypeScript/linters don't mark them as unused
+  // (They are intended for future quick-action buttons)
+  void handleCall;
+  void handleMessage;
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
