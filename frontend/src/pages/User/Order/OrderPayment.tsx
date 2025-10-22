@@ -87,8 +87,8 @@ export default function OrderPayment() {
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
   
   const shipping = 0;
-  const discount = 0;
-  const total = subtotal + shipping - discount;
+  // const discount = 0;
+  const total = subtotal + shipping;
 
   // Auth guard: check protected profile endpoint and redirect to login 
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function OrderPayment() {
           <OrderSummaryCard
             subtotal={subtotal}
             shipping={shipping}
-            discount={discount}
+            // discount={discount}
             total={total}
             onNext={() => {
               // Guard: Standard Delivery requires a selected/default delivery address

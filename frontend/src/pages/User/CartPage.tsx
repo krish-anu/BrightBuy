@@ -103,7 +103,7 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
           <OrderSummaryCard
             subtotal={selectedSubtotal}
             shipping={0}
-            discount={0}
+            // discount={0}
             total={selectedSubtotal}
             onNext={() => {
               // Only proceed with selected items; if none, do nothing
@@ -127,6 +127,7 @@ function CartPageContent({ items, removeItem, updateQuantity, itemsCount }: Cart
               navigate(`/order/confirm?${params.toString()}`);
             }}
             nextLabel="Proceed with Selected"
+            showShippingRow={false}
           />
         </div>
       </div>

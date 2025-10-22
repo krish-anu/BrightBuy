@@ -80,8 +80,8 @@ export default function OrderConfirm() {
     // Calculate subtotal by computing lineTotal for each item
     const subtotal: number = items.reduce((sum: number, i: OrderItem) => sum + i.unitPrice * i.quantity, 0);
     const shipping: number = 0;  
-    const discount: number = 0; 
-    const total: number = subtotal + shipping - discount;
+    // const discount: number = 0; 
+    const total: number = subtotal + shipping;
 
     // Guard: ensure URL has required params only if no global items exist
     if ((!productId || !variantId) && (!globalItems || globalItems.length === 0)) {
@@ -111,7 +111,7 @@ export default function OrderConfirm() {
                 <OrderSummaryCard
                     subtotal={subtotal}
                     shipping={shipping}
-                    discount={discount}
+                    // discount={discount}
                     total={total}
                     onNext={() => {
                         // Ensure sessionKey is included so next pages bind to the same session
@@ -120,6 +120,7 @@ export default function OrderConfirm() {
                         navigate(`/order/payment?${qs.toString()}`);
                     }}
                     className="mt-12"
+                    showShippingRow={false}
                 />
             </div>
         </div>
