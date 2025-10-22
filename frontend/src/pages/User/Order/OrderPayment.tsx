@@ -1,15 +1,16 @@
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
 import { BackHeader } from "@/components/Order/BackHeader";
 import { OrderSummaryCard } from "@/components/Order/OrderSummaryCard";
-import PaymentMethod  from "@/components/Order/PaymentMethod";
-import ShippingMethod from "@/components/Order/ShippingMethod";
+import PaymentMethod from "@/components/Order/PaymentMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
-import { Separator } from "@/components/ui/separator";
-import { useOrderSession } from "../../../../contexts/OrderContext";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import ShippingMethod from "@/components/Order/ShippingMethod";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { Separator } from "@/components/ui/separator";
 import { getUserProfile } from "@/services/user.services";
 import { getVariant } from "@/services/variant.services";
+import { useOrderSession } from "../../../../contexts/OrderContext";
  
 
 type ShippingChoice = "standard" | "pickup";
@@ -37,7 +38,7 @@ export default function OrderPayment() {
   // Prefer explicit URL param, then key derived from current params, and only then fall back to stored key
   const sessionKey = sessionKeyParam || derivedKey || storedKey || "order:_:_";
 
-  // Keep last used key in sessionStorage and keep URL in sync for smoother returns
+  // Keep last used key in sessionStorage and sync the URL so refreshes stay on the same session
   useEffect(() => {
     try { sessionStorage.setItem("bb:lastOrderSessionKey", sessionKey); } catch {}
     if (!sessionKeyParam) {
@@ -48,8 +49,6 @@ export default function OrderPayment() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
   const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
-  // Derive delivery mode from user selection
-  const deliveryMode = useMemo(() => (shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup"), [shippingMethod]);
 
   // Determine if any item is out of stock by checking variant stock on the server
   const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
@@ -57,11 +56,8 @@ export default function OrderPayment() {
     let ignore = false;
     (async () => {
       try {
-        if (!items || items.length === 0) {
-          if (!ignore) setHasOutOfStock(false);
-          return;
-        }
-        // Fetch variant details for each item to read stockQnt
+        if (!items?.length) { if (!ignore) setHasOutOfStock(false); return; }
+        // Fetch variant details for each item to read stock levels server-side
         const results = await Promise.all(
           items.map(async (it) => {
             const vid = (typeof it.id === "string" && /^\d+$/.test(it.id)) ? Number(it.id) : it.id;
@@ -76,19 +72,16 @@ export default function OrderPayment() {
       } catch (e) {
         // If stock check fails, be conservative and do not block; treat as not out of stock
         if (!ignore) setHasOutOfStock(false);
-      } finally {
-        // no-op
       }
     })();
     return () => { ignore = true; };
   }, [items]);
-  
-  // compute summary values
-  const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-  
-  const shipping = 0;
-  // const discount = 0;
-  const total = subtotal + shipping;
+
+  // Compute summary values once per items change to avoid repeated work in render
+  const subtotal = useMemo(() => (
+    items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+  ), [items]);
+  const total = subtotal;
 
   // Auth guard: check protected profile endpoint and redirect to login 
   useEffect(() => {
@@ -113,7 +106,7 @@ export default function OrderPayment() {
   // Guard against invalid direct access or missing session data
   // Consider the session invalid if there are no items.
   // Use a null-safe check in case `items` is undefined/null from the context.
-  const isInvalid = !items || items.length === 0;
+  const isInvalid = !items?.length;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
@@ -124,9 +117,6 @@ export default function OrderPayment() {
     );
   }
 
-  // No forced payment change; COD is allowed for Store Pickup now
-  void deliveryMode;
-
   return (
     <div className="space-y-8">
       <BackHeader title="Product Confirmation" />
@@ -135,6 +125,7 @@ export default function OrderPayment() {
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
           {shippingMethod === "standard" ? (
+            // Address picker handles creating/selecting addresses and feeds city info for shipping later steps
             <ShippingAddressSection
               onSelectionChange={setShippingAddressId}
               initialSelectedId={shippingAddressId}
@@ -157,8 +148,7 @@ export default function OrderPayment() {
         <div className="md:col-span-1 space-y-8">
           <OrderSummaryCard
             subtotal={subtotal}
-            shipping={shipping}
-            // discount={discount}
+            shipping={0}
             total={total}
             onNext={() => {
               // Guard: Standard Delivery requires a selected/default delivery address

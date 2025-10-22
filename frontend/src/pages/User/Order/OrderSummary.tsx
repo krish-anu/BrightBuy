@@ -1,13 +1,13 @@
-import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
-import { useOrderSession, type OrderItem as CtxOrderItem } from "../../../../contexts/OrderContext";
-import { Button } from "@/components/ui/button";
-import { createOrder } from "@/services/order.services";
-import { BillSummary } from "@/components/Order/BillSummary";
-import { listAddresses } from "@/services/address.services";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+import { BillSummary } from "@/components/Order/BillSummary";
+import { Button } from "@/components/ui/button";
+import { listAddresses } from "@/services/address.services";
 import { estimatedDeliveryDate } from "@/services/delivery.services";
+import { createOrder } from "@/services/order.services";
 import { getVariant } from "@/services/variant.services";
-// import { loadStripe } from "@stripe/stripe-js";
+import { useOrderSession, type OrderItem as CtxOrderItem } from "../../../../contexts/OrderContext";
 
 export default function OrderSummary() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export default function OrderSummary() {
   // Prefer explicit URL param, then key derived from current params, then stored key
   const sessionKey = sessionKeyParam || derivedKey || storedKey || "order:_:_";
 
-  // Normalize URL to keep sessionKey present and remember last key for returns
+  // Keep sessionKey stable so refreshes and redirects land back in the same checkout flow
   useEffect(() => {
     try { sessionStorage.setItem("bb:lastOrderSessionKey", sessionKey); } catch {}
     if (!sessionKeyParam) {
@@ -37,7 +37,7 @@ export default function OrderSummary() {
   }, [sessionKey]);
   const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
 
-  // Fetch addresses to format the selected one for display
+  // Fetch addresses so we can show the shipping address summary on the bill card
   const [addresses, setAddresses] = useState<any[]>([]);
   useEffect(() => {
     let mounted = true;
@@ -56,18 +56,18 @@ export default function OrderSummary() {
     if (!shippingAddressId) return undefined;
     const addr = addresses.find((a) => String(a.id) === String(shippingAddressId));
     if (!addr) return `Address #${shippingAddressId}`;
-    // Common fields from backend: line1, line2, city, postalCode
+    // Keep address compact but descriptive for the summary footer
     const parts = [addr.line1, addr.line2, addr.city, addr.postalCode].filter(Boolean);
     return parts.join(", ");
   }, [addresses, shippingAddressId]);
 
-  // Estimated delivery via backend API
+  // Track stock status so ETA API can include backorder logic
   const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
   useEffect(() => {
     let ignore = false;
     (async () => {
       try {
-        if (!items || items.length === 0) { if (!ignore) setHasOutOfStock(false); return; }
+        if (!items?.length) { if (!ignore) setHasOutOfStock(false); return; }
         const results = await Promise.all(
           items.map(async (it) => {
             const vid = (typeof it.id === "string" && /^\d+$/.test(it.id)) ? Number(it.id) : (it.id as any);
@@ -77,8 +77,7 @@ export default function OrderSummary() {
             return Number(stock) <= 0;
           })
         );
-  const anyOOS = results.some(Boolean);
-  if (!ignore) setHasOutOfStock(anyOOS);
+        if (!ignore) setHasOutOfStock(results.some(Boolean));
       } catch {
         if (!ignore) setHasOutOfStock(false);
       }
@@ -128,13 +127,23 @@ export default function OrderSummary() {
     return () => { ignore = true; };
   }, [shippingMethod, shippingAddressId, hasOutOfStock]);
 
-  const subtotal = items.reduce((sum: number, i: CtxOrderItem) => sum + i.unitPrice * i.quantity, 0);
-  const shipping = 0;
-  const discount = 0;
-  const total = subtotal + shipping - discount;
+  const payloadItems = useMemo(() => (
+    items.map((item) => {
+      const numeric = Number(item.id);
+      return {
+        variantId: Number.isNaN(numeric) ? String(item.id) : numeric,
+        quantity: item.quantity,
+      };
+    })
+  ), [items]);
+
+  const subtotal = useMemo(() => (
+    items.reduce((sum: number, item: CtxOrderItem) => sum + item.unitPrice * item.quantity, 0)
+  ), [items]);
+  const total = subtotal;
 
   // Guard invalid direct access
-  const isInvalid = items.length === 0;
+  const isInvalid = !items.length;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
@@ -159,11 +168,6 @@ export default function OrderSummary() {
         return;
       }
 
-      const payloadItems = items.map((i) => ({
-        variantId: Number(i.id) || String(i.id),
-        quantity: i.quantity,
-      }));
-
       const deliveryAddressId = shippingMethod === "standard"
         ? (isNaN(Number(shippingAddressId)) ? shippingAddressId : Number(shippingAddressId))
         : undefined;
@@ -181,7 +185,6 @@ export default function OrderSummary() {
       } as const;
 
       const result = await createOrder(payload as any);
-      console.log("Stripe session created", result);
 
       // Accept possible backend keys
       const sessionId = (result as any)?.sessionId || (result as any)?.id || (result as any)?.checkoutSessionId;
@@ -222,11 +225,6 @@ export default function OrderSummary() {
       // COD is allowed for Store Pickup now; no pre-guard needed
 
       // Build items payload
-      const payloadItems = items.map((i) => ({
-        variantId: Number(i.id) || String(i.id),
-        quantity: i.quantity,
-      }));
-
       // Require a shipping address ID only for Standard Delivery
       if (deliveryMode === "Standard Delivery" && !shippingAddressId) {
         alert("Please select a shipping address to place a COD order.");
@@ -256,10 +254,10 @@ export default function OrderSummary() {
       await createOrder(payload as any);
 
       // On success, redirect to success page with session params
-  const qs = new URLSearchParams(searchParams);
-  if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
-  qs.set("flow", "cod");
-  navigate(`/order/success?${qs.toString()}`);
+      const qs = new URLSearchParams(searchParams);
+      if (!qs.get("sessionKey")) qs.set("sessionKey", sessionKey);
+      qs.set("flow", "cod");
+      navigate(`/order/success?${qs.toString()}`);
     } catch (err: any) {
       const backend = err?.original?.response?.data || err?.response?.data;
       const msg = (backend && (backend.message || backend.error)) || err?.message || "Failed to place order";
@@ -283,8 +281,8 @@ export default function OrderSummary() {
         deliveryAddressText={shippingMethod === "standard" && paymentMethod !== 'cod' ? deliveryAddressText : undefined}
         estimatedDeliveryText={shippingMethod === "standard" ? etaText : undefined}
         subtotal={subtotal}
-        shipping={shipping}
-        discount={discount}
+        shipping={0}
+        discount={0}
         total={total}
         onNext={flow === "online" ? onPayOnline : onPlaceOrder}
         nextLabel={flow === "online" ? "Pay with Stripe" : "Place Order"}
