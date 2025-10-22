@@ -44,9 +44,13 @@ const getAssignedDeliveriesForStaff = async (req, res, next) => {
       where.push('d.staffId = ?');
       params.push(userId);
     }
-  // Only show deliveries that are actionable for staff: Assigned or Shipped (in_transit).
-  // Delivered or Cancelled should not be returned so they disappear from staff view after delivery.
-  where.push("d.status IN ('Assigned','Shipped')");
+    // By default only show deliveries that are actionable for staff: Assigned or Shipped (in_transit).
+    // Delivered or Cancelled should not be returned so they disappear from staff view after delivery.
+    // However if caller passes ?includeDelivered=true we will include Delivered rows as well.
+    const includeDelivered = String(req.query?.includeDelivered || '').toLowerCase() === 'true';
+    if (!includeDelivered) {
+      where.push("d.status IN ('Assigned','Shipped')");
+    }
     if (where.length) {
       sql += `WHERE ${where.join(' AND ')}\n`;
     }
@@ -219,6 +223,18 @@ const getEstimatedDeliveryDate = async (req, res, next) => {
   }
 };
 
+// Get single delivery by id (admin/superadmin)
+const getDeliveryByIdController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rows = await query(deliveryQueries.getDeliveryById, [id]);
+    if (!rows.length) return res.status(404).json({ message: 'Delivery not found' });
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 
@@ -229,4 +245,5 @@ module.exports = {
   updateDeliveryStatusController,
   getDeliveryStaffAssignmentSummary,
   getEstimatedDeliveryDate
+  ,getDeliveryByIdController
 };

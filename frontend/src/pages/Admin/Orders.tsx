@@ -50,30 +50,39 @@ const Orders: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      // Decide which endpoint to call based on token role to avoid 403 Forbidden
-      const current = getCurrentUserFromToken();
-      const role = (current?.role || '').toString().toLowerCase();
+      // Try fetching all orders first (admin). If forbidden, fall back to assigned orders.
       let ordersData: Order[] = [];
-      if (role === 'admin' || role === 'superadmin') {
+      try {
         ordersData = await getAllOrders();
-      } else if (role === 'warehousestaff' || role === 'deliverystaff' || role.includes('delivery')) {
-        // warehouse and delivery staff should only get their assigned orders
-        ordersData = await getAssignedOrders();
-      } else {
-        // Other roles are not allowed to list all orders; surface a helpful message and return empty
-        setError('You do not have permission to list all orders.');
-        setOrders([]);
-        setLoading(false);
-        return;
+      } catch (err: any) {
+        // If backend forbids listing all orders, try assigned orders for staff users
+        if (err?.message === 'Forbidden' || err?.response?.status === 403) {
+          try {
+            ordersData = await getAssignedOrders();
+          } catch (innerErr: any) {
+            console.error('Failed to fetch assigned orders after forbidden:', innerErr);
+            if (innerErr?.message === 'Forbidden' || innerErr?.response?.status === 403) {
+              setError('You do not have permission to view orders. Contact an admin.');
+            } else {
+              setError('Failed to load orders. Please try again.');
+            }
+            setOrders([]);
+            setLoading(false);
+            return;
+          }
+        } else {
+          // Unexpected error while attempting to load all orders
+          console.error('Error fetching all orders:', err);
+          setError('Failed to load orders. Please try again.');
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
       }
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
-      // If admin and activeTab is shipped, load shipped orders too
-      if (role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin') {
-        // lazy load shipped orders
-        // lazy load placeholder - no-op
-      }
+      // Note: shipped orders are loaded via separate API when the 'shipped' tab is active
     } catch (err) {
       console.error('Error loading orders:', err);
       // Distinguish forbidden from other errors
@@ -823,10 +832,21 @@ const Orders: React.FC = () => {
                     <button onClick={async () => {
                       const selected = availableDeliveryStaff.find(s => s._selected);
                       if (!selected) { alert('Please select a staff'); return; }
-                      try {
+                        try {
                         setAssigningDelivery(true);
                         // Use deliveryId if present, otherwise pass the orderId — backend will create a delivery record when missing
                         const idToUse = deliveryToAssign.deliveryId || deliveryToAssign.orderId;
+
+                        // If a delivery exists (we passed a deliveryId), fetch it and check for existing staff to avoid 409
+                        if (deliveryToAssign.deliveryId) {
+                          const check = await (await import('../../services/delivery.services')).getDeliveryById(Number(deliveryToAssign.deliveryId));
+                          if (check.success && check.data && check.data.staffId) {
+                            alert(`A staff member (id=${check.data.staffId}) is already assigned to this delivery.`);
+                            setAssigningDelivery(false);
+                            return;
+                          }
+                        }
+
                         const resp = await assignStaffToDelivery(Number(idToUse), selected.id);
                         // If the service returns an error-like response, surface it
                         if (resp && resp.success === false) {
