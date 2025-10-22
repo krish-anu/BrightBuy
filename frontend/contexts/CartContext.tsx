@@ -28,6 +28,7 @@ interface CartContextType {
   clearCart: () => void;
   total: number;
   itemsCount: number;
+  refresh: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -83,31 +84,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     return result;
   };
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    const initLocal = () => {
-      if (!savedCart) return;
-      try {
-        const parsed: CartItem[] = JSON.parse(savedCart) || [];
-        const cleaned = parsed
-          .filter(it => Number.isFinite(Number(it.variantId)) && Number.isFinite(Number(it.productId)))
-          .map(it => ({
-            ...it,
-            variantId: Number(it.variantId),
-            productId: Number(it.productId),
-            price: Number(it.price),
-            quantity: Math.max(1, Number(it.quantity) || 1),
-          }));
-        setItems(cleaned);
-      } catch {
-        localStorage.removeItem('cart');
-        setItems([]);
-      }
-    };
+    // Load cart behavior: when authenticated, fetch/merge server cart; when not authenticated, show empty cart
+    useEffect(() => {
+    // Wait for auth to hydrate to avoid clearing cart prematurely on page refresh
+    if (maybeAuth && maybeAuth.authReady === false) {
+      return;
+    }
 
-    // If user is authenticated, prefer server cart; otherwise initialize from local
     let ignore = false;
+
     const fetchServer = async () => {
       try {
         const rows = await apiListCart();
@@ -127,18 +112,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
           return;
         }
       } catch (e) {
-        // fallback to local behavior
-        console.warn('Failed to load server cart, falling back to local', e);
-        initLocal();
+        console.warn('Failed to load server cart', e);
+        // On server fetch failure, leave cart empty to avoid leaking other user's data
+        setItems([]);
       }
     };
 
-    // If the user is authenticated (via auth context), merge any local cart into server then fetch server cart;
-    // otherwise use local
+    // If authenticated, optionally merge any existing local guest cart into server then fetch server cart
     if (isAuthenticatedFn()) {
       const tryMergeAndFetch = async () => {
         try {
-          // If there is a local cart (from before login), merge it into server-side cart.
           const raw = localStorage.getItem('cart');
           if (raw) {
             try {
@@ -154,7 +137,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                 }));
 
               if (cleaned.length) {
-                // Persist each local item to server. The server will upsert (increment existing qty).
                 await Promise.all(
                   cleaned.map((it) =>
                     apiAddToCart({ variantId: it.variantId, quantity: it.quantity, unitPrice: it.price }).catch((e) => {
@@ -163,11 +145,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                     })
                   )
                 );
-                // Remove local cart after attempting merge to avoid duplicate re-merges
                 localStorage.removeItem('cart');
               }
             } catch (e) {
-              // If parsing fails, remove corrupt local cart and continue
               console.warn('[cart] failed to parse local cart during merge, clearing local cart', e);
               localStorage.removeItem('cart');
             }
@@ -175,21 +155,21 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
           await fetchServer();
         } catch (e) {
-          console.warn('Failed to merge/fetch server cart, falling back to local', e);
-          initLocal();
+          console.warn('Failed to merge/fetch server cart, leaving cart empty', e);
+          setItems([]);
         }
       };
 
       void tryMergeAndFetch();
     } else {
-      initLocal();
+      // Not authenticated: ensure cart is empty and do not load any previous user's items
+      try { localStorage.removeItem('cart'); } catch {}
+      setItems([]);
     }
 
-    return () => {
-      ignore = true;
-    };
-  // Re-run when authentication status (user) changes so we can sync server cart
-  }, [maybeAuth?.user]);
+    return () => { ignore = true };
+  // Re-run when authentication status (user) or auth readiness changes
+  }, [maybeAuth?.user, maybeAuth?.authReady]);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
@@ -221,7 +201,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     if (isAuthenticatedFn()) {
       console.log('[cart] persisting addToCart to server for variantId=', newItem.variantId, 'qty=', newItem.quantity);
       void apiAddToCart({ variantId: newItem.variantId, quantity: newItem.quantity, unitPrice: newItem.price })
-        .then((resp) => console.log('[cart] server addToCart response:', resp))
+        .then(() => {
+          // Refresh from server so quantities and selections are exact
+          refresh();
+          // Cross-tab sync signal
+          try { localStorage.setItem('cart_sync', String(Date.now())); } catch {}
+        })
         .catch((e) => {
           console.warn('Failed to persist addToCart to server:', e);
         });
@@ -234,7 +219,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // best-effort: find server-side cart id by variantId is not available here, skip unless frontend stores server id
       // fallback: refetch server cart to align
       void apiListCart()
-        .then((rows) => setItems((rows || []).map(mapServerRow)))
+        .then((rows) => {
+          setItems((rows || []).map(mapServerRow));
+          try { localStorage.setItem('cart_sync', String(Date.now())); } catch {}
+        })
         .catch((e) => console.warn('Failed to refresh server cart after remove', e));
     }
   };
@@ -247,7 +235,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         .then((rows) => {
           const row = (rows || []).find((r: any) => Number(r.variantId) === Number(variantId));
           if (row && row.id) {
-            return apiUpdateCartQuantity(row.id, quantity).then((res) => setItems((res.data || []).map(mapServerRow))).catch(() => {});
+            return apiUpdateCartQuantity(row.id, quantity)
+              .then((res) => {
+                setItems((res.data || []).map(mapServerRow));
+                try { localStorage.setItem('cart_sync', String(Date.now())); } catch {}
+              })
+              .catch(() => {});
           }
         })
         .catch((e) => console.warn('Failed to update quantity on server', e));
@@ -257,7 +250,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const clearCart = () => {
     setItems([]);
     if (isAuthenticatedFn()) {
-      void apiClearCart().catch((e) => console.warn('Failed to clear server cart', e));
+      void apiClearCart()
+        .then(() => {
+          // Cross-tab sync signal
+          try { localStorage.setItem('cart_sync', String(Date.now())); } catch {}
+        })
+        .catch((e) => console.warn('Failed to clear server cart', e));
     }
   };
 
@@ -283,6 +281,43 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // Number of displayed variants (distinct rows), not the sum of quantities
   const itemsCount = items.filter(it => Number.isFinite(Number(it.variantId))).length;
 
+  // Listen for cross-tab cart updates and refresh
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'cart_sync') {
+        refresh();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Expose a refresh method to reload from server (or clear if not authenticated)
+  const refresh = () => {
+    if (maybeAuth && maybeAuth.authReady === false) return;
+    if (isAuthenticatedFn()) {
+      void apiListCart()
+        .then((rows) => {
+          const mapped = (rows || []).map((r: any) => {
+            const base = mapServerRow(r);
+            const attrs = parseAttributes(r.attributes);
+            return {
+              ...base,
+              color: attrs.Color || attrs.color || undefined,
+              size: attrs.Size || attrs.size || undefined,
+            } as CartItem;
+          });
+          setItems(mapped);
+        })
+        .catch((e) => {
+          console.warn('[cart] refresh failed, leaving items as-is', e);
+        });
+    } else {
+      try { localStorage.removeItem('cart'); } catch {}
+      setItems([]);
+    }
+  };
+
   return (
     <CartContext.Provider
       value={{
@@ -297,6 +332,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         clearCart,
         total,
         itemsCount,
+        refresh,
       }}
     >
       {children}

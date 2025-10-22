@@ -1,7 +1,8 @@
+import React from "react";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, User, Search, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "../../../contexts/CartContext";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,36 @@ function CartBadge() {
 export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { refresh } = useCart();
+
+  // Hide cart badge in auth pages to avoid showing stale counts
+  const isAuthRoute = React.useMemo(() => {
+    const p = location.pathname.toLowerCase();
+    return p.startsWith('/login') || p.startsWith('/signup') || p.startsWith('/admin/login') || p.startsWith('/admin/signup');
+  }, [location.pathname]);
+
+  // Refresh cart badge on route changes
+  React.useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search]);
+
+  // Refresh cart when window regains focus and on storage sync events
+  React.useEffect(() => {
+    const onFocus = () => refresh();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'cart_sync' || e.key === 'auth_sync') {
+        refresh();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [refresh]);
 
   const handleLogout = () => {
     logout();
@@ -67,7 +98,7 @@ export function Navbar() {
           >
             <div className="relative">
               <ShoppingCart className="h-5 w-5" />
-              <CartBadge />
+              {!isAuthRoute && <CartBadge />}
             </div>
             <span className="hidden md:block text-lg font-medium">Cart</span>
           </Link>
