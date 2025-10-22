@@ -61,10 +61,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     variantId: Number(r.variantId),
     productId: Number(r.productId ?? 0),
     quantity: Number(r.quantity || 1),
-    name: r.productName || '',
+    // prefer variant name if present otherwise product name
+    name: r.variantName || r.productName || '',
     price: Number(r.unitPrice ?? r.variantPrice ?? 0),
-    imageUrl: undefined,
+    imageUrl: r.imageUrl || r.imageURL || undefined,
   });
+
+  // helper to parse concatenated attributes string from server
+  const parseAttributes = (attrStr: string | undefined) => {
+    const result: Record<string, string> = {};
+    if (!attrStr) return result;
+    // server returns like: "Color::Red||Size::M"
+    try {
+      attrStr.split('||').forEach((pair) => {
+        const [k, v] = pair.split('::');
+        if (k && v) result[k] = v;
+      });
+    } catch {
+      // ignore parsing errors
+    }
+    return result;
+  };
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -96,7 +113,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         const rows = await apiListCart();
         if (ignore) return;
         if (Array.isArray(rows)) {
-          setItems(rows.map(mapServerRow));
+          setItems(
+            rows.map((r: any) => {
+              const base = mapServerRow(r);
+              const attrs = parseAttributes(r.attributes);
+              return {
+                ...base,
+                color: attrs.Color || attrs.color || undefined,
+                size: attrs.Size || attrs.size || undefined,
+              } as CartItem;
+            })
+          );
           return;
         }
       } catch (e) {
@@ -106,9 +133,54 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       }
     };
 
-    // If the user is authenticated (via auth context), fetch server cart; otherwise use local
+    // If the user is authenticated (via auth context), merge any local cart into server then fetch server cart;
+    // otherwise use local
     if (isAuthenticatedFn()) {
-      void fetchServer();
+      const tryMergeAndFetch = async () => {
+        try {
+          // If there is a local cart (from before login), merge it into server-side cart.
+          const raw = localStorage.getItem('cart');
+          if (raw) {
+            try {
+              const parsed: CartItem[] = JSON.parse(raw) || [];
+              const cleaned = parsed
+                .filter(it => Number.isFinite(Number(it.variantId)) && Number.isFinite(Number(it.productId)))
+                .map(it => ({
+                  ...it,
+                  variantId: Number(it.variantId),
+                  productId: Number(it.productId),
+                  price: Number(it.price),
+                  quantity: Math.max(1, Number(it.quantity) || 1),
+                }));
+
+              if (cleaned.length) {
+                // Persist each local item to server. The server will upsert (increment existing qty).
+                await Promise.all(
+                  cleaned.map((it) =>
+                    apiAddToCart({ variantId: it.variantId, quantity: it.quantity, unitPrice: it.price }).catch((e) => {
+                      console.warn('[cart] failed to merge item to server', it, e);
+                      return null;
+                    })
+                  )
+                );
+                // Remove local cart after attempting merge to avoid duplicate re-merges
+                localStorage.removeItem('cart');
+              }
+            } catch (e) {
+              // If parsing fails, remove corrupt local cart and continue
+              console.warn('[cart] failed to parse local cart during merge, clearing local cart', e);
+              localStorage.removeItem('cart');
+            }
+          }
+
+          await fetchServer();
+        } catch (e) {
+          console.warn('Failed to merge/fetch server cart, falling back to local', e);
+          initLocal();
+        }
+      };
+
+      void tryMergeAndFetch();
     } else {
       initLocal();
     }
