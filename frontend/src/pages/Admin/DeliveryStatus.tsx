@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getAssignedDeliveries, updateDeliveryStatusForStaff } from '../../services/delivery.services';
+import { getAssignedDeliveriesWithOptions, updateDeliveryStatusForStaff } from '../../services/delivery.services';
 import * as LucideIcons from 'lucide-react';
 import { formatCurrencyUSD } from '../../lib/utils';
 // import type { Icon as LucideIcon } from 'lucide-react';
@@ -134,7 +134,8 @@ const DeliveryStatus: React.FC = () => {
         setCurrentUser(tokenPayload);
       } catch (e) { setCurrentUser(null); }
 
-      const resp = await getAssignedDeliveries();
+  // include delivered items so staff can view delivery details after marking delivered
+  const resp = await getAssignedDeliveriesWithOptions({ includeDelivered: true });
       if (resp.success) {
         const rows = resp.data.map((r: any) => mapApiDeliveryToUI(r));
         setDeliveriesList(rows as any);
@@ -373,7 +374,7 @@ const DeliveryStatus: React.FC = () => {
                       }
                       const updated = resp.data;
                       // Re-fetch assigned deliveries to ensure UI is consistent with server
-                      const refreshed = await getAssignedDeliveries();
+                      const refreshed = await getAssignedDeliveriesWithOptions({ includeDelivered: true });
                       if (refreshed.success) {
                         const rows = refreshed.data.map((r: any) => mapApiDeliveryToUI(r));
                         setDeliveriesList(rows as any);
@@ -458,6 +459,38 @@ const DeliveryStatus: React.FC = () => {
             </div>
             <div className="text-sm text-red-700">Failed</div>
           </div>
+        </div>
+      </div>
+
+      {/* Delivered Deliveries List */}
+      <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivered Deliveries</h3>
+        <div className="space-y-3">
+          {(loading ? [] : deliveriesList)
+            .filter(d => d.status === 'delivered')
+            .map(delivery => (
+              <div key={delivery.id} className="p-4 border rounded-lg flex justify-between items-start">
+                <div>
+                  <h4 className="font-medium text-gray-900">{delivery.id} <span className="text-sm text-gray-500">(Order {delivery.orderId})</span></h4>
+                  <p className="text-sm text-gray-600 mt-1 truncate">{delivery.customerAddress}</p>
+                  <div className="text-sm text-gray-600 mt-2 flex items-center space-x-3">
+                    <span className="text-xs text-gray-500">Delivered: {formatDate((delivery as any).deliveredAt)}</span>
+                    <span className="text-xs text-gray-500">{formatCurrencyUSD((delivery as any).orderTotal ?? 0)}</span>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 ml-4 flex items-center space-x-2">
+                  <button
+                    className="px-3 py-1 border rounded text-sm bg-gray-50 hover:bg-gray-100"
+                    onClick={() => setSelectedDelivery(delivery)}
+                  >
+                    View
+                  </button>
+                </div>
+              </div>
+            ))}
+          {(loading === false && deliveriesList.filter(d => d.status === 'delivered').length === 0) && (
+            <div className="p-4 text-gray-600">No delivered deliveries yet.</div>
+          )}
         </div>
       </div>
     </div>

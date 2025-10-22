@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { isBlacklisted } = require('../utils/tokenBlacklist');
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -7,6 +8,9 @@ const verifyToken = (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
+  if (isBlacklisted(token)) {
+    return res.status(401).json({ message: "Unauthorized: Token revoked" });
+  }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded; // decoded contains id and role

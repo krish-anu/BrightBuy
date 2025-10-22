@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userQueries = require('../queries/userQueries');
 const ApiError = require('../utils/ApiError');
+const { addToken } = require('../utils/tokenBlacklist');
 
 // Register user
 const registerUser = async (req, res, next) => {
@@ -127,7 +128,7 @@ const loginUser = async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // session valid for 10 minutes
+      { expiresIn: '1h' } 
     );
 
   res.status(200).json({ token, role: user.role, email: user.email, name: user.name, id: user.id, roleAccepted: !!user.role_accepted });
@@ -138,7 +139,31 @@ const loginUser = async (req, res, next) => {
 
 // Logout user
 const logoutUser = async (req, res) => {
-  res.status(200).json({ message: 'User logged out successfully' });
+  try {
+    // Check Authorization header first
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+    // Fallback to cookie named 'token'
+    if (!token && req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (token) {
+      addToken(token);
+    }
+
+    if (req.cookies && req.cookies.token) {
+      res.clearCookie('token');
+    }
+
+    res.status(200).json({ message: 'User logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ message: 'Logout failed' });
+  }
 };
 
 // Get all users

@@ -582,6 +582,14 @@ const getTopSellingProducts = async (req, res, next) => {
     const { startDate, endDate, limit } = req.query;
     const s = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     const e = endDate || new Date().toISOString().split('T')[0];
+    // let eDate = endDate ? new Date(endDate) : new Date();
+
+    // // Add extra days to endDate (e.g., +1 day)
+    // const extraDays = 1; // change as needed
+    // eDate.setDate(eDate.getDate() + extraDays);
+
+    // // Convert back to YYYY-MM-DD string
+    // const e = eDate.toISOString().split('T')[0];
     let l = Number(limit) || 10;
     if (l < 5) l = 5; // enforce minimum requested limit
 
@@ -589,6 +597,7 @@ const getTopSellingProducts = async (req, res, next) => {
 
     // Always use the no-limit query (avoids LIMIT parameter issues on some MySQL setups)
     const allRows = await query(orderQueries.topSellingProductsBetweenNoLimit, [s, e]);
+    console.log(allRows)
     let products = (allRows || []).slice(0, l);
 
     // If still fewer than 5 overall (very small catalog), attempt to pad with products
@@ -608,6 +617,7 @@ const getTopSellingProducts = async (req, res, next) => {
 
     // Cap to requested limit
     products = products.slice(0, l);
+    console.log(products)
 
     res.status(200).json({ success: true, data: { startDate: s, endDate: e, limit: l, products } });
   } catch (err) { next(err); }

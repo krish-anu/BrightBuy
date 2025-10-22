@@ -13,6 +13,9 @@ router.get('/assigned', verifyToken, authorizeRoles(ROLES.DELIVERY, ROLES.ADMIN,
 
 router.patch('/:id/assignStaff',verifyToken,authorizeRoles(ROLES.ADMIN,ROLES.SUPERADMIN),assignDeliveryStaff)
 
+// Admins can fetch a delivery by id to inspect current staff assignment
+router.get('/:id', verifyToken, authorizeRoles(ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/delivery.controller').getDeliveryByIdController)
+
 // Update delivery status (delivery staff can update only their assigned deliveries)
 router.patch('/:id/status', verifyToken, authorizeRoles(ROLES.DELIVERY, ROLES.ADMIN, ROLES.SUPERADMIN), require('../controllers/delivery.controller').updateDeliveryStatusController)
 

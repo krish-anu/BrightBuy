@@ -349,15 +349,21 @@ const getProductsPaginatedFrontend = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
     const parentCategoryId = req.query.parentCategoryId ? parseInt(req.query.parentCategoryId) : null;
+    const rawSearch = (req.query.search || '').toString().trim();
+    const hasSearch = rawSearch.length > 0;
+    const like = `%${rawSearch}%`;
 
     // Base product selection scoped to pagination (and optional category)
     let baseSql = `
       SELECT p.id, p.name, p.description, p.brand
       FROM products p
       ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : parentCategoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id INNER JOIN categories c ON c.id = pc.categoryId AND (c.id = ${parentCategoryId} OR c.parentId = ${parentCategoryId})` : ''}
+      ${hasSearch ? `WHERE (p.name LIKE ? OR p.description LIKE ? OR p.brand LIKE ?)` : ''}
       ORDER BY p.name ASC
       LIMIT ${limit} OFFSET ${offset}
     `;
+
+    const baseParams = hasSearch ? [like, like, like] : [];
 
     const sql = `
       SELECT 
@@ -412,15 +418,16 @@ const getProductsPaginatedFrontend = async (req, res, next) => {
       ORDER BY bp.name ASC
     `;
 
-    const rows = await query(sql, []);
+    const rows = await query(sql, baseParams);
 
     // Count products (not variants)
     let countSql = `
       SELECT COUNT(DISTINCT p.id) AS totalCount
       FROM products p
       ${categoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id AND pc.categoryId = ${categoryId}` : parentCategoryId ? `INNER JOIN product_categories pc ON pc.productId = p.id INNER JOIN categories c ON c.id = pc.categoryId AND (c.id = ${parentCategoryId} OR c.parentId = ${parentCategoryId})` : ''}
+      ${hasSearch ? `WHERE (p.name LIKE ? OR p.description LIKE ? OR p.brand LIKE ?)` : ''}
     `;
-    const countRows = await query(countSql, []);
+    const countRows = await query(countSql, baseParams);
     const totalCount = countRows[0]?.totalCount || 0;
     const totalPages = Math.ceil(totalCount / limit);
 

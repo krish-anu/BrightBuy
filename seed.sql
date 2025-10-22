@@ -1602,7 +1602,7 @@ INSERT IGNORE INTO orders (id, userId, orderDate, totalPrice, deliveryMode, deli
 (4,3,'2025-02-14 16:20:00',189.99,'Standard Delivery',10.00,'Confirmed','Card'),
 (5,6,'2025-03-20 11:30:00',449.99,'Store Pickup',0.00,'Delivered','Card'),
 (6,4,'2025-04-18 13:45:00',1514.99,'Standard Delivery',15.00,'Delivered','Card'),
-(7,7,'2025-05-22 10:00:00',699.99,'Standard Delivery',12.00,'Shipped','Card'),
+-- (7,7,'2025-05-22 10:00:00',699.99,'Standard Delivery',12.00,'Shipped','Card'),
 (8,5,'2025-06-10 15:30:00',249.99,'Store Pickup',0.00,'Confirmed','CashOnDelivery'),
 (9,3,'2025-07-08 12:15:00',3514.99,'Standard Delivery',15.00,'Delivered','Card'),
 (10,6,'2025-08-25 14:20:00',829.99,'Standard Delivery',20.00,'Delivered','Card'),

@@ -81,6 +81,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthReady(true);
   }, []);
 
+  // Cross-tab auth sync: listen for token/auth events and rehydrate user
+  useEffect(() => {
+    const onStorage = () => {
+      try {
+        const payload = getCurrentUserFromToken();
+        if (payload && payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
+          const emailFromPayload = (payload as any).email || 'unknown@local';
+          const usernameFromPayload = (payload as any).username || emailFromPayload.split('@')[0] || (payload.id?.toString() || 'user');
+          const nameFromPayload = (payload as any).name || usernameFromPayload || 'User';
+          setUser({ id: payload.id, username: usernameFromPayload, name: nameFromPayload, email: emailFromPayload, role: payload.role });
+        } else {
+          setUser(null);
+          Cookies.remove('brightbuy_user');
+        }
+      } catch {
+        setUser(null);
+        Cookies.remove('brightbuy_user');
+      }
+    };
+    const handler = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE__TOKEN || e.key === 'auth_sync') {
+        onStorage();
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
   // Track auto logout timer
   useEffect(() => {
   if (!user) return;
@@ -142,6 +170,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           sessionStorage.removeItem('brightbuy_last_path');
           // Defer navigation responsibility to caller; optionally we could expose lastPath via context.
         }
+        // Broadcast auth change for other tabs
+        try { localStorage.setItem('auth_sync', `login:${Date.now()}`); } catch {}
         return { success: true, user: userWithoutPassword };
       } else {
         return {
@@ -159,8 +189,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Logout function
   const logout = () => {
-    setUser(null);
+    try {
+      // send logout to backend to blacklist token if present
+      const token = localStorage.getItem(LOCAL_STORAGE__TOKEN);
+      if (token) {
+        fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          keepalive: true,
+        }).catch(() => {});
+      } else {
+        fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+      }
+    } catch (e) {}
+
+    // remove any local session/token/cookie data
+    try { localStorage.removeItem(LOCAL_STORAGE__TOKEN); } catch {}
+    // Clear guest cart immediately to avoid showing stale cart on auth pages
+    try { localStorage.removeItem('cart'); } catch {}
+    try { sessionStorage.removeItem('brightbuy_last_path'); } catch {}
     Cookies.remove("brightbuy_user");
+
+    // clear in-memory user to update UI (Navbar etc.)
+    setUser(null);
+
+    // Broadcast auth change for other tabs
+    try { localStorage.setItem('auth_sync', `logout:${Date.now()}`); } catch {}
+    // Also signal cart sync so other tabs/pages clear cart UI immediately
+    try { localStorage.setItem('cart_sync', String(Date.now())); } catch {}
   };
 
   // Helpers
