@@ -32,6 +32,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { refresh } = useCart();
+  const [query, setQuery] = React.useState("");
 
   // Hide cart badge in auth pages to avoid showing stale counts
   const isAuthRoute = React.useMemo(() => {
@@ -44,6 +45,33 @@ export function Navbar() {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
+
+  // Populate search box from URL if present (so it's consistent when landing on /shop?search=...)
+  React.useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const s = sp.get('search') || '';
+    setQuery(s);
+  }, [location.search]);
+
+  // Live search: debounce typing and navigate/update the shop page
+  React.useEffect(() => {
+    const q = query.trim();
+    const targetPath = '/shop';
+    const targetSearch = q ? `?search=${encodeURIComponent(q)}` : '';
+    const isAlreadyTarget = location.pathname === targetPath && (location.search || '') === targetSearch;
+    if (isAlreadyTarget) return;
+
+    const handle = setTimeout(() => {
+      if (location.pathname.startsWith('/shop')) {
+        navigate({ pathname: targetPath, search: targetSearch }, { replace: true });
+      } else if (q.length > 0) {
+        // If not on shop, start showing results as the user types
+        navigate(`${targetPath}${targetSearch}`);
+      }
+      // If query is empty and not on /shop, do nothing (avoid pulling users away)
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [query, navigate, location.pathname, location.search]);
 
   // Refresh cart when window regains focus and on storage sync events
   React.useEffect(() => {
@@ -66,6 +94,18 @@ export function Navbar() {
     navigate('/login');
   };
 
+  const submitSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const q = query.trim();
+    if (q.length === 0) {
+      // go to shop without search
+      navigate('/shop');
+    } else {
+      const params = new URLSearchParams({ search: q });
+      navigate(`/shop?${params.toString()}`);
+    }
+  };
+
   return (
     <div className="bg-accent/40 backdrop-blur-xs border-b border-b-accent-foreground/20 sticky top-0 z-50 shadow-lg/20">
       <div className="max-w-7xl mx-auto px-4 grid grid-cols-4 h-16 items-center">
@@ -78,19 +118,22 @@ export function Navbar() {
           </Link>
         </div>
         {/* Search bar hidden on small screens, visible on md+ */}
-        <div className="md:col-span-2 hidden md:flex items-center ">
+        <form className="md:col-span-2 hidden md:flex items-center " onSubmit={submitSearch}>
           <Input
             type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Products here..."
             className="h-10 rounded-l-md rounded-r-none border-r-0  focus-visible:ring-0 "
           />
           <Button
-            type="button"
+            type="submit"
             className="h-10 rounded-l-none rounded-r-md px-3 bg-ring "
+            aria-label="Search"
           >
             <Search className="h-5 w-5 text-accent" />
           </Button>
-        </div>
+        </form>
         <div className="ml-auto flex flex-row items-center space-x-4 col-span-2 md:col-span-1 sm:justify-end">
           <Link
             to="/cart"
@@ -148,19 +191,22 @@ export function Navbar() {
       </div>
 
       {/* search bar for small screens */}
-      <div className="flex md:hidden max-w-7xl mx-auto px-4 pb-2">
+      <form className="flex md:hidden max-w-7xl mx-auto px-4 pb-2" onSubmit={submitSearch}>
         <Input
           type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search Products here..."
           className="h-10 rounded-l-md rounded-r-none border-r-0 focus-visible:ring-0 flex-1"
         />
         <Button
-          type="button"
+          type="submit"
           className="h-10 rounded-l-none rounded-r-md px-3 bg-ring "
+          aria-label="Search"
         >
           <Search className="h-5 w-5 text-accent" />
         </Button>
-      </div>
+      </form>
     </div>
   );
 }
