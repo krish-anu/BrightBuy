@@ -162,6 +162,36 @@ docker compose -f docker-compose.dev.yml logs -f backend
 
 ---
 
+## Deploy / Setup server
+
+If you have a remote server and a private key, you can copy the setup script and run it with the following commands (replace paths/host as needed):
+
+1. Copy the setup script to the server (example uses an AWS-like Ubuntu host):
+
+```bash
+scp -i ~/Downloads/bright.pem ~/Downloads/setup_server.sh ubuntu@13.201.36.162:/home/ubuntu/
+```
+
+2. SSH into the server:
+
+```bash
+ssh -i ~/Downloads/bright.pem ubuntu@13.201.36.162
+```
+
+3. Make the script executable and run it (as sudo if necessary):
+
+```bash
+chmod +x setup_server.sh
+sudo ./setup_server.sh
+```
+
+Notes:
+- Ensure the private key file (`bright.pem`) has secure permissions (chmod 600).
+- Replace the IP address, username, and key path to match your server and credentials.
+- Review `setup_server.sh` before running it on a production host to verify what it installs and configures.
+
+---
+
 ## Logging
 
 - Backend uses `console.log` for logging actions.

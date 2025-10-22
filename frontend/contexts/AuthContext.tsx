@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
+    adminLogin?: boolean,
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -102,10 +103,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [user]);
 
   // Login function
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, adminLogin?: boolean) => {
     setIsLoading(true);
     try {
-      const foundUser = await loginUser(email, password);
+      const foundUser = await loginUser(email, password, adminLogin);
       // console.log("foundUser", foundUser);
 
       if (foundUser?.success) {

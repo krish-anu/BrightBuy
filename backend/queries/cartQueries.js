@@ -1,10 +1,16 @@
 const cartQueries = {
   listByUser: `
-    SELECT c.id, c.userId, c.variantId, c.quantity, c.selected, c.unitPrice, v.SKU, v.price as variantPrice, v.productId as productId, p.name as productName
+    SELECT c.id, c.userId, c.variantId, c.quantity, c.selected, c.unitPrice,
+           v.SKU, v.price as variantPrice, v.productId as productId, p.name as productName,
+           v.variantName as variantName, v.imageURL as imageUrl,
+           GROUP_CONCAT(CONCAT(va.name, '::', pvo.value) SEPARATOR '||') AS attributes
     FROM carts c
     LEFT JOIN product_variants v ON v.id = c.variantId
     LEFT JOIN products p ON p.id = v.productId
+    LEFT JOIN product_variant_options pvo ON pvo.variantId = v.id
+    LEFT JOIN variant_attributes va ON va.id = pvo.attributeId
     WHERE c.userId = ?
+    GROUP BY c.id, c.userId, c.variantId, c.quantity, c.selected, c.unitPrice, v.SKU, v.price, v.productId, p.name, v.variantName, v.imageURL
     ORDER BY c.createdAt DESC
   `,
   insert: `
