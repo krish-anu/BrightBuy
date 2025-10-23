@@ -1,90 +1,4 @@
-// const { query } = require('../config/db');
-// const ApiError = require('../utils/ApiError');
-// const { estimateDeliveryDate } = require('../utils/estimateDeliveryDate');
 
-// const calculateOrderDetails = async (items, deliveryMode, deliveryAddress, user,connection) => {
-//     let totalPrice = 0;
-//     let hasOutOfStock = false;
-//     let orderedItems = [];
-
-//     for (const item of items) {
-//         // Get variant and product info from DB
-//         const variants = await connection.query(
-//             `SELECT pv.id AS variantId, pv.variantName, pv.price, pv.stockQnt, 
-//                     p.id AS productId, p.name AS productName
-//              FROM product_variants pv
-//              JOIN products p ON pv.ProductId = p.id
-//              WHERE pv.id = ?`,
-//             [item.variantId]
-//         );
-
-//         const variant = variants[0];
-//         if (!variant) throw new ApiError('Item not found', 404);
-//         if (variant.stockQnt < item.quantity) hasOutOfStock = true;
-
-//         // Round price properly
-//         const price = parseFloat(Number(variant.price).toFixed(2));
-//         const itemTotal = parseFloat((price * item.quantity).toFixed(2));
-
-//         totalPrice += itemTotal;
-
-//         orderedItems.push({
-//             variantId: variant.variantId,
-//             productId: variant.productId,
-//             productName: variant.productName,
-//             variantName: variant.variantName,
-//             price, // already rounded
-//             quantity: item.quantity,
-//             total: itemTotal,
-//             inStock: variant.stockQnt >= item.quantity
-//         });
-//     }
-
-//     // Delivery settings
-//     let deliveryCharge = deliveryMode === 'Standard Delivery' ? 150.0 : 0;
-//     deliveryCharge = parseFloat(deliveryCharge.toFixed(2));
-
-//     let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
-
-//     let finalAddress = deliveryAddress;
-//     if (deliveryMode === 'Standard Delivery') {
-//         if (!finalAddress?.city) {
-//             if (!user.address || !user.city) throw new ApiError('Delivery address is required', 400);
-//             finalAddress = { ...user.address, city: user.city };
-//         }
-
-//         const cities = await connection.query(`SELECT * FROM cities WHERE name = ?`, [finalAddress.city]);
-//         let city;
-//         if (cities.length === 0) {
-//             const result = await connection.query(
-//                 `INSERT INTO cities (name, isMainCity) VALUES (?, ?)`,
-//                 [finalAddress.city, 0]
-//             );
-//             city = { id: result.insertId, name: finalAddress.city, isMainCity: 0 };
-//         } else {
-//             city = cities[0];
-//         }
-
-//         if (city.isMainCity) deliveryDays = 5;
-//     }
-
-//     if (hasOutOfStock) deliveryDays += 3;
-
-//     const deliveryDate = estimateDeliveryDate(deliveryDays);
-
-//     // Final total rounded
-//     const totalAmount = parseFloat((totalPrice + deliveryCharge).toFixed(2));
-
-//     return {
-//         totalPrice: parseFloat(totalPrice.toFixed(2)),
-//         deliveryCharge,
-//         totalAmount,
-//         deliveryDate,
-//         finalAddress,
-//         orderedItems,
-//         hasOutOfStock
-//     };
-// };
 
 // module.exports = { calculateOrderDetails };
 const { query } = require('../config/db');
@@ -153,35 +67,43 @@ const calculateOrderDetails = async (items, deliveryMode, user, connection,deliv
         });
     }
 
-    // Delivery settings
-    let deliveryCharge = deliveryMode === 'Standard Delivery' ? 150.0 : 0;
-    deliveryCharge = parseFloat(deliveryCharge.toFixed(2));
+    // Delivery charge calculation per business rules
+    // Store Pickup is always free; Standard Delivery depends on destination city type and order value
+    const round2 = (n) => parseFloat(Number(n).toFixed(2));
+    const roundedSubtotal = round2(totalPrice);
 
-    // let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
+    const calcShipping = (isMainCity, orderValue, mode) => {
+        if (mode === 'Store Pickup') return 0;
+        if (isMainCity) {
+            if (orderValue <= 100) return 5.99;
+            if (orderValue <= 500) return 3.99;
+            return 0; // > 500 = free
+        }
+        // other/rural cities
+        if (orderValue <= 100) return 9.99;
+        if (orderValue <= 500) return 6.99;
+        return 3.99; // > 500
+    };
 
-    // let finalAddress = deliveryAddress;
-    // if (deliveryMode === 'Standard Delivery') {
-    //     if (!finalAddress?.city) {
-    //         if (!user.address || !user.address.line1 || !user.address.city) throw new ApiError('Delivery address is required', 400);
-    //         finalAddress = { ...user.address };
-    //     }
+    let isMainCity = 0;
+    if (deliveryMode === 'Standard Delivery') {
+        // Resolve destination city type via deliveryAddressId -> addresses.cityId -> cities.isMainCity
+        
+        const [addrRows] = await connection.query(
+            `SELECT a.cityId, c.isMainCategory
+             FROM addresses a
+             JOIN cities c ON c.id = a.cityId
+             WHERE a.id = ?`,
+            [deliveryAddressId]
+        );
+        if (!addrRows || !addrRows.length) {
+            throw new ApiError('Invalid delivery address', 400);
+        }
+        isMainCity = Number(addrRows[0].isMainCategory) ? 1 : 0;
+    }
 
-    //     const cities = await connection.query(`SELECT * FROM cities WHERE name = ?`, [finalAddress.city]);
-    //     let city;
-    //     if (cities.length === 0) {
-    //         const result = await connection.query(
-    //             `INSERT INTO cities (name, isMainCity) VALUES (?, ?)`,
-    //             [finalAddress.city, 0]
-    //         );
-    //         city = { id: result.insertId, name: finalAddress.city, isMainCity: 0 };
-    //     } else {
-    //         city = cities[0];
-    //     }
+    let deliveryCharge = round2(calcShipping(Boolean(isMainCity), roundedSubtotal, deliveryMode));
 
-    //     if (city.isMainCity) deliveryDays = 5;
-    // }
-
-    // if (hasOutOfStock) deliveryDays += 3;
 
     // const deliveryDate = estimateDeliveryDate(deliveryDays);
     const deliveryDate = await EstimateDeliveryDate(deliveryAddressId,orderId=null, deliveryMode, hasOutOfStock, connection)

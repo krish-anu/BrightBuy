@@ -88,7 +88,7 @@ const addOrder = async (req, res, next) => {
     //   throw new ApiError('Invalid payment method', 400);
     // }
 
-    const { totalPrice, deliveryCharge, deliveryDate, orderedItems } =
+    const { totalPrice, deliveryCharge, totalAmount, deliveryDate, orderedItems } =
       await calculateOrderDetails(items, deliveryMode, req.user, connection, deliveryAddressId);
 
     const order = await saveOrderToDatabase(
@@ -134,16 +134,28 @@ const addOrder = async (req, res, next) => {
 
       let session;
       try {
+        const productLineItems = orderedItems.map(item => ({
+          price_data: {
+            currency: 'usd',
+            product_data: { name: item.productName },
+            unit_amount: Math.round(item.price * 100)
+          },
+          quantity: item.quantity
+        }));
+        const shippingLineItems = (deliveryMode === 'Standard Delivery' && Number(deliveryCharge) > 0)
+          ? [{
+              price_data: {
+                currency: 'usd',
+                product_data: { name: 'Delivery charge' },
+                unit_amount: Math.round(Number(deliveryCharge) * 100)
+              },
+              quantity: 1
+            }]
+          : [];
+
         session = await stripe.checkout.sessions.create({
           payment_method_types: ['card'],
-          line_items: orderedItems.map(item => ({
-            price_data: {
-              currency: 'usd',
-              product_data: { name: item.productName },
-              unit_amount: Math.round(item.price * 100)
-            },
-            quantity: item.quantity
-          })),
+          line_items: [...productLineItems, ...shippingLineItems],
           mode: 'payment',
           success_url: successUrl,
           cancel_url: cancelUrl,
@@ -153,7 +165,10 @@ const addOrder = async (req, res, next) => {
             sessionKey: ctx.sessionKey ? String(ctx.sessionKey) : '',
             productId: ctx.productId ? String(ctx.productId) : '',
             variantId: ctx.variantId ? String(ctx.variantId) : '',
-            qty: ctx.qty ? String(ctx.qty) : ''
+            qty: ctx.qty ? String(ctx.qty) : '',
+            deliveryCharge: String(deliveryCharge ?? 0),
+            subtotal: String(totalPrice ?? 0),
+            totalAmount: String(totalAmount ?? (Number(totalPrice || 0) + Number(deliveryCharge || 0)))
           }
         });
       } catch (e) {

@@ -3,7 +3,7 @@ import axiosInstance from "@/axiosConfig";
 export type City = {
   id: number;
   name: string;
-  isMainCity?: number;
+  isMainCategory?: number;
 };
 
 export const getAllCities = async (): Promise<City[]> => {

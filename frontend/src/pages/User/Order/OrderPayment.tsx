@@ -11,6 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { getUserProfile } from "@/services/user.services";
 import { getVariant } from "@/services/variant.services";
 import { useOrderSession } from "../../../../contexts/OrderContext";
+import { listAddresses } from "@/services/address.services";
+import { getAllCities, type City } from "@/services/city.services";
+import { computeShippingCharge } from "@/lib/utils";
  
 
 type ShippingChoice = "standard" | "pickup";
@@ -48,7 +51,7 @@ export default function OrderPayment() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
-  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
+  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items, setShippingCost } = useOrderSession(sessionKey);
 
   // Determine if any item is out of stock by checking variant stock on the server
   const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
@@ -81,7 +84,37 @@ export default function OrderPayment() {
   const subtotal = useMemo(() => (
     items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   ), [items]);
-  const total = subtotal;
+
+  // Load addresses and cities to estimate shipping on this page as well
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try { const rows = await listAddresses(); if (mounted) setAddresses(rows || []); } catch {}
+      try { const all = await getAllCities(); if (mounted) setCities(all || []); } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
+  const selectedAddr = useMemo(() => (
+    addresses.find((a) => String(a.id) === String(shippingAddressId))
+  ), [addresses, shippingAddressId]);
+  const isMainCity = useMemo(() => {
+    if (!selectedAddr?.cityId) return undefined;
+    const city = cities.find((c) => Number(c.id) === Number(selectedAddr.cityId));
+    return Boolean(city?.isMainCategory);
+  }, [cities, selectedAddr]);
+  const shipping = useMemo(() => {
+    if (shippingMethod !== 'standard') return 0;
+    if (!selectedAddr || typeof isMainCity === 'undefined') return 0;
+    return computeShippingCharge(Boolean(isMainCity), Number(subtotal.toFixed(2)), 'standard');
+  }, [shippingMethod, selectedAddr, isMainCity, subtotal]);
+  const total = useMemo(() => subtotal + shipping, [subtotal, shipping]);
+
+  // Persist computed shipping to session context so Summary page can reuse it without recomputing
+  useEffect(() => {
+    setShippingCost(shipping);
+  }, [shipping, setShippingCost]);
 
   // Auth guard: check protected profile endpoint and redirect to login 
   useEffect(() => {
@@ -148,7 +181,7 @@ export default function OrderPayment() {
         <div className="md:col-span-1 space-y-8">
           <OrderSummaryCard
             subtotal={subtotal}
-            shipping={0}
+            shipping={shipping}
             total={total}
             onNext={() => {
               // Guard: Standard Delivery requires a selected/default delivery address

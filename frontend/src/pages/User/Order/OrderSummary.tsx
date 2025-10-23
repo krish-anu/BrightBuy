@@ -35,7 +35,7 @@ export default function OrderSummary() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
-  const { items, shippingMethod, paymentMethod, shippingAddressId } = useOrderSession(sessionKey);
+  const { items, shippingMethod, paymentMethod, shippingAddressId, shippingCost } = useOrderSession(sessionKey);
 
   // Fetch addresses so we can show the shipping address summary on the bill card
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -140,7 +140,10 @@ export default function OrderSummary() {
   const subtotal = useMemo(() => (
     items.reduce((sum: number, item: CtxOrderItem) => sum + item.unitPrice * item.quantity, 0)
   ), [items]);
-  const total = subtotal;
+  const shippingFromMemory = useMemo(() => (
+    shippingMethod === 'standard' ? (typeof shippingCost === 'number' ? shippingCost : 0) : 0
+  ), [shippingMethod, shippingCost]);
+  const total = useMemo(() => subtotal + shippingFromMemory, [subtotal, shippingFromMemory]);
 
   // Guard invalid direct access
   const isInvalid = !items.length;
@@ -281,7 +284,7 @@ export default function OrderSummary() {
         deliveryAddressText={shippingMethod === "standard" && paymentMethod !== 'cod' ? deliveryAddressText : undefined}
         estimatedDeliveryText={shippingMethod === "standard" ? etaText : undefined}
         subtotal={subtotal}
-        shipping={0}
+        shipping={shippingFromMemory}
         discount={0}
         total={total}
         onNext={flow === "online" ? onPayOnline : onPlaceOrder}
