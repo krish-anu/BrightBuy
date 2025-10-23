@@ -1,4 +1,5 @@
 import type { Address } from "@/types/Address"
+import { Badge } from "../ui/badge"
 
 export function AddressSummary({ address }: { address: Address | undefined }) {
   if (!address) return null
@@ -8,9 +9,9 @@ export function AddressSummary({ address }: { address: Address | undefined }) {
         {address.name}
         <span className="font-normal text-muted-foreground pl-4 md:text-lg text-md"> {address.phone} </span>
       </span> */}
-      <p className="text-muted-foreground">{address.address}</p>
-      <p className="text-muted-foreground">{address.city}</p>
-      <p className="text-muted-foreground">{address.zip}</p>
+      <p className="text-muted-foreground font-bold"><span><Badge variant="outline" className="mr-2 text-primary">Address:</Badge></span>{address.address}</p>
+      <p className="text-muted-foreground"><Badge variant="outline" className="mr-2 text-primary">City:</Badge>{address.city}</p>
+      <p className="text-muted-foreground"><Badge variant="outline" className="mr-2 text-primary">ZIP:</Badge>{address.zip}</p>
     </div>
   )
 }

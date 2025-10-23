@@ -53,7 +53,7 @@ export function AddressEditForm({
     >
       <FieldSet>
         <FieldGroup>
-          <Field>
+          {/* <Field>
             <FieldContent>
               <label htmlFor="name" className="text-sm font-medium">
                 Full Name
@@ -68,7 +68,7 @@ export function AddressEditForm({
               </label>
               <Input id="phone" value={a.phone} onChange={(e) => onChange({ ...a, phone: e.target.value })} />
             </FieldContent>
-          </Field>
+          </Field> */}
           <Field>
             <FieldContent>
               <label htmlFor="address-line1" className="text-sm font-medium">

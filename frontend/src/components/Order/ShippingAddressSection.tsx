@@ -127,17 +127,16 @@ export default function ShippingAddressSection({
 		});
 	}, [addresses, initialSelectedId]);
 
-	// bubble selection changes up, but avoid redundant emits to prevent parent-child loops
-	const lastEmittedIdRef = useRef<string | undefined>(undefined);
+	// Bubble selection changes up; re-emit if the selected record changes after list refresh
+	const lastEmittedSigRef = useRef<string | undefined>(undefined);
 	useEffect(() => {
 		if (!onSelectionChange) return;
-		if (lastEmittedIdRef.current === selectedId) return;
 		const selected = addresses.find((a) => a.id === selectedId);
+		const sig = `${selectedId || ''}:${selected?.cityId ?? ''}:${selected?.address ?? ''}`;
+		if (lastEmittedSigRef.current === sig) return;
 		onSelectionChange(selectedId || undefined, selected);
-		lastEmittedIdRef.current = selectedId;
-		// Only depend on selectedId/onSelectionChange; addresses is used for lookup but doesn't affect emitted id
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedId, onSelectionChange]);
+		lastEmittedSigRef.current = sig;
+	}, [selectedId, addresses, onSelectionChange]);
 
 	useEffect(() => {
 		if (!open) {
@@ -310,8 +309,14 @@ export default function ShippingAddressSection({
 				const resp = await apiAddAddress(payload as any);
 				const createdId = resp?.id;
 				if (createdId) {
-					// ensure UI selects the newly created address
-					setSelectedId(String(createdId));
+					const createdIdStr = String(createdId);
+					// Replace the temp address with the persisted one and select it immediately
+					setAddresses((prev) => prev.map((addr) => addr.id === next.id ? { ...next, id: createdIdStr } : addr));
+					setSelectedId(createdIdStr);
+					// Emit selection instantly so parent (Payment) can recompute shipping
+					if (onSelectionChange) {
+						onSelectionChange(createdIdStr, { ...next, id: createdIdStr });
+					}
 					if (next.isDefault) {
 						await apiMakeDefault(Number(createdId));
 					}
