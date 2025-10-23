@@ -185,6 +185,7 @@ chmod +x setup_server.sh
 sudo ./setup_server.sh
 ```
 ```bash
+sudo groupadd docker
 sudo usermod -aG docker $USER
 newgrp docker
 
