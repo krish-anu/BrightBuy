@@ -46,6 +46,8 @@ function App() {
             <Route path="admin/login" element={<UserLogin />} />
             <Route path="signup" element={<UserSignup />} />
             <Route path="shop" element={<ProductsPage />} />
+            {/* Support category-friendly URLs like /shop/electronics */}
+            <Route path="shop/:category" element={<ProductsPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="products/:productID" element={<ProductDetailPage />} />
             <Route path="products/:productID" element={<ProductDetailPage />} />
