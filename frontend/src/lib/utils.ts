@@ -48,3 +48,24 @@ export function formatCurrencyUSD(
 
   return new Intl.NumberFormat('en-US', merged).format(num);
 }
+
+// Shipping charge helper mirrored from backend rules
+// - Store Pickup: always free
+// - Standard Delivery: depends on city type (isMainCity) and order value thresholds
+export function computeShippingCharge(
+  isMainCity: boolean,
+  orderValue: number,
+  shippingMethod: "standard" | "pickup"
+): number {
+  if (shippingMethod === "pickup") return 0;
+  const v = Number(orderValue);
+  if (Number.isNaN(v)) return 0;
+  if (isMainCity) {
+    if (v <= 100) return 5.99;
+    if (v <= 500) return 3.99;
+    return 0; // > 500
+  }
+  if (v <= 100) return 9.99;
+  if (v <= 500) return 6.99;
+  return 3.99; // > 500
+}

@@ -16,6 +16,7 @@ export type OrderSelection = {
   shippingMethod: ShippingChoice;
   paymentMethod: PaymentChoice;
   shippingAddressId?: string;
+  shippingCost?: number; // computed in Payment page based on address + subtotal
 };
 
 type OrderContextValue = {
@@ -30,6 +31,7 @@ const defaultSelection: OrderSelection = {
   shippingMethod: "standard",
   paymentMethod: "online",
   shippingAddressId: undefined,
+  shippingCost: 0,
 };
 
 const STORAGE_KEY = "bb:order:selections";
@@ -94,6 +96,13 @@ export function useOrderSession(key: string) {
     }));
   }, [ctx.setOrders, key]);
 
+  const setShippingCost = useCallback((cost?: number) => {
+    ctx.setOrders((prev: Record<string, OrderSelection>) => ({
+      ...prev,
+      [key]: { ...(prev[key] ?? defaultSelection), shippingCost: typeof cost === 'number' ? cost : 0 },
+    }));
+  }, [ctx.setOrders, key]);
+
   const reset = useCallback(() => {
     ctx.setOrders((prev: Record<string, OrderSelection>) => ({
       ...prev,
@@ -107,6 +116,7 @@ export function useOrderSession(key: string) {
     setShippingMethod,
     setPaymentMethod,
     setShippingAddressId,
+    setShippingCost,
     reset,
   } as const;
 }

@@ -37,10 +37,22 @@ export default function ShippingAddressSection({
     const [formData, setFormData] = useState<Address | null>(null);
     const [open, setOpen] = useState(false);
 	const [cities, setCities] = useState<City[]>([]);
-		const [profileLoading, setProfileLoading] = useState(false);
-		const [profileError, setProfileError] = useState<unknown>(null);
-		const [profileSaving, setProfileSaving] = useState(false);
-		const [profileSaveError, setProfileSaveError] = useState<unknown>(null);
+	const [profileLoading, setProfileLoading] = useState(false);
+	const [profileError, setProfileError] = useState<unknown>(null);
+	const [profileSaving, setProfileSaving] = useState(false);
+	const [profileSaveError, setProfileSaveError] = useState<unknown>(null);
+
+	// Normalize backend address record into UI Address shape
+	const mapToAddress = (raw: any, index: number): Address => ({
+		id: String(raw?.id ?? `addr-${index}`),
+		name: raw?.fullName ?? raw?.name ?? "",
+		address: [raw?.line1, raw?.line2].filter(Boolean).join(", ") || raw?.address || "",
+		city: raw?.city ?? raw?.cityName ?? "",
+		cityId: raw?.cityId ?? null,
+		zip: String(raw?.postalCode ?? ""),
+		phone: String(raw?.phone ?? ""),
+		isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
+	});
 
 		const refetchAddresses = async () => {
 			try {
@@ -52,17 +64,7 @@ export default function ShippingAddressSection({
 				const rawAddresses = Array.isArray((payload as any)?.addresses)
 					? ((payload as any).addresses as any[])
 					: [];
-				const mapped = rawAddresses.map((raw: any, idx: number): Address => ({
-					id: String(raw?.id ?? `addr-${idx}`),
-					name: raw?.fullName ?? raw?.name ?? "",
-					address: [raw?.line1, raw?.line2].filter(Boolean).join(", ") || raw?.address || "",
-					city: raw?.city ?? raw?.cityName ?? "",
-					cityId: raw?.cityId ?? undefined,
-					zip: String(raw?.postalCode ?? ""),
-					phone: String(raw?.phone ?? ""),
-					isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
-				}));
-				setAddresses(mapped);
+				setAddresses(rawAddresses.map(mapToAddress));
 			} catch (e) {
 				// bubble to caller normally
 				throw e;
@@ -70,57 +72,24 @@ export default function ShippingAddressSection({
 		};
 
 	useEffect(() => {
-		let ignore = false;
-
-		const mapToAddress = (raw: any, index: number): Address => ({
-            id: String(raw?.id ?? `addr-${index}`),
-            name: raw?.fullName ?? raw?.name ?? "",
-            address: [raw?.line1, raw?.line2].filter(Boolean).join(", ") || raw?.address || "",
-            city: raw?.city ?? raw?.cityName ?? "",
-            cityId: raw?.cityId ?? null,
-            zip: String(raw?.postalCode ?? ""),
-            phone: String(raw?.phone ?? ""),
-            isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
-        });
-
-		const fetchProfile = async () => {
-			try {
-				if (ignore) return;
-				setProfileError(null);
-				setProfileLoading(true);
-				const res = await getUserProfile();
-				if (ignore) return;
-
-				const payload =
-					res && typeof res === "object" && "data" in (res as Record<string, unknown>)
-						? (res as { data: unknown }).data
-						: res;
-				
-				const rawAddresses = Array.isArray((payload as any)?.addresses)
-                    ? ((payload as any).addresses as any[])
-                    : [];
-
-				const mapped = rawAddresses.map(mapToAddress);
-				if (ignore) return;
-				setAddresses(mapped);
-			} catch (error) {
-				const status = (error as any)?.response?.status ?? (error as any)?.status;
-				if (status === 401) {
-					// pass current location so login can return the user here
-					navigate("/login", { state: { from: location }, replace: true });
-					return;
+			let ignore = false;
+			(async () => {
+				try {
+					setProfileError(null);
+					setProfileLoading(true);
+					await refetchAddresses();
+				} catch (error) {
+					const status = (error as any)?.response?.status ?? (error as any)?.status;
+					if (status === 401) {
+						navigate("/login", { state: { from: location }, replace: true });
+						return;
+					}
+					if (!ignore) setProfileError(error);
+				} finally {
+					if (!ignore) setProfileLoading(false);
 				}
-                 if (!ignore) setProfileError(error);
-             } finally {
-                 if (!ignore) setProfileLoading(false);
-             }
-         };
-
-		fetchProfile();
-
-		return () => {
-			ignore = true;
-		};
+			})();
+			return () => { ignore = true; };
 	}, []);
 
 	// Lazy-load cities only when entering edit mode to reduce initial work
@@ -357,7 +326,7 @@ export default function ShippingAddressSection({
 			setProfileSaving(false);
 		}
 	};
-    // Note: default address persistence is handled via the edit form toggle or a separate confirm button (if enabled)
+	// Note: default address persistence is handled via the edit form toggle or a separate confirm button (if enabled)
 
 	const defaultId =
 		addresses.find((addr) => addr.isDefault)?.id ?? addresses[0]?.id ?? "";
@@ -374,15 +343,13 @@ export default function ShippingAddressSection({
 		if (!selectedAddress) return false;
 		// Prefer id match, fallback to name
 		if (selectedAddress.cityId != null) {
-			console.log(cities)
 			const match = cities.find((c) => String(c.id) === String(selectedAddress.cityId));
-			console.log(match)
-			const flag = match ? (match as any).isMainCategory : undefined;
+			const flag = match ? ((match as any).isMainCity ?? (match as any).isMainCategory) : undefined;
 			return !!(typeof flag === 'number' ? flag === 1 : flag);
 		}
 		if (selectedAddress.city) {
 			const match = cities.find((c) => String(c.name).toLowerCase() === String(selectedAddress.city).toLowerCase());
-			const flag = match ? (match as any).isMainCategory : undefined;
+			const flag = match ? ((match as any).isMainCity ?? (match as any).isMainCategory) : undefined;
 			return !!(typeof flag === 'number' ? flag === 1 : flag);
 		}
 		return false;

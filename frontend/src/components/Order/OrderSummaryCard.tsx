@@ -5,21 +5,23 @@ import { CircleArrowRightIcon } from "lucide-react";
 interface OrderSummaryCardProps {
   subtotal: number;
   shipping: number;
-  discount?: number;
+  // discount?: number;
   total: number;
   onNext: () => void;
   nextLabel?: string;
   className?: string;
+  showShippingRow?: boolean;
 }
 
 export function OrderSummaryCard({
   subtotal,
   shipping,
-  discount,
+  // discount,
   total,
   onNext,
   nextLabel = "Next",
   className,
+  showShippingRow = true,
 }: OrderSummaryCardProps) {
   const row = (label: string, value: number, bold?: boolean) => (
     <div className="flex justify-between w-full">
@@ -43,8 +45,8 @@ export function OrderSummaryCard({
     >
       <h2 className="text-xl font-bold">Order Summary</h2>
       {row("Subtotal", subtotal)}
-      {row("Shipping", shipping)}
-  {typeof discount === "number" ? row("Discount", discount) : null}
+    {showShippingRow ? row("Shipping", shipping) : null}
+  {/* {typeof discount === "number" ? row("Discount", discount) : null} */}
       <Separator />
       {row("Total", total, true)}
       <Button variant="order" onClick={onNext} className="mt-2 font-semibold gap-2 w-full md:w-auto h-12 text-xl">
