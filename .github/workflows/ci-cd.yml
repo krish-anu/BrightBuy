@@ -35,17 +35,15 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      - name: Validate frontend env secret
-        run: |
-          if [ -z "${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" ]; then
-            echo "ERROR: Missing secret VITE_STRIPE_PUBLISHABLE_KEY.";
-            exit 1;
-          fi
       - name: Install frontend deps & build
-        env:
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
         run: |
           cd frontend
+          # Use secret if available; otherwise fallback to a harmless placeholder for PR builds
+          export VITE_STRIPE_PUBLISHABLE_KEY="${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}"
+          if [ -z "$VITE_STRIPE_PUBLISHABLE_KEY" ]; then
+            echo "VITE_STRIPE_PUBLISHABLE_KEY not provided; using placeholder for PR build"
+            export VITE_STRIPE_PUBLISHABLE_KEY="pk_test_placeholder_123"
+          fi
           npm ci
           npm run build
 
@@ -61,6 +59,13 @@ jobs:
         run: |
           if [ -z "${{ secrets.DOCKER_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
             echo "ERROR: Missing required secrets DOCKER_USERNAME and/or DOCKER_PASSWORD.";
+            exit 1;
+          fi
+
+      - name: Validate frontend publishable key (main only)
+        run: |
+          if [ -z "${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" ]; then
+            echo "ERROR: Missing secret VITE_STRIPE_PUBLISHABLE_KEY for main image build.";
             exit 1;
           fi
 
