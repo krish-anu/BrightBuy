@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userQueries = require('../queries/userQueries');
 const ApiError = require('../utils/ApiError');
+const { addToken } = require('../utils/tokenBlacklist');
 
 // Register user
 const registerUser = async (req, res, next) => {
@@ -19,7 +20,26 @@ const registerUser = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const assignedRole = role || 'Customer';
-    const autoApproved = ['Customer', 'SuperAdmin'].includes(assignedRole) ? 1 : 0;
+
+    // Special handling for SuperAdmin: if there are no existing SuperAdmin users,
+    // make the first SuperAdmin auto-approved and mark role_accepted as 1.
+    // For subsequent SuperAdmin registrations, keep them pending (role_accepted = 0)
+    // so that an existing SuperAdmin must approve them.
+    let autoApproved = 0;
+    if (assignedRole === 'Customer') {
+      autoApproved = 1;
+    } else if (assignedRole === 'SuperAdmin') {
+      // check existing SuperAdmin count
+      const [{ c }] = await query(`SELECT COUNT(*) AS c FROM users WHERE role = 'SuperAdmin'`);
+      if (Number(c) === 0) {
+        autoApproved = 1; // first SuperAdmin is auto-approved
+      } else {
+        autoApproved = 0; // subsequent SuperAdmins require approval
+      }
+    } else {
+      autoApproved = 0;
+    }
+
     const userRes = await query(userQueries.insert, [
       name,
       email,
@@ -45,7 +65,15 @@ const registerUser = async (req, res, next) => {
       }
     }
 
-    res.status(201).json({ message: 'User registered successfully' });
+    // Return a helpful response for SuperAdmin registrations: indicate if the account
+    // is pending approval or auto-approved. For the first SuperAdmin we return status 'N/A'
+    // to match the requirement that there is no approver.
+    const resp = { message: 'User registered successfully' };
+    if (assignedRole === 'SuperAdmin') {
+      resp.superAdminStatus = (autoApproved === 1 && (await query(`SELECT COUNT(*) AS c FROM users WHERE role = 'SuperAdmin'`))[0].c == 1) ? 'N/A' : (autoApproved === 1 ? 'Approved' : 'Pending');
+    }
+
+    res.status(201).json(resp);
   } catch (err) {
     next(err);
   }
@@ -83,15 +111,24 @@ const loginUser = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Require approval for non-customer roles (except SuperAdmin which is inherently approved)
-    if (user.role !== 'Customer' && user.role !== 'SuperAdmin' && !user.role_accepted) {
+    // Require approval for any non-customer role (including SuperAdmin) if not accepted.
+    // The very first SuperAdmin will have role_accepted = 1 (auto-approved); subsequent
+    // SuperAdmin registrations will be pending until approved by an existing SuperAdmin.
+    if (user.role !== 'Customer' && !user.role_accepted) {
       return res.status(403).json({ message: 'Account pending approval by SuperAdmin' });
     }
+
+      // Prevent admin/staff accounts from logging in through the public/customer flow unless explicitly requested
+      const adminRoles = ['Admin', 'SuperAdmin', 'WarehouseStaff', 'DeliveryStaff'];
+      const adminLoginRequested = !!req.body?.adminLogin;
+      if (adminRoles.includes(user.role) && !adminLoginRequested) {
+        return res.status(403).json({ message: 'Please use the admin login page for admin/staff accounts' });
+      }
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // session valid for 10 minutes
+      { expiresIn: '1h' } 
     );
 
   res.status(200).json({ token, role: user.role, email: user.email, name: user.name, id: user.id, roleAccepted: !!user.role_accepted });
@@ -102,7 +139,31 @@ const loginUser = async (req, res, next) => {
 
 // Logout user
 const logoutUser = async (req, res) => {
-  res.status(200).json({ message: 'User logged out successfully' });
+  try {
+    // Check Authorization header first
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+    // Fallback to cookie named 'token'
+    if (!token && req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (token) {
+      addToken(token);
+    }
+
+    if (req.cookies && req.cookies.token) {
+      res.clearCookie('token');
+    }
+
+    res.status(200).json({ message: 'User logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ message: 'Logout failed' });
+  }
 };
 
 // Get all users

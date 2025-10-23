@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -18,8 +18,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ShippingAddressSection({
 	onSelectionChange,
+	shippingMethod,
+	hasOutOfStock,
+	initialSelectedId,
+	showEta = true,
 }: {
 	onSelectionChange?: (addressId: string | undefined, address?: Address) => void;
+	shippingMethod?: "standard" | "pickup";
+	hasOutOfStock?: boolean;
+	initialSelectedId?: string;
+	showEta?: boolean;
 }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -55,12 +63,6 @@ export default function ShippingAddressSection({
 					isDefault: Boolean(raw?.isDefault === true || raw?.isDefault === 1),
 				}));
 				setAddresses(mapped);
-				if (mapped.length) {
-					const fallback = mapped.find((a) => a.isDefault) ?? mapped[0];
-					setSelectedId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : fallback.id));
-				} else {
-					setSelectedId("");
-				}
 			} catch (e) {
 				// bubble to caller normally
 				throw e;
@@ -94,44 +96,21 @@ export default function ShippingAddressSection({
 						? (res as { data: unknown }).data
 						: res;
 				
-				console.log("Fetched profile payload:", payload);
-
 				const rawAddresses = Array.isArray((payload as any)?.addresses)
                     ? ((payload as any).addresses as any[])
                     : [];
 
 				const mapped = rawAddresses.map(mapToAddress);
 				if (ignore) return;
-								setAddresses(mapped);
-				console.log("Mapped addresses:", mapped);
-								// load cities once to power the city selector
-								try {
-									const allCities = await getAllCities();
-									setCities(allCities);
-								} catch (e) {
-									console.warn("Failed to load cities", e);
-								}
-				if (!mapped.length) {
-					setSelectedId("");
-					return;
-				}
-
-				// Try to retain previously selected address 
-				setSelectedId((prev) => {
-					if (prev && mapped.some((addr) => addr.id === prev)) return prev;
-					const fallback = mapped.find((addr) => addr.isDefault) ?? mapped[0];
-					return fallback ? fallback.id : "";
-				});
+				setAddresses(mapped);
 			} catch (error) {
 				const status = (error as any)?.response?.status ?? (error as any)?.status;
-				console.log("Fetch profile error status:", status, "typeof:", typeof status);
 				if (status === 401) {
 					// pass current location so login can return the user here
 					navigate("/login", { state: { from: location }, replace: true });
 					return;
 				}
                  if (!ignore) setProfileError(error);
-                 console.log("Error while fetching address data: ",error);
              } finally {
                  if (!ignore) setProfileLoading(false);
              }
@@ -144,25 +123,52 @@ export default function ShippingAddressSection({
 		};
 	}, []);
 
+	// Lazy-load cities only when entering edit mode to reduce initial work
 	useEffect(() => {
-		if (!addresses.length) {			
+		let cancelled = false;
+		if (isEditing && cities.length === 0) {
+			(async () => {
+				try {
+					const allCities = await getAllCities();
+					if (!cancelled) setCities(allCities);
+				} catch (e) {
+					console.warn("Failed to load cities", e);
+				}
+			})();
+		}
+		return () => { cancelled = true; };
+	}, [isEditing, cities.length]);
+
+	// Establish/restore selection when address list or initialSelectedId changes
+	useEffect(() => {
+		if (!addresses.length) {
 			setSelectedId("");
 			return;
 		}
+		setSelectedId((prev) => {
+			// If parent provided a selection and it's valid, prefer it unless current prev is already valid
+			if (initialSelectedId && addresses.some((a) => a.id === initialSelectedId)) {
+				if (prev && addresses.some((a) => a.id === prev)) return prev; // keep current valid selection
+				return initialSelectedId;
+			}
+			// Else, keep current if still valid; otherwise fall back to default/first
+			if (prev && addresses.some((a) => a.id === prev)) return prev;
+			const fb = addresses.find((a) => a.isDefault) ?? addresses[0];
+			return fb ? fb.id : "";
+		});
+	}, [addresses, initialSelectedId]);
 
-		if (!selectedId || !addresses.some((addr) => addr.id === selectedId)) {
-			const fallback = addresses.find((addr) => addr.isDefault) ?? addresses[0];
-			if (fallback) setSelectedId(fallback.id);
-		}
-	}, [addresses, selectedId]);
-
-	// bubble selection changes up
+	// bubble selection changes up, but avoid redundant emits to prevent parent-child loops
+	const lastEmittedIdRef = useRef<string | undefined>(undefined);
 	useEffect(() => {
-		if (onSelectionChange) {
-			const selected = addresses.find((a) => a.id === selectedId);
-			onSelectionChange(selectedId || undefined, selected);
-		}
-	}, [selectedId, addresses, onSelectionChange]);
+		if (!onSelectionChange) return;
+		if (lastEmittedIdRef.current === selectedId) return;
+		const selected = addresses.find((a) => a.id === selectedId);
+		onSelectionChange(selectedId || undefined, selected);
+		lastEmittedIdRef.current = selectedId;
+		// Only depend on selectedId/onSelectionChange; addresses is used for lookup but doesn't affect emitted id
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedId, onSelectionChange]);
 
 	useEffect(() => {
 		if (!open) {
@@ -243,8 +249,13 @@ export default function ShippingAddressSection({
 		let resolvedCityId = next.cityId ?? null;
 		if ((resolvedCityId === null || resolvedCityId === undefined) && next.city) {
 			try {
-				const cities = await getAllCities();
-				const match = cities.find((c) => String(c.name).toLowerCase() === String(next.city).toLowerCase());
+				// Prefer already loaded cities; fetch if missing
+				let lookup = cities;
+				if (!lookup || lookup.length === 0) {
+					lookup = await getAllCities();
+					setCities(lookup);
+				}
+				const match = lookup.find((c) => String(c.name).toLowerCase() === String(next.city).toLowerCase());
 				if (match) resolvedCityId = match.id;
 			} catch (e) {
 				console.warn("Unable to resolve cityId from city name", e);
@@ -329,8 +340,12 @@ export default function ShippingAddressSection({
 			} else {
 				const resp = await apiAddAddress(payload as any);
 				const createdId = resp?.id;
-				if (createdId && next.isDefault) {
-					await apiMakeDefault(Number(createdId));
+				if (createdId) {
+					// ensure UI selects the newly created address
+					setSelectedId(String(createdId));
+					if (next.isDefault) {
+						await apiMakeDefault(Number(createdId));
+					}
 				}
 			}
 			// refetch to align with backend truth
@@ -346,6 +361,50 @@ export default function ShippingAddressSection({
 
 	const defaultId =
 		addresses.find((addr) => addr.isDefault)?.id ?? addresses[0]?.id ?? "";
+
+	// Derive a single ETA date according to spec (only for Standard Delivery)
+	const selectedAddress = useMemo(() => (
+		addresses.find((addr) => addr.id === selectedId) ||
+		addresses.find((addr) => addr.isDefault) ||
+		addresses[0] || null
+	), [addresses, selectedId]);
+
+	const isMainCity = useMemo(() => {
+		if (!showEta) return false;
+		if (!selectedAddress) return false;
+		// Prefer id match, fallback to name
+		if (selectedAddress.cityId != null) {
+			console.log(cities)
+			const match = cities.find((c) => String(c.id) === String(selectedAddress.cityId));
+			console.log(match)
+			const flag = match ? (match as any).isMainCategory : undefined;
+			return !!(typeof flag === 'number' ? flag === 1 : flag);
+		}
+		if (selectedAddress.city) {
+			const match = cities.find((c) => String(c.name).toLowerCase() === String(selectedAddress.city).toLowerCase());
+			const flag = match ? (match as any).isMainCategory : undefined;
+			return !!(typeof flag === 'number' ? flag === 1 : flag);
+		}
+		return false;
+	}, [selectedAddress, cities, showEta]);
+
+	const etaDays = useMemo(() => {
+		if (!showEta) return null;
+		if (shippingMethod !== "standard") return null;
+		if (!selectedAddress) return null;
+		let base = isMainCity ? 5 : 7;
+		let days = base;
+		if (hasOutOfStock) days += 3;
+		return days;
+	}, [showEta, shippingMethod, selectedAddress, isMainCity, hasOutOfStock]);
+
+	const etaDisplay = useMemo(() => {
+		if (etaDays == null) return null;
+		const d = new Date();
+		d.setDate(d.getDate() + Number(etaDays));
+		return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+	}, [etaDays]);
+
 
 	return (
 		<div>
@@ -415,7 +474,6 @@ export default function ShippingAddressSection({
 												value={selectedId || defaultId}
 												onChange={(val) => {
 													if (val !== selectedId) {
-														console.debug("Address selection changed", { from: selectedId, to: val });
 														setSelectedId(val);
 													}
 												}}
@@ -435,23 +493,8 @@ export default function ShippingAddressSection({
 													className="mt-4 text-primary border-primary hover:text-background w-full"
 													onClick={handleAddNew}
 												>
-													Check your details
+													Add new address
 												</Button>
-											{/* <Button
-												variant="order"
-												className="w-full"
-												disabled={!selectedId || selectedId === (addresses.find((a) => a.isDefault)?.id ?? "")}
-												onClick={async () => {
-													const currentDefault = addresses.find((a) => a.isDefault)?.id ?? "";
-													if (selectedId && selectedId !== currentDefault) {
-														console.debug("Confirming selection; persisting default", { selectedId, currentDefault });
-														await setDefaultAddress(selectedId);
-													}
-													setOpen(false);
-												}}
-											>
-												Use Selected Address
-											</Button> */}
 										</div>
 									</>
 								) : (
@@ -481,6 +524,26 @@ export default function ShippingAddressSection({
 					</Dialog>
 				</div>
 			</div>
+			{shippingMethod === "standard" && showEta && etaDisplay && (
+				<div className="mt-6">
+					<label className="text-lg md:text-xl font-medium text-muted-foreground block mb-2">
+						Estimated Delivery
+					</label>
+					<div
+						className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-muted/30 border border-muted text-sm md:text-base"
+						title={etaDisplay}
+						aria-label={`Estimated delivery ${etaDisplay}`}
+					>
+						<span className="text-accent-foreground" aria-hidden>
+							📅
+						</span>
+						<span className="font-semibold text-accent-foreground">Arrives by {etaDisplay}</span>
+						{hasOutOfStock ? (
+							<span className="ml-2 text-xs text-muted-foreground">(+ extra time due to backorder)</span>
+						) : null}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

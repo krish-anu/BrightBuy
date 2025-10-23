@@ -88,10 +88,11 @@
 
 // module.exports = { calculateOrderDetails };
 const { query } = require('../config/db');
+const { EstimateDeliveryDate } = require('../services/delivery.service');
 const ApiError = require('../utils/ApiError');
-const { estimateDeliveryDate } = require('../utils/estimateDeliveryDate');
 
-const calculateOrderDetails = async (items, deliveryMode, user, connection) => {
+
+const calculateOrderDetails = async (items, deliveryMode, user, connection,deliveryAddressId) => {
     let totalPrice = 0;
     let hasOutOfStock = false;
     let orderedItems = [];
@@ -156,7 +157,7 @@ const calculateOrderDetails = async (items, deliveryMode, user, connection) => {
     let deliveryCharge = deliveryMode === 'Standard Delivery' ? 150.0 : 0;
     deliveryCharge = parseFloat(deliveryCharge.toFixed(2));
 
-    let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
+    // let deliveryDays = deliveryMode === 'Standard Delivery' ? 7 : 1;
 
     // let finalAddress = deliveryAddress;
     // if (deliveryMode === 'Standard Delivery') {
@@ -180,9 +181,10 @@ const calculateOrderDetails = async (items, deliveryMode, user, connection) => {
     //     if (city.isMainCity) deliveryDays = 5;
     // }
 
-    if (hasOutOfStock) deliveryDays += 3;
+    // if (hasOutOfStock) deliveryDays += 3;
 
-    const deliveryDate = estimateDeliveryDate(deliveryDays);
+    // const deliveryDate = estimateDeliveryDate(deliveryDays);
+    const deliveryDate = await EstimateDeliveryDate(deliveryAddressId,orderId=null, deliveryMode, hasOutOfStock, connection)
 
     // Final total rounded and validated
     const totalAmount = parseFloat((totalPrice + deliveryCharge).toFixed(2));

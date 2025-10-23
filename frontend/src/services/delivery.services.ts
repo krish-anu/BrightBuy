@@ -24,6 +24,32 @@ export const getAssignedDeliveries = async () => {
   }
 };
 
+export const getAssignedDeliveriesWithOptions = async (opts?: { includeDelivered?: boolean }) => {
+  try {
+    const params: any = {};
+    if (opts?.includeDelivered) params.includeDelivered = true;
+    const response = await axiosInstance.get('/api/delivery/assigned', { params });
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error('Error fetching assigned deliveries with options:', error);
+    const status = (error as any)?.response?.status;
+    const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch deliveries';
+    return { success: false, error: errMsg, status };
+  }
+};
+
+export const getDeliveryById = async (id: number) => {
+  try {
+    const response = await axiosInstance.get(`/api/delivery/${id}`);
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error('Error fetching delivery by id:', error);
+    const status = (error as any)?.response?.status;
+    const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch delivery';
+    return { success: false, error: errMsg, status };
+  }
+};
+
 export const updateDeliveryStatusForStaff = async (deliveryId: number, status: 'in_transit' | 'delivered' | 'failed') => {
   try {
     const response = await axiosInstance.patch(`/api/delivery/${deliveryId}/status`, { status });
@@ -42,6 +68,24 @@ export const getDeliveryAssignmentSummary = async () => {
   } catch (error) {
     console.error('Error fetching delivery assignment summary:', error);
     const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch assignment summary';
+    return { success: false, error: errMsg };
+  }
+};
+
+export const estimatedDeliveryDate = async (
+  orderId: number | null = null,
+  deliveryAddressId: number | null = null,
+  deliveryMode?: string,
+  hasOutOfStock?: boolean
+) => {
+  try {
+    const response = await axiosInstance.get('/api/delivery/deliveyDate', {
+      params: { orderId, deliveryAddressId, deliveryMode, hasOutOfStock },
+    });
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error('Error fetching estimated delivery date:', error);
+    const errMsg = (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to fetch estimated date';
     return { success: false, error: errMsg };
   }
 };

@@ -196,6 +196,11 @@ export interface CreateOrderInput {
   deliveryMode: DeliveryMode;
   paymentMethod: PaymentMethodBackend;
   deliveryAddressId?: number | string;
+  // Optional checkout context to help backend build success/cancel URLs
+  sessionKey?: string;
+  productId?: number | string;
+  variantId?: number | string;
+  qty?: number | string;
 }
 
 export const createOrder = async (

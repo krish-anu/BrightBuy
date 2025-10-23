@@ -50,30 +50,39 @@ const Orders: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      // Decide which endpoint to call based on token role to avoid 403 Forbidden
-      const current = getCurrentUserFromToken();
-      const role = (current?.role || '').toString().toLowerCase();
+      // Try fetching all orders first (admin). If forbidden, fall back to assigned orders.
       let ordersData: Order[] = [];
-      if (role === 'admin' || role === 'superadmin') {
+      try {
         ordersData = await getAllOrders();
-      } else if (role === 'warehousestaff' || role === 'deliverystaff' || role.includes('delivery')) {
-        // warehouse and delivery staff should only get their assigned orders
-        ordersData = await getAssignedOrders();
-      } else {
-        // Other roles are not allowed to list all orders; surface a helpful message and return empty
-        setError('You do not have permission to list all orders.');
-        setOrders([]);
-        setLoading(false);
-        return;
+      } catch (err: any) {
+        // If backend forbids listing all orders, try assigned orders for staff users
+        if (err?.message === 'Forbidden' || err?.response?.status === 403) {
+          try {
+            ordersData = await getAssignedOrders();
+          } catch (innerErr: any) {
+            console.error('Failed to fetch assigned orders after forbidden:', innerErr);
+            if (innerErr?.message === 'Forbidden' || innerErr?.response?.status === 403) {
+              setError('You do not have permission to view orders. Contact an admin.');
+            } else {
+              setError('Failed to load orders. Please try again.');
+            }
+            setOrders([]);
+            setLoading(false);
+            return;
+          }
+        } else {
+          // Unexpected error while attempting to load all orders
+          console.error('Error fetching all orders:', err);
+          setError('Failed to load orders. Please try again.');
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
       }
       console.log('Loaded orders data:', ordersData);
       console.log('Order statuses:', ordersData.map(order => ({ id: order.id, status: order.status })));
       setOrders(ordersData);
-      // If admin and activeTab is shipped, load shipped orders too
-      if (role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin') {
-        // lazy load shipped orders
-        // lazy load placeholder - no-op
-      }
+      // Note: shipped orders are loaded via separate API when the 'shipped' tab is active
     } catch (err) {
       console.error('Error loading orders:', err);
       // Distinguish forbidden from other errors
@@ -526,6 +535,7 @@ const Orders: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Mode</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -556,6 +566,10 @@ const Orders: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {/* deliveryMode may be a string or object; normalize display */}
+                      {typeof order.deliveryMode === 'string' ? order.deliveryMode : ((order.deliveryMode as any)?.mode || stringifyField(order.deliveryMode) || 'Unknown')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(order.orderDate || order.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -581,15 +595,18 @@ const Orders: React.FC = () => {
                           <IconComponent iconName="Edit" size={16} />
                         </button>
                         { (getCurrentUserFromToken()?.role === 'Admin' || getCurrentUserFromToken()?.role === 'SuperAdmin') && (
-                          // Only allow assignment when order status is Shipped
+                          // Only allow assignment when order status is Shipped and delivery mode is not Store Pickup
                           (() => {
                             const isShipped = (order.status || '').toString().toLowerCase() === 'shipped';
+                            const modeStr = typeof order.deliveryMode === 'string' ? order.deliveryMode : ((order.deliveryMode as any)?.mode || '');
+                            const isStorePickup = (modeStr || '').toString().toLowerCase() === 'store pickup';
+                            const disableAssign = !isShipped || isStorePickup;
                             return (
                               <button
-                                className={`${isShipped ? 'text-purple-600 hover:text-purple-900' : 'text-gray-400 cursor-not-allowed'}`}
-                                title={isShipped ? 'Assign Delivery' : 'Assign Delivery (only available when order is Shipped)'}
+                                className={`${!disableAssign ? 'text-purple-600 hover:text-purple-900' : 'text-gray-400 cursor-not-allowed'}`}
+                                title={!disableAssign ? 'Assign Delivery' : isStorePickup ? 'Assign disabled for Store Pickup' : 'Assign Delivery (only available when order is Shipped)'}
                                 onClick={async () => {
-                                  if (!isShipped) return; // prevent action when not shipped
+                                  if (disableAssign) return; // prevent action when not shipped or store pickup
                                   // Guard client-side: ensure current token belongs to Admin or SuperAdmin
                                   const current = getCurrentUserFromToken();
                                   if (!current || (current.role !== 'Admin' && current.role !== 'SuperAdmin')) {
@@ -823,10 +840,21 @@ const Orders: React.FC = () => {
                     <button onClick={async () => {
                       const selected = availableDeliveryStaff.find(s => s._selected);
                       if (!selected) { alert('Please select a staff'); return; }
-                      try {
+                        try {
                         setAssigningDelivery(true);
                         // Use deliveryId if present, otherwise pass the orderId — backend will create a delivery record when missing
                         const idToUse = deliveryToAssign.deliveryId || deliveryToAssign.orderId;
+
+                        // If a delivery exists (we passed a deliveryId), fetch it and check for existing staff to avoid 409
+                        if (deliveryToAssign.deliveryId) {
+                          const check = await (await import('../../services/delivery.services')).getDeliveryById(Number(deliveryToAssign.deliveryId));
+                          if (check.success && check.data && check.data.staffId) {
+                            alert(`A staff member (id=${check.data.staffId}) is already assigned to this delivery.`);
+                            setAssigningDelivery(false);
+                            return;
+                          }
+                        }
+
                         const resp = await assignStaffToDelivery(Number(idToUse), selected.id);
                         // If the service returns an error-like response, surface it
                         if (resp && resp.success === false) {

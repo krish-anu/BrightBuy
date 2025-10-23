@@ -1,10 +1,8 @@
-const { stripeWebhook } = require('../controllers/webhook.controller');
-const verifyToken = require('../middlewares/auth.middleware');
-const authorizeRoles = require('../middlewares/role.middleware');
-const ROLES = require('../roles');
-const router = require('express').Router();
 const express = require("express");
+const router = express.Router();
+const { stripeWebhook } = require('../controllers/webhook.controller');
 
-router.post('/', express.raw({ type: 'application/json' }), stripeWebhook);
+// NOTE: remove express.raw() here; it’s already applied in app.js
+router.post('/', stripeWebhook);
 
 module.exports = router;

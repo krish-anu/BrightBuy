@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import * as LucideIcons from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import { getAllUsers, updateUser, deleteUser, approveUser } from "../../services/user.services";
@@ -61,8 +61,16 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const { user: authUser } = useAuth();
   const isSuperAdmin = authUser?.role === 'SuperAdmin';
-  // Pending requests: anyone (any role except SuperAdmin) whose role_accepted == 0
-  const pendingRequests = isSuperAdmin ? users.filter(u => u.role !== 'SuperAdmin' && !u.role_accepted) : [];
+  // Compute the earliest-created SuperAdmin (the "first" one) so we can show N/A for it
+  const firstSuperAdminId = useMemo(() => {
+    const superAdmins = users.filter(u => u.role === 'SuperAdmin');
+    if (superAdmins.length === 0) return null;
+    superAdmins.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return superAdmins[0].id;
+  }, [users]);
+
+  // Pending requests: any user whose role_accepted == 0 (including SuperAdmin entries)
+  const pendingRequests = isSuperAdmin ? users.filter(u => !u.role_accepted) : [];
   
   // Modal states
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -365,17 +373,31 @@ const UserManagement: React.FC = () => {
                   {isSuperAdmin && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       {user.role === 'SuperAdmin' ? (
-                        <span className="text-xs text-gray-400">N/A</span>
-                      ) : user.role_accepted ? (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
-                          <IconComponent iconName="CheckCircle2" size={14} />
-                          <span className="ml-1">Approved</span>
-                        </span>
+                        user.id === firstSuperAdminId ? (
+                          <span className="text-xs text-gray-400">N/A</span>
+                        ) : user.role_accepted ? (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                            <IconComponent iconName="CheckCircle2" size={14} />
+                            <span className="ml-1">Approved</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                            <IconComponent iconName="Clock" size={14} />
+                            <span className="ml-1">Pending</span>
+                          </span>
+                        )
                       ) : (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
-                          <IconComponent iconName="Clock" size={14} />
-                          <span className="ml-1">Pending</span>
-                        </span>
+                        user.role_accepted ? (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                            <IconComponent iconName="CheckCircle2" size={14} />
+                            <span className="ml-1">Approved</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                            <IconComponent iconName="Clock" size={14} />
+                            <span className="ml-1">Pending</span>
+                          </span>
+                        )
                       )}
                     </td>
                   )}
@@ -387,15 +409,16 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="flex justify-center space-x-3">
-                      {isSuperAdmin && !user.role_accepted && user.role !== 'SuperAdmin' && (
+                      {isSuperAdmin && !user.role_accepted && (
                         <button
                           className="text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 p-1 rounded transition-colors duration-200"
                           title="Approve User"
                           onClick={async () => {
                             try {
-                              await approveUser(user.id);
-                              // Update local state
-                              setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role_accepted: 1 } : u));
+                              const res = await approveUser(user.id);
+                              // API returns updated user in res.data; fall back to assuming role_accepted becomes true
+                              const updatedUser = res?.data || res;
+                              setUsers(prev => prev.map(u => u.id === user.id ? ({ ...u, ...(updatedUser?.id ? updatedUser : { role_accepted: 1 }) }) : u));
                             } catch (e) {
                               alert('Failed to approve user');
                             }
@@ -462,7 +485,15 @@ const UserManagement: React.FC = () => {
                     </div>
                     <button
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-                      onClick={async () => { await approveUser(pr.id); setUsers(prev => prev.map(u => u.id === pr.id ? { ...u, role_accepted: 1 } : u)); }}
+                      onClick={async () => {
+                        try {
+                          const res = await approveUser(pr.id);
+                          const updatedUser = res?.data || res;
+                          setUsers(prev => prev.map(u => u.id === pr.id ? ({ ...u, ...(updatedUser?.id ? updatedUser : { role_accepted: 1 }) }) : u));
+                        } catch (e) {
+                          alert('Failed to approve user');
+                        }
+                      }}
                     >
                       <IconComponent iconName="BadgeCheck" size={14} /> Approve
                     </button>

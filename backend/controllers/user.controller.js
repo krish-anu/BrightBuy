@@ -72,13 +72,13 @@ const approveUser = async (req, res, next) => {
     const rows = await query(userQueries.getById, [id]);
     if (rows.length === 0)
       return res.status(404).json({ message: "User not found" });
-    if (rows[0].role === "SuperAdmin")
-      return res
-        .status(400)
-        .json({ message: "Cannot change SuperAdmin approval" });
+    // Allow SuperAdmin approval as well — the route is protected so only an existing
+    // SuperAdmin can call this. This lets a SuperAdmin approve another SuperAdmin.
     await query(`UPDATE users SET role_accepted = 1 WHERE id = ?`, [id]);
-    const updated = await query(userQueries.getById, [id]);
-    res.status(200).json({ success: true, data: updated[0] });
+  const updated = await query(userQueries.getById, [id]);
+  const user = updated[0];
+  const roleStatus = user.role_accepted ? 'Approved' : 'Pending';
+  res.status(200).json({ success: true, data: user, roleStatus });
   } catch (err) {
     next(err);
   }

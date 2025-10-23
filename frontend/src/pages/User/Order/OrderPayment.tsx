@@ -5,9 +5,12 @@ import ShippingMethod from "@/components/Order/ShippingMethod";
 import ShippingAddressSection from "@/components/Order/ShippingAddressSection";
 import { Separator } from "@/components/ui/separator";
 import { useOrderSession } from "../../../../contexts/OrderContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getUserProfile } from "@/services/user.services";
+import { getVariant } from "@/services/variant.services";
+ 
 
 type ShippingChoice = "standard" | "pickup";
 type PaymentChoice = "online" | "cod";
@@ -21,13 +24,63 @@ export type OrderSelections = {
 
 export default function OrderPayment() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const sessionKeyParam: string | null = searchParams.get("sessionKey");
   const productId: string | null = searchParams.get("productId");
   const variantId: string | null = searchParams.get("variantId");
-  const sessionKey = sessionKeyParam || `order:${productId || "_"}:${variantId || "_"}`;
-  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, /* shippingAddressId, */ setShippingAddressId, items } = useOrderSession(sessionKey);
+  // Restore the session key if it's missing after refresh/redirect within same tab
+  const storedKey = (() => {
+    try { return sessionStorage.getItem("bb:lastOrderSessionKey"); } catch { return null; }
+  })();
+  const derivedKey = `order:${productId || "_"}:${variantId || "_"}`;
+  const sessionKey = sessionKeyParam || storedKey || derivedKey;
 
+  // Keep last used key in sessionStorage and keep URL in sync for smoother returns
+  useEffect(() => {
+    try { sessionStorage.setItem("bb:lastOrderSessionKey", sessionKey); } catch {}
+    if (!sessionKeyParam) {
+      const qs = new URLSearchParams(searchParams);
+      qs.set("sessionKey", sessionKey);
+      navigate({ pathname: location.pathname, search: `?${qs.toString()}` }, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
+  const { shippingMethod, setShippingMethod, paymentMethod, setPaymentMethod, shippingAddressId, setShippingAddressId, items } = useOrderSession(sessionKey);
+  // Derive delivery mode from user selection
+  const deliveryMode = useMemo(() => (shippingMethod === "standard" ? "Standard Delivery" : "Store Pickup"), [shippingMethod]);
+
+  // Determine if any item is out of stock by checking variant stock on the server
+  const [hasOutOfStock, setHasOutOfStock] = useState<boolean>(false);
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        if (!items || items.length === 0) {
+          if (!ignore) setHasOutOfStock(false);
+          return;
+        }
+        // Fetch variant details for each item to read stockQnt
+        const results = await Promise.all(
+          items.map(async (it) => {
+            const vid = (typeof it.id === "string" && /^\d+$/.test(it.id)) ? Number(it.id) : it.id;
+            const resp = await getVariant(vid as any);
+            // resp may be null if variant deleted
+            const data = resp && (resp as any).data ? (resp as any).data : (resp as any);
+            const stock = data?.stockQnt ?? data?.stock ?? 0;
+            return Number(stock) <= 0;
+          })
+        );
+        if (!ignore) setHasOutOfStock(results.some(Boolean));
+      } catch (e) {
+        // If stock check fails, be conservative and do not block; treat as not out of stock
+        if (!ignore) setHasOutOfStock(false);
+      } finally {
+        // no-op
+      }
+    })();
+    return () => { ignore = true; };
+  }, [items]);
   console.log(items);
   // compute summary values
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
@@ -36,8 +89,30 @@ export default function OrderPayment() {
   const discount = 0;
   const total = subtotal + shipping - discount;
 
+  // Auth guard: check protected profile endpoint and redirect to login 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await getUserProfile();
+      } catch (err: any) {
+        if (!mounted) return;
+        const status = err?.response?.status ?? err?.status;
+        if (status === 401 || status === 403 || status == 404) {
+          navigate("/login", { state: { from: location }, replace: true });
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [navigate, location]);
+
+
   // Guard against invalid direct access or missing session data
-  const isInvalid = items.length === 0;
+  // Consider the session invalid if there are no items.
+  // Use a null-safe check in case `items` is undefined/null from the context.
+  const isInvalid = !items || items.length === 0;
   if (isInvalid) {
     return (
       <div className="space-y-4 p-6">
@@ -48,12 +123,8 @@ export default function OrderPayment() {
     );
   }
 
-  // If user selects Store Pickup, force payment method to Online
-  useEffect(() => {
-    if (shippingMethod === "pickup" && paymentMethod === "cod") {
-      setPaymentMethod("online");
-    }
-  }, [shippingMethod, paymentMethod, setPaymentMethod]);
+  // No forced payment change; COD is allowed for Store Pickup now
+  void deliveryMode;
 
   return (
     <div className="space-y-8">
@@ -62,12 +133,23 @@ export default function OrderPayment() {
         <div className="md:col-span-3 space-y-8">
           <ShippingMethod value={shippingMethod} onChange={setShippingMethod} />
           <Separator />
-          <ShippingAddressSection onSelectionChange={setShippingAddressId} />
+          {shippingMethod === "standard" && paymentMethod !== "cod" ? (
+            <ShippingAddressSection
+              onSelectionChange={setShippingAddressId}
+              initialSelectedId={shippingAddressId}
+              shippingMethod={shippingMethod}
+              hasOutOfStock={hasOutOfStock}
+              showEta={false}
+            />
+          ) : (
+            <div className="p-4 rounded-lg bg-muted/30 border text-sm md:text-base text-muted-foreground">
+              You can pick up your order from the store nearest to you.
+            </div>
+          )}
           <Separator />
           <PaymentMethod
             value={paymentMethod}
             onChange={setPaymentMethod}
-            allowCOD={shippingMethod !== "pickup"}
           />
 
         </div>
@@ -78,6 +160,11 @@ export default function OrderPayment() {
             discount={discount}
             total={total}
             onNext={() => {
+              // Guard: Standard Delivery requires a selected/default delivery address
+              if (shippingMethod === "standard" && !shippingAddressId) {
+                alert("Please add and select a delivery address to continue with Standard Delivery.");
+                return;
+              }
               // Navigate to summary screen; for online we'll show a Pay button, for COD a Place Order button
               const qs = new URLSearchParams(searchParams);
               const flow = paymentMethod; // "online" | "cod"
@@ -95,4 +182,4 @@ export default function OrderPayment() {
     </div>
   );
 }
- 
+
