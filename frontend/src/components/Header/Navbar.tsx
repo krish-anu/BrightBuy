@@ -56,7 +56,8 @@ export function Navbar() {
   // Live search: debounce typing and navigate/update the shop page
   React.useEffect(() => {
     const q = query.trim();
-    const targetPath = '/shop';
+    // Preserve category-friendly paths like /shop/:category if already on them
+    const targetPath = location.pathname.startsWith('/shop') ? location.pathname : '/shop';
     const targetSearch = q ? `?search=${encodeURIComponent(q)}` : '';
     const isAlreadyTarget = location.pathname === targetPath && (location.search || '') === targetSearch;
     if (isAlreadyTarget) return;

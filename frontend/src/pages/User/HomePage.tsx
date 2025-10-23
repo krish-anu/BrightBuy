@@ -29,6 +29,15 @@ const CATEGORY_ITEMS = [
 // (removed unused CardProduct type)
 
 export default function HomePage() {
+  // Slugify helper to match the shop route expectations (/shop/:category)
+  const slugify = (s: string) =>
+    (s || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   // Future-friendly filter (e.g., filter by category like "Mobiles & Tablets")
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const categories = useMemo(() => ["all", ...CATEGORY_ITEMS.map((c) => c.name)], []);
@@ -128,7 +137,7 @@ export default function HomePage() {
               <Card className="overflow-hidden">
                 <AspectRatio ratio={16 / 9}>
                   <img
-                    src="https://images.unsplash.com/photo-1518773553398-650c184e0bb3?q=80&w=1600&auto=format&fit=crop"
+                    src="https://img.freepik.com/free-photo/modern-stationary-collection-arrangement_23-2149309682.jpg?semt=ais_hybrid&w=740&q=80"
                     alt="Hero"
                     className="h-full w-full object-cover"
                     loading="eager"
@@ -187,7 +196,7 @@ export default function HomePage() {
           <h2 className="mb-6 text-xl sm:text-2xl font-semibold">Shop by category</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {CATEGORY_ITEMS.map((c) => (
-              <Link key={c.name} to={`/products?category=${encodeURIComponent(c.name)}`} className="focus:outline-none">
+              <Link key={c.name} to={`/shop/${slugify(c.name)}`} className="focus:outline-none">
                 <Card className="flex h-full items-center justify-center gap-2 px-4 py-6 text-center hover:shadow-md">
                   <span className="text-2xl" aria-hidden>
                     {c.emoji}

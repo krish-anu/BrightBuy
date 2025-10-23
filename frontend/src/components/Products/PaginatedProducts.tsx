@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ type BrandOption = { id: number | null; name: string };
 type AttrOption = { id: number; name: string };
 
 export default function PaginatedProducts() {
+  // Optional category segment from URL: /shop/:category
+  const { category: categoryParam } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
@@ -37,6 +39,16 @@ export default function PaginatedProducts() {
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [globalBrands, setGlobalBrands] = useState<BrandOption[]>([]);
   const [attributes, setAttributes] = useState<AttrOption[]>([]);
+
+  // Helper to compare category names with URL-friendly slugs
+  const slugify = (s: string) =>
+    (s || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
   // Sync local search state from URL (e.g., when navigating from Navbar to /shop?search=...)
   useEffect(() => {
@@ -73,6 +85,41 @@ export default function PaginatedProducts() {
       }
     })();
   }, []);
+
+  // If route is /shop/:category, preselect that category once categories are available
+  useEffect(() => {
+    if (!categories || categories.length === 0) return;
+    const param = (categoryParam || "").trim();
+    if (!param) {
+      // Clear category filters when no category in path
+      setCategoryId(null);
+      setParentCategoryId(null);
+      return;
+    }
+
+    const targetSlug = slugify(param);
+    const match = categories.find((c) => {
+      const name = c.name || "";
+      return slugify(name) === targetSlug || name.trim().toLowerCase() === param.toLowerCase();
+    });
+
+    if (!match) {
+      // Unknown category -> show all
+      setCategoryId(null);
+      setParentCategoryId(null);
+      return;
+    }
+
+    // Select child vs parent appropriately
+    setPage(1);
+    if (match.parentId && match.parentId !== 0) {
+      setCategoryId(match.id);
+      setParentCategoryId(null);
+    } else {
+      setParentCategoryId(match.id);
+      setCategoryId(null);
+    }
+  }, [categoryParam, categories]);
 
   // Load brands and attributes once
   useEffect(() => {
@@ -172,6 +219,8 @@ export default function PaginatedProducts() {
           // Categories may come as JSON string or array
           let categoriesArr: any[] = [];
           const rawCats = r.Categories ?? r.categories ?? [];
+          console.log("rawCats", rawCats);
+
           if (Array.isArray(rawCats)) categoriesArr = rawCats;
           else if (typeof rawCats === 'string') {
             try { categoriesArr = JSON.parse(rawCats); } catch { categoriesArr = []; }
