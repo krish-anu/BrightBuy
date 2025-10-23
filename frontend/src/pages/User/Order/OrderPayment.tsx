@@ -82,11 +82,12 @@ export default function OrderPayment() {
 
   // Compute summary values once per items change to avoid repeated work in render
   const subtotal = useMemo(() => (
-    items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+  items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   ), [items]);
 
   // Load addresses and cities to estimate shipping on this page as well
   const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<any | null>(null); // live selection from child
   const [cities, setCities] = useState<City[]>([]);
   useEffect(() => {
     let mounted = true;
@@ -97,12 +98,13 @@ export default function OrderPayment() {
     return () => { mounted = false; };
   }, []);
   const selectedAddr = useMemo(() => (
-    addresses.find((a) => String(a.id) === String(shippingAddressId))
-  ), [addresses, shippingAddressId]);
+    selectedAddress || addresses.find((a) => String(a.id) === String(shippingAddressId))
+  ), [selectedAddress, addresses, shippingAddressId]);
   const isMainCity = useMemo(() => {
     if (!selectedAddr?.cityId) return undefined;
     const city = cities.find((c) => Number(c.id) === Number(selectedAddr.cityId));
-    return Boolean(city?.isMainCategory);
+    // Use backend field isMainCity (number 0/1)
+    return Boolean((city as any)?.isMainCity ?? (city as any)?.isMainCategory);
   }, [cities, selectedAddr]);
   const shipping = useMemo(() => {
     if (shippingMethod !== 'standard') return 0;
@@ -160,7 +162,10 @@ export default function OrderPayment() {
           {shippingMethod === "standard" ? (
             // Address picker handles creating/selecting addresses and feeds city info for shipping later steps
             <ShippingAddressSection
-              onSelectionChange={setShippingAddressId}
+              onSelectionChange={(id, addr) => {
+                setShippingAddressId(id);
+                setSelectedAddress(addr ?? null);
+              }}
               initialSelectedId={shippingAddressId}
               shippingMethod={shippingMethod}
               hasOutOfStock={hasOutOfStock}
