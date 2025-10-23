@@ -4,15 +4,15 @@ import { Separator } from "@/components/ui/separator";
 export default function Footer() {
   return (
     <footer className="bg-foreground mt-10 text-muted shadow-2xl">
-      <div className="max-w-7xl grid md:grid-cols-5 sm:grid-cols-2 items-center mx-auto px-4 gap-8 py-10 ">
-        <div className="md:col-span-2">
+      <div className="max-w-7xl grid md:grid-cols-4 sm:grid-cols-2 items-start mx-auto px-4 gap-8 py-10">
+        <div>
           <span className="text-2xl font-bold text-secondary">BrightBuy</span>
           <p className="text-md mt-2">
-            Your one-stop shop for electronics, fashion, and home essentials.
+            Your one-stop shop for electronics and home essentials.
           </p>
         </div>
         <div>
-          <span className="text-lg font-medium">Links</span>
+          <span className="text-lg font-medium">Quick Links</span>
           <ul className="mt-2 space-y-1">
             <li>
               <Link
@@ -30,47 +30,21 @@ export default function Footer() {
                 About Us
               </Link>
             </li>
-            <li>
-              <Link
-                to="/contact"
-                className="text-muted-foreground hover:text-background"
-              >
-                Contact
-              </Link>
-            </li>
           </ul>
         </div>
         <div>
-          <span className="text-lg font-medium">Top Selling Categories</span>
+          <span className="text-lg font-medium">Contact Us</span>
           <ul className="mt-2 space-y-1">
             <li>
-              <Link
-                to="/category/electronics"
-                className="text-muted-foreground hover:text-background"
-              >
-                Electronics
-              </Link>
+              <span className="text-background">+1 (555) 123-4567</span>
             </li>
             <li>
-              <Link
-                to="/category/fashion"
-                className="text-muted-foreground hover:text-background"
-              >
-                Toys
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/category/home"
-                className="text-muted-foreground hover:text-background"
-              >
-                Home Essentials
-              </Link>
+              <span className="text-background">support@brightbuy.com</span>
             </li>
           </ul>
         </div>
         <div>
-          <span className="text-lg font-medium">Follow Us</span>
+          <span className="text-lg font-medium">Social Media</span>
           <ul className="mt-2 space-y-1">
             <li>
               <Link
