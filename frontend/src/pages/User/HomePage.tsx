@@ -64,7 +64,7 @@ export default function HomePage() {
   const normalized = useMemo(() => {
     return featuredSource.map((p) => ({
       // prefer variantId (unique per variant), fall back to productId or id
-      id: p.variantId ?? p.productId ?? p.id,
+      id: p.productId ?? p.id,
       // prefer productName from backend, fall back to name
       name: p.productName ?? p.name,
       // Categories may come as JSON string or array under 'Categories' or 'categories'
