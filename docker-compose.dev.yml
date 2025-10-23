@@ -26,7 +26,6 @@ services:
     container_name: backend
     volumes:
       - ./backend:/app
-      - ./backend/node_modules:/app/node_modules
     ports:
       - "8081:8081"
     env_file:
@@ -54,11 +53,11 @@ services:
       VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
     volumes:
       - ./frontend:/app
-      - ./frontend/node_modules:/app/node_modules
+      - /app/node_modules
     ports:
       - "5173:5173"
     working_dir: /app
-    command: sh -c "npm run dev -- --host"
+    command: sh -c "npm ci && npm run dev -- --host"
     develop:
       watch:
         # Rebuild image when Dockerfile or dependency manifests change

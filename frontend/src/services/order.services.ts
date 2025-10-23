@@ -72,7 +72,8 @@ type StatsResponse = {
 // Get all orders
 export const getAllOrders = async (): Promise<Order[]> => {
   try {
-    const response = await axiosInstance.get<OrdersResponse>("/api/order/");
+    // Prefer path without trailing slash to avoid any strict routing edge cases
+    const response = await axiosInstance.get<OrdersResponse>("/api/order");
     return response.data.data || [];
   } catch (error) {
     console.error("Error fetching orders:", error);
@@ -80,6 +81,10 @@ export const getAllOrders = async (): Promise<Order[]> => {
     const anyErr: any = error;
     if (anyErr?.response?.status === 403) {
       throw new Error('Forbidden');
+    }
+    // Surface backend message for better admin UI diagnostics
+    if (anyErr?.response?.data?.message) {
+      throw new Error(anyErr.response.data.message);
     }
     throw error;
   }
