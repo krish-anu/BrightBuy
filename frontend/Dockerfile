@@ -1,5 +1,7 @@
 # Stage 1: Build
 FROM node:22-bullseye AS builder
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ENV VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY}
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

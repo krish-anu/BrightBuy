@@ -184,7 +184,11 @@ ssh -i ~/Downloads/bright.pem ubuntu@13.201.36.162
 chmod +x setup_server.sh
 sudo ./setup_server.sh
 ```
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
 
+```
 Notes:
 - Ensure the private key file (`bright.pem`) has secure permissions (chmod 600).
 - Replace the IP address, username, and key path to match your server and credentials.
