@@ -32,7 +32,7 @@ BrightBuy is a full-stack retail inventory and online order management system. I
 
 ## Tech Stack
 
-- **Backend:** Node.js, Express, Sequelize ORM, MySQL
+- **Backend:** Node.js, Express, MySQL
 - **Frontend:** React, Vite, Tailwind CSS
 - **Database:** MySQL 8
 - **Payment:** Stripe API
